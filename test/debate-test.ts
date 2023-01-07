@@ -178,7 +178,6 @@ describe('ArborVote', function () {
 
       expect(rootArgument.pro).to.eq(0);
       expect(rootArgument.con).to.eq(0);
-      expect(rootArgument.const).to.eq(0);
       expect(rootArgument.vote).to.eq(0);
       expect(rootArgument.fees).to.eq(0);
 
@@ -306,7 +305,6 @@ describe('ArborVote', function () {
 
       expect(proArgument.pro).to.eq(5);
       expect(proArgument.con).to.eq(5);
-      expect(proArgument.const).to.eq(25);
       expect(proArgument.vote).to.eq(10);
       expect(proArgument.fees).to.eq(0);
 
@@ -342,7 +340,6 @@ describe('ArborVote', function () {
 
       expect(conArgument.pro).to.eq(5);
       expect(conArgument.con).to.eq(5);
-      expect(conArgument.const).to.eq(25);
       expect(conArgument.vote).to.eq(10);
       expect(conArgument.fees).to.eq(0);
 
@@ -413,7 +410,6 @@ describe('ArborVote', function () {
         );
         expect(argument.pro).to.eq(5);
         expect(argument.con).to.eq(5);
-        expect(argument.const).to.eq(25);
         expect(argument.vote).to.eq(10);
         expect(argument.fees).to.eq(0);
       });
@@ -434,7 +430,6 @@ describe('ArborVote', function () {
         );
         expect(argument.pro).to.eq(2);
         expect(argument.con).to.eq(8);
-        expect(argument.const).to.eq(16);
         expect(argument.vote).to.eq(10);
         expect(argument.fees).to.eq(0);
       });
@@ -455,7 +450,6 @@ describe('ArborVote', function () {
         );
         expect(argument.pro).to.eq(0);
         expect(argument.con).to.eq(10);
-        expect(argument.const).to.eq(0); // TODO
         expect(argument.vote).to.eq(10);
         expect(argument.fees).to.eq(0);
       });

@@ -46,13 +46,15 @@ struct Argument {
     uint16 untalliedChilds; //  | + 16 bits
     uint64 finalizationTime; // ┘ + 64 bits = 256 bits
     uint32 pro; //              ┐   32 bits
+    uint32 proIssued; //        |   32 bits
     uint32 con; //              | + 32 bits
-    uint32 const; //            | + 32 bits // TODO remove
+    uint32 conIssued; //        | + 32 bits
     uint32 vote; //             | + 32 bit
     uint32 fees; //             | + 32 bit
-    uint32 childsVote; //       | + 32 bit
-    int64 childsImpact; //      ┘ + 64 bits = 256 bits
-} // 2 slots
+    uint32 childsVote; //       ┘ + 32 bit = 224 bits
+    int64 childsImpact;
+    //uint32 const; //            | + 32 bits // TODO remove
+} // 3 slots
 
 struct InvestmentData {
     uint32 voteTokensInvested; // ┐   32 bits
@@ -92,7 +94,8 @@ enum Phase {
     Unitialized,
     Editing,
     Voting,
-    Finished
+    Finished,
+    Tallied
 }
 
 struct PhaseData {

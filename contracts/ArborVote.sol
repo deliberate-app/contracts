@@ -604,7 +604,7 @@ contract ArborVote is IArbitrable {
 
         _executeProInvestment({_debateId: _debateId, _argumentId: _argumentId, _investment: data});
 
-        user_.shares[_argumentId].pro += _voteTokenAmount;
+        user_.shares[_argumentId].pro += data.proMint + data.proSwap;
 
         emit Invested({
             debateId: _debateId,
@@ -640,7 +640,7 @@ contract ArborVote is IArbitrable {
 
         _executeConInvestment({_debateId: _debateId, _argumentId: _argumentId, _investment: data});
 
-        user_.shares[_argumentId].con += _voteTokenAmount;
+        user_.shares[_argumentId].con += data.conMint + data.conSwap;
 
         emit Invested({
             debateId: _debateId,
@@ -662,7 +662,50 @@ contract ArborVote is IArbitrable {
             _tallyNode(_debateId, leafArgumentIds[i]);
         }
 
-        phases[_debateId].currentPhase = Phase.Finished;
+        phases[_debateId].currentPhase = Phase.Tallied;
+    }
+
+    /// @notice Tallies the argument tree of a debate.
+    /// @param _debateId The ID of the debate.
+    /// @param _argumentId The ID of the argument. // TODO store the argument IDs that the user invested in to allow redeeming all at once
+    function redeemArgumentShares(
+        uint256 _debateId,
+        uint16 _argumentId,
+        address _account
+    ) external onlyPhase(_debateId, Phase.Finished) {
+        User storage user_ = users[_debateId][_account];
+        Shares storage userShares_ = users[_debateId][_account].shares[_argumentId];
+        Argument storage argument_ = debates[_debateId].arguments[_argumentId];
+
+        /**
+         * def y_share(self, y_amount):
+         *     return y_amount / (self.__y + self.__y_issued)
+         * def returns_y_in_b(self, y_amount):
+         *     b_share = self.__b * self.approval()
+         *     return self.y_share(y_amount) * b_share
+         */
+        if (userShares_.pro > 0) {
+            user_.tokens += argument_.vote.multipyByFraction(
+                argument_.con * userShares_.pro,
+                (argument_.pro + argument_.con) * (argument_.pro + argument_.proIssued)
+            );
+            userShares_.pro = 0;
+        }
+
+        /**
+         * def n_share(self, n_amount):
+         *     return n_amount / (self.__n + self.__n_issued)
+         * def returns_n_in_b(self, n_amount):
+         *     b_share = self.__b * self.disapproval()
+         *     return self.n_share(n_amount) * b_share
+         */
+        if (userShares_.con > 0) {
+            user_.tokens += argument_.vote.multipyByFraction(
+                argument_.pro * userShares_.con,
+                (argument_.pro + argument_.con) * (argument_.con + argument_.conIssued)
+            );
+            userShares_.con = 0;
+        }
     }
 
     /// @notice An internal function reverting if the debate is not in a certain phase.
@@ -739,7 +782,6 @@ contract ArborVote is IArbitrable {
             100 - _initialApproval,
             _initialApproval
         );
-        argument_.const = argument_.pro * argument_.con;
         argument_.vote = DEBATE_DEPOSIT;
 
         argument_.creator = msg.sender;
@@ -845,6 +887,7 @@ contract ArborVote is IArbitrable {
         argument_.vote += votes;
         argument_.fees += _investment.fee;
         argument_.pro -= _investment.proSwap;
+        argument_.proIssued += _investment.proMint + _investment.proSwap;
         argument_.con += _investment.conMint;
     }
 
@@ -869,6 +912,7 @@ contract ArborVote is IArbitrable {
         argument_.fees += _investment.fee;
         argument_.pro += _investment.proMint;
         argument_.con -= _investment.conSwap;
+        argument_.conIssued += _investment.conMint + _investment.conSwap;
     }
 
     /// @notice Internal function to calculate the amount of pro tokens obtained from swapping the minted con tokens.
