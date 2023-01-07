@@ -19,11 +19,11 @@ library DebateLib {
 
 struct Debate {
     mapping(uint16 => Argument) arguments;
-    uint32 totalVotes; //            ┐   32 bits
-    uint16 argumentsCount; //        ┘ + 16 bits = 48 bits
-    uint16[] leafArgumentIds; //     ]  256 bits * x
-    uint16[] disputedArgumentIds; // ]  256 bits * y
-} // 1 + x + y slots
+    uint32 totalVotes; //            ┐   4
+    uint16 argumentsCount; //        ┘ + 2 = 6
+    uint16[] leafArgumentIds; //     ]  32 * x
+    uint16[] disputedArgumentIds; // ]  32 * y
+}
 
 /**
  * Argument Related
@@ -38,31 +38,31 @@ enum State {
 }
 
 struct Argument {
-    bytes32 contentURI; //      ]  256 bits
-    address creator; //         ┐  160 bits
-    bool isSupporting; //       | +  8 bits
-    State state; //             | +  8 bits
-    uint16 parentArgumentId; // | + 16 bits
-    uint16 untalliedChilds; //  | + 16 bits
-    uint64 finalizationTime; // ┘ + 64 bits = 256 bits
-    uint32 pro; //              ┐   32 bits
-    uint32 proIssued; //        | + 32 bits
-    uint32 con; //              | + 32 bits
-    uint32 conIssued; //        | + 32 bits
-    uint32 vote; //             | + 32 bit
-    uint32 fees; //             | + 32 bit
-    uint32 childsVote; //       ┘ + 32 bit = 224 bits
-    int64 childsImpact; //      ]   64 bits
-} // 4 slots
+    bytes32 contentURI; //      ]  32
+    address creator; //         ┐  20
+    bool isSupporting; //       | + 1
+    State state; //             | + 1
+    uint16 parentArgumentId; // | + 2
+    uint16 untalliedChilds; //  | + 2
+    uint64 finalizationTime; // ┘ + 8 = 32
+    uint32 pro; //              ┐   4
+    uint32 proIssued; //        | + 4
+    uint32 con; //              | + 4
+    uint32 conIssued; //        | + 4
+    uint32 vote; //             | + 4
+    uint32 fees; //             | + 4
+    uint32 childsVote; //       ┘ + 4 = 28
+    int64 childsImpact; //      ]   8
+}
 
 struct InvestmentData {
-    uint32 voteTokensInvested; // ┐   32 bits
-    uint32 proMint; //            | + 32 bits
-    uint32 conMint; //            | + 32 bits
-    uint32 fee; //                | + 32 bits
-    uint32 proSwap; //            | + 32 bits
-    uint32 conSwap; //            ┘ + 32 bits = 192 bits
-} // 1 slot
+    uint32 voteTokensInvested; // ┐   4
+    uint32 proMint; //            | + 4
+    uint32 conMint; //            | + 4
+    uint32 fee; //                | + 4
+    uint32 proSwap; //            | + 4
+    uint32 conSwap; //            ┘ + 4 = 24
+}
 
 /**
  * User Related
@@ -75,15 +75,15 @@ enum Role {
 }
 
 struct User {
-    mapping(uint16 => Shares) shares; // ]  256 bits
-    Role role; //                        ┐    8 bits
-    uint32 tokens; //                    ┘ + 32 bits = 40 bits
-} // 2 slots
+    mapping(uint16 => Shares) shares; // ]  32
+    Role role; //                        ┐   1
+    uint32 tokens; //                    ┘ + 4 = 5
+}
 
 struct Shares {
-    uint32 pro; // ┐   32 bits
-    uint32 con; // ┘ + 32 bits = 64 bits
-} // 1 slot
+    uint32 pro; // ┐   4
+    uint32 con; // ┘ + 4 =  8
+}
 
 /**
  * Time Related
@@ -98,8 +98,8 @@ enum Phase {
 }
 
 struct PhaseData {
-    Phase currentPhase; //    ┐    8 bits
-    uint64 editingEndTime; // | + 64 bits
-    uint64 votingEndTime; //  | + 64 bits
-    uint64 timeUnit; //       ┘ + 64 bits = 194 bits
-} // 1 slot
+    Phase currentPhase; //    ┐   1
+    uint64 editingEndTime; // | + 8
+    uint64 votingEndTime; //  | + 8
+    uint64 timeUnit; //       ┘ + 8 = 25
+}
