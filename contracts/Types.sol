@@ -19,11 +19,11 @@ library DebateLib {
 
 struct Debate {
     mapping(uint16 => Argument) arguments;
-    uint32 totalVotes; //     ┐   32 bits
-    uint16 argumentsCount; // ┘ + 16 bits = 48 bits
-    uint16[] leafArgumentIds;
-    uint16[] disputedArgumentIds;
-}
+    uint32 totalVotes; //            ┐   32 bits
+    uint16 argumentsCount; //        ┘ + 16 bits = 48 bits
+    uint16[] leafArgumentIds; //     ]  256 bits * x
+    uint16[] disputedArgumentIds; // ]  256 bits * y
+} // 1 + x + y slots
 
 /**
  * Argument Related
@@ -38,7 +38,7 @@ enum State {
 }
 
 struct Argument {
-    bytes32 contentURI;
+    bytes32 contentURI; //      ]  256 bits
     address creator; //         ┐  160 bits
     bool isSupporting; //       | +  8 bits
     State state; //             | +  8 bits
@@ -46,15 +46,14 @@ struct Argument {
     uint16 untalliedChilds; //  | + 16 bits
     uint64 finalizationTime; // ┘ + 64 bits = 256 bits
     uint32 pro; //              ┐   32 bits
-    uint32 proIssued; //        |   32 bits
+    uint32 proIssued; //        | + 32 bits
     uint32 con; //              | + 32 bits
     uint32 conIssued; //        | + 32 bits
     uint32 vote; //             | + 32 bit
     uint32 fees; //             | + 32 bit
     uint32 childsVote; //       ┘ + 32 bit = 224 bits
-    int64 childsImpact;
-    //uint32 const; //            | + 32 bits // TODO remove
-} // 3 slots
+    int64 childsImpact; //      ]   64 bits
+} // 4 slots
 
 struct InvestmentData {
     uint32 voteTokensInvested; // ┐   32 bits
@@ -76,9 +75,9 @@ enum Role {
 }
 
 struct User {
-    Role role; //     ┐    8 bits
-    uint32 tokens; // ┘ + 32 bits = 40 bits
-    mapping(uint16 => Shares) shares;
+    mapping(uint16 => Shares) shares; // ]  256 bits
+    Role role; //                        ┐    8 bits
+    uint32 tokens; //                    ┘ + 32 bits = 40 bits
 } // 2 slots
 
 struct Shares {
