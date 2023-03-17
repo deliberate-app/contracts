@@ -1,9 +1,24 @@
 import {ethers} from 'hardhat';
-import {Contract} from 'ethers';
+import {BigNumber, Contract} from 'ethers';
 import {expect} from 'chai';
 
 import {toBytes, convertToStruct, getTime, advanceTimeTo} from './test-helpers';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
+
+import {
+  DAO,
+  DAO__factory,
+  ArborVote,
+  ArborVote__factory,
+  MockArbitrator,
+  MockArbitrator__factory,
+  MockProofOfHumanity,
+  MockProofOfHumanity__factory,
+  MockERC20,
+  MockERC20__factory,
+} from '../typechain';
+
+import {deployWithProxy} from './proxy';
 
 enum Phase {
   Unitialized,
@@ -27,14 +42,14 @@ enum State {
 }
 
 describe('ArborVote', function () {
-  let utilsLib: Contract;
-  let arborVote: Contract;
+  let arborVote: ArborVote;
 
-  let mockProofOfHumanity: Contract;
-  let mockERC20: Contract;
-  let mockArbitrator: Contract;
+  let mockProofOfHumanity: MockProofOfHumanity;
+  let mockERC20: MockERC20;
+  let mockArbitrator: MockArbitrator;
+  let dao: DAO;
   let signers: SignerWithAddress[];
-  let debateId: number;
+  let debateId: BigNumber;
 
   const timeUnit: number = 1 * 60; // 1 minute
   const thesisContent = toBytes('We should do XYZ');
@@ -42,47 +57,50 @@ describe('ArborVote', function () {
   const conArgumentContent = toBytes('This is a bad idea.');
   const rootArgumentId = 0;
 
-  beforeEach(async function () {
+  before(async function () {
     signers = await ethers.getSigners();
 
-    const UtilsLib = await ethers.getContractFactory('UtilsLib');
-    utilsLib = await UtilsLib.deploy();
-    await utilsLib.deployed();
+    const DAO = new DAO__factory(signers[0]);
+    dao = await deployWithProxy<DAO>(DAO);
+    //dao = await DAO.deploy();
 
-    const MockProofOfHumanity = await ethers.getContractFactory(
-      'MockProofOfHumanity'
+    const daoExampleURI = 'https://example.com';
+
+    await dao.initialize(
+      '0x00',
+      signers[0].address,
+      ethers.constants.AddressZero,
+      daoExampleURI
     );
+  });
+
+  beforeEach(async function () {
+    const MockProofOfHumanity = new MockProofOfHumanity__factory(signers[0]);
     mockProofOfHumanity = await MockProofOfHumanity.deploy();
-    await mockProofOfHumanity.deployed();
 
-    const MockArbitrator = await ethers.getContractFactory('MockArbitrator');
+    // const MockArbitrator = await ethers.getContractFactory('MockArbitrator');
+    const MockArbitrator = new MockArbitrator__factory(signers[0]);
     mockArbitrator = await MockArbitrator.deploy();
-    await mockArbitrator.deployed();
 
-    const ArborVote = await ethers.getContractFactory('ArborVote', {
-      libraries: {
-        UtilsLib: utilsLib.address,
-      },
-    });
-    arborVote = await ArborVote.deploy();
-    await arborVote.deployed();
+    const ArborVote = new ArborVote__factory(signers[0]);
+    arborVote = await deployWithProxy<ArborVote>(ArborVote);
 
-    const MockERC20 = await ethers.getContractFactory('MockERC20');
+    const MockERC20 = new MockERC20__factory(signers[0]);
     mockERC20 = await MockERC20.deploy(1000, signers[0].address);
-    await mockERC20.deployed();
     await mockERC20.approve(arborVote.address, 1000);
   });
 
   describe('initialize', async function () {
     it('initializes the contract', async function () {
-      await expect(arborVote.initialize(mockProofOfHumanity.address)).to.not.be
-        .reverted;
+      await expect(
+        arborVote.initialize(dao.address, mockProofOfHumanity.address)
+      ).to.not.be.reverted;
     });
   });
 
   describe('advancePhase', async function () {
     beforeEach(async function () {
-      await arborVote.initialize(mockProofOfHumanity.address);
+      await arborVote.initialize(dao.address, mockProofOfHumanity.address);
       debateId = await arborVote.callStatic.createDebate(
         thesisContent,
         timeUnit
@@ -105,13 +123,13 @@ describe('ArborVote', function () {
       let phaseData = convertToStruct(await arborVote.phases(debateId));
       expect(phaseData.currentPhase).to.eq(Phase.Editing);
 
-      await advanceTimeTo(phaseData.editingEndTime);
+      await advanceTimeTo(phaseData.editingEndTime.toNumber());
       await arborVote.advancePhase(debateId);
       expect((await arborVote.phases(debateId)).currentPhase).to.eq(
         Phase.Voting
       );
 
-      await advanceTimeTo(phaseData.votingEndTime);
+      await advanceTimeTo(phaseData.votingEndTime.toNumber());
       await arborVote.advancePhase(debateId);
       expect((await arborVote.phases(debateId)).currentPhase).to.eq(
         Phase.Finished
@@ -121,11 +139,11 @@ describe('ArborVote', function () {
 
   describe('createDebate', async function () {
     beforeEach(async function () {
-      await arborVote.initialize(mockProofOfHumanity.address);
+      await arborVote.initialize(dao.address, mockProofOfHumanity.address);
     });
 
     it('is uninitialized before a debate is created', async function () {
-      debateId = 0;
+      debateId = BigNumber.from(0);
       let phaseData = convertToStruct(await arborVote.phases(debateId));
       expect(phaseData.currentPhase).to.eq(Phase.Unitialized);
       expect(phaseData.editingEndTime).to.eq(0);
@@ -196,7 +214,7 @@ describe('ArborVote', function () {
 
   describe('join', async function () {
     beforeEach(async function () {
-      await arborVote.initialize(mockProofOfHumanity.address);
+      await arborVote.initialize(dao.address, mockProofOfHumanity.address);
       debateId = await arborVote.callStatic.createDebate(
         thesisContent,
         timeUnit
@@ -251,7 +269,7 @@ describe('ArborVote', function () {
 
   describe('addArgument', async function () {
     beforeEach(async function () {
-      await arborVote.initialize(mockProofOfHumanity.address);
+      await arborVote.initialize(dao.address, mockProofOfHumanity.address);
       debateId = await arborVote.callStatic.createDebate(
         thesisContent,
         timeUnit

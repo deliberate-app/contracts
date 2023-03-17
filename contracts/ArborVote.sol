@@ -5,13 +5,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
+import {IDAO, PluginUUPSUpgradeable} from "@aragon/osx/core/plugin/PluginUUPSUpgradeable.sol";
+
 import "./interfaces/IArbitrator.sol";
 import "./interfaces/IArbitrable.sol";
 import "./interfaces/IProofOfHumanity.sol";
 import "./utils/UtilsLib.sol";
 import "./Types.sol";
 
-contract ArborVote is IArbitrable {
+contract ArborVote is IArbitrable, PluginUUPSUpgradeable {
     using UtilsLib for uint16[];
     using UtilsLib for uint32;
     using UtilsLib for uint64;
@@ -183,8 +185,10 @@ contract ArborVote is IArbitrable {
     }
 
     /// @notice Initializes the contract.
+    /// @param _dao The associated DAO.
     /// @param _poh The proof of humanity registry contract.
-    function initialize(IProofOfHumanity _poh) external {
+    function initialize(IDAO _dao, IProofOfHumanity _poh) external initializer {
+        __PluginUUPSUpgradeable_init(_dao);
         poh = _poh;
     }
 

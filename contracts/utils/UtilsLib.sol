@@ -7,7 +7,7 @@ library UtilsLib {
     /// @param a The nominator.
     /// @param b The denominiator.
     /// @return The rounded down result of `v * a/b`.
-    function multipyByFraction(uint32 v, uint32 a, uint32 b) public pure returns (uint32) {
+    function multipyByFraction(uint32 v, uint32 a, uint32 b) internal pure returns (uint32) {
         uint32 vdiv = v / b;
         uint32 vmod = v % b;
         uint32 adiv = a / b;
@@ -21,7 +21,7 @@ library UtilsLib {
     /// @param a The nominator.
     /// @param b The denominiator.
     /// @return The rounded down result of `v * a/b`.
-    function multipyByFraction(int64 v, int64 a, int64 b) public pure returns (int64) {
+    function multipyByFraction(int64 v, int64 a, int64 b) internal pure returns (int64) {
         int64 vdiv = v / b;
         int64 vmod = v % b;
         int64 adiv = a / b;
@@ -30,7 +30,7 @@ library UtilsLib {
         return vdiv * adiv * b + vdiv * amod + vmod * adiv + (vmod * amod) / b;
     }
 
-    function split(uint32 v, uint32 a, uint32 b) public pure returns (uint32 v1, uint32 v2) {
+    function split(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 v1, uint32 v2) {
         v2 = multipyByFraction({v: v, a: b, b: a + b});
         v1 = v - v2;
     }
@@ -46,7 +46,7 @@ library UtilsLib {
         uint16 begin,
         uint16 end,
         uint16 value
-    ) public pure returns (uint16) {
+    ) internal pure returns (uint16) {
         uint16 len = end - begin;
         if (len == 0 || (len == 1 && array[begin] != value)) {
             return type(uint16).max;
@@ -64,7 +64,7 @@ library UtilsLib {
     /// @param array The array to be searched.
     /// @param value The value to be searched
     /// @return The index of the value in the array.
-    function findIndex(uint16[] memory array, uint16 value) public pure returns (uint16) {
+    function findIndex(uint16[] memory array, uint16 value) internal pure returns (uint16) {
         return
             findIndexInInterval({array: array, begin: 0, end: uint16(array.length), value: value});
     }
@@ -72,7 +72,7 @@ library UtilsLib {
     /// @notice Removes a value in an array by its index.
     /// @param array The array.
     /// @param i The index to be removed
-    function removeByIndex(uint16[] storage array, uint16 i) public {
+    function removeByIndex(uint16[] storage array, uint16 i) internal {
         while (i < array.length - 1) {
             array[i] = array[i + 1];
             i++;
@@ -83,7 +83,7 @@ library UtilsLib {
     /// @notice Removes a value from an array.
     /// @param array The array.
     /// @param value The value to be removed
-    function removeByValue(uint16[] storage array, uint16 value) public {
+    function removeByValue(uint16[] storage array, uint16 value) internal {
         removeByIndex({array: array, i: findIndex({array: array, value: value})});
     }
 }

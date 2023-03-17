@@ -21,8 +21,8 @@ struct Debate {
     mapping(uint16 => Argument) arguments;
     uint32 totalVotes; //            ┐   4
     uint16 argumentsCount; //        ┘ + 2 = 6
-    uint16[] leafArgumentIds; //     ]  32 * x
-    uint16[] disputedArgumentIds; // ]  32 * y
+    uint16[] leafArgumentIds; //     ]  32 * x // TODO Use subgraph to keep track of leaf IDs and figure out the tally tree order. Then we might just need a bool `tallied` in the Argument
+    uint16[] disputedArgumentIds; // ]  32 * y // TODO http://zxstudio.org/blog/2018/09/11/effectively-storing-arrays-in-solidity/
 }
 
 /**
@@ -53,6 +53,7 @@ struct Argument {
     uint32 fees; //             | + 4
     uint32 childsVote; //       ┘ + 4 = 28
     int64 childsImpact; //      ]   8
+    // bool tallied // TODO Needed to replace `leafArgumentIds`
 }
 
 struct InvestmentData {
