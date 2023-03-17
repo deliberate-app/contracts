@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.17;
 
 import "../test/MockERC20.sol";
 import "../interfaces/IArbitrable.sol";
@@ -7,11 +7,10 @@ import "../interfaces/IArbitrable.sol";
 contract MockArbitrator is IArbitrator {
     MockERC20 private token;
 
-    function createDispute(uint256 _possiblerRulings, bytes calldata _metadata)
-        external
-        pure
-        returns (uint256)
-    {
+    function createDispute(
+        uint256 _possiblerRulings,
+        bytes calldata _metadata
+    ) external pure returns (uint256) {
         (_possiblerRulings, _metadata);
         return 0;
     }
@@ -33,11 +32,7 @@ contract MockArbitrator is IArbitrator {
     function getDisputeFees()
         external
         view
-        returns (
-            address recipient,
-            ERC20 feeToken,
-            uint256 feeAmount
-        )
+        returns (address recipient, ERC20 feeToken, uint256 feeAmount)
     {
         recipient = address(0);
         feeToken = token;

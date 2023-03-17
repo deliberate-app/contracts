@@ -4,7 +4,7 @@
 
 // From https://github.com/aragon/protocol/blob/f1b3361a160da92b9bb449c0a05dee0c30e41594/packages/evm/contracts/arbitration/IArbitrable.sol
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.17;
 
 import "./IArbitrator.sol";
 

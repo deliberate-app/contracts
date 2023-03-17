@@ -4,7 +4,7 @@
 
 // From https://github.com/aragon/protocol/blob/f1b3361a160da92b9bb449c0a05dee0c30e41594/packages/evm/contracts/arbitration/IArbitrator.sol
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -15,9 +15,10 @@ interface IArbitrator {
      * @param _metadata Optional metadata that can be used to provide additional information on the dispute to be created
      * @return Dispute identification number
      */
-    function createDispute(uint256 _possibleRulings, bytes calldata _metadata)
-        external
-        returns (uint256);
+    function createDispute(
+        uint256 _possibleRulings,
+        bytes calldata _metadata
+    ) external returns (uint256);
 
     /**
      * @dev Submit evidence for a dispute
@@ -54,11 +55,7 @@ interface IArbitrator {
     function getDisputeFees()
         external
         view
-        returns (
-            address recipient,
-            ERC20 feeToken,
-            uint256 feeAmount
-        );
+        returns (address recipient, ERC20 feeToken, uint256 feeAmount);
 
     /**
      * @dev Tell the payments recipient address
