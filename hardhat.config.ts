@@ -31,7 +31,7 @@ for (const network of Object.keys(networks)) {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: '0.8.17',
+    version: '0.8.19',
     settings: {
       optimizer: {
         enabled: true,

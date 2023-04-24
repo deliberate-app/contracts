@@ -7,11 +7,31 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 import {IDAO, PluginUUPSUpgradeable} from "@aragon/osx/core/plugin/PluginUUPSUpgradeable.sol";
 
+import {IPermissionCondition} from "@aragon/osx/core/permission/IPermissionCondition.sol";
+import {IMembership} from "@aragon/osx/core/plugin/membership/IMembership.sol";
+import {ProposalUpgradeable} from "@aragon/osx/core/plugin/proposal/ProposalUpgradeable.sol";
+
 import "./interfaces/IArbitrator.sol";
 import "./interfaces/IArbitrable.sol";
 import "./interfaces/IProofOfHumanity.sol";
 import "./utils/UtilsLib.sol";
 import "./Types.sol";
+
+contract ArborVoteProxy is PluginUUPSUpgradeable, IMembership, ProposalUpgradeable {
+    function isMember(address _account) external pure returns (bool) {
+        return true;
+    }
+
+    /// @notice Checks if this or the parent contract supports an interface by its ID.
+    /// @param _interfaceId The ID of the interface.
+    /// @return Returns `true` if the interface is supported.
+    function supportsInterface(
+        bytes4 _interfaceId
+    ) public view override(PluginUUPSUpgradeable, ProposalUpgradeable) returns (bool) {
+        return
+            _interfaceId == type(IMembership).interfaceId || super.supportsInterface(_interfaceId);
+    }
+}
 
 contract ArborVote is IArbitrable, PluginUUPSUpgradeable {
     using UtilsLib for uint16[];
