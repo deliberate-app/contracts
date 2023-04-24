@@ -1,5 +1,6 @@
-//SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.19;
 
 // https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB#code
 

@@ -1,5 +1,6 @@
-//SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.19;
 
 library UtilsLib {
     /// @notice Calculate `v * a/b` and round it down. Taken from https://ethereum.stackexchange.com/questions/55701/how-to-do-solidity-percentage-calculation.

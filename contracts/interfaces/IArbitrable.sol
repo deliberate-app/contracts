@@ -1,12 +1,10 @@
-/*
- * SPDX-License-Identifier:    MIT
- */
+// SPDX-License-Identifier: MIT
 
-// From https://github.com/aragon/protocol/blob/f1b3361a160da92b9bb449c0a05dee0c30e41594/packages/evm/contracts/arbitration/IArbitrable.sol
-
-pragma solidity ^0.8.17;
+pragma solidity 0.8.19;
 
 import "./IArbitrator.sol";
+
+// From https://github.com/aragon/protocol/blob/f1b3361a160da92b9bb449c0a05dee0c30e41594/packages/evm/contracts/arbitration/IArbitrable.sol
 
 /**
  * @dev The Arbitrable instances actually don't require to follow any specific interface.
