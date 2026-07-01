@@ -2,6 +2,9 @@
 
 pragma solidity ^0.8.24;
 
+import {Math} from "@openzeppelin-contracts-5.6.1/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
+
 /// @title Utils
 /// @author Michael Heuer
 /// @notice A library with math and array helper functions.
@@ -25,34 +28,30 @@ library Utils {
         removeByIndex({array: array, i: findIndex({array: array, value: value})});
     }
 
-    /// @notice Calculates `v * a/b` and rounds it down.
-    /// @dev Taken from https://ethereum.stackexchange.com/questions/55701.
+    /// @notice Calculates `floor(v * a / b)`.
+    /// @dev Delegates to OpenZeppelin `Math.mulDiv`, which forms the full-precision (512-bit) product `v * a` before
+    /// dividing, so it neither overflows nor loses precision. This supersedes the manual `v / b`-based decomposition
+    /// (see https://ethereum.stackexchange.com/questions/55701) that was previously used to avoid the intermediate
+    /// `v * a` overflow; that decomposition divided first on purpose and was exact, but static analyzers flag it as a
+    /// `divide-before-multiply` false positive.
     /// @param v The value.
     /// @param a The nominator.
     /// @param b The denominator.
-    /// @return result The rounded down result of `v * a/b`.
-    function multipyByFraction(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 result) {
-        uint32 vdiv = v / b;
-        uint32 vmod = v % b;
-        uint32 adiv = a / b;
-        uint32 amod = a % b;
-
-        result = vdiv * adiv * b + vdiv * amod + vmod * adiv + (vmod * amod) / b;
+    /// @return result The rounded down result of `v * a / b`.
+    function multiplyByFraction(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 result) {
+        result = SafeCast.toUint32(Math.mulDiv(v, a, b));
     }
 
-    /// @notice Calculates `v * a/b` and rounds it down.
-    /// @dev Taken from https://ethereum.stackexchange.com/questions/55701.
+    /// @notice Calculates `v * a / b`, rounded toward zero.
+    /// @dev Widens the operands to `int256` so the intermediate product `v * a` cannot overflow before the division,
+    /// keeping the result exact (multiply-before-divide). OpenZeppelin and Solady provide no signed `mulDiv`, so the
+    /// widened computation is done directly here.
     /// @param v The value.
     /// @param a The nominator.
     /// @param b The denominator.
-    /// @return result The rounded down result of `v * a/b`.
-    function multipyByFraction(int64 v, int64 a, int64 b) internal pure returns (int64 result) {
-        int64 vdiv = v / b;
-        int64 vmod = v % b;
-        int64 adiv = a / b;
-        int64 amod = a % b;
-
-        result = vdiv * adiv * b + vdiv * amod + vmod * adiv + (vmod * amod) / b;
+    /// @return result The result of `v * a / b`, rounded toward zero.
+    function multiplyByFraction(int64 v, int64 a, int64 b) internal pure returns (int64 result) {
+        result = SafeCast.toInt64(int256(v) * int256(a) / int256(b));
     }
 
     /// @notice Splits a value `v` into two parts proportional to `a` and `b`.
@@ -62,7 +61,7 @@ library Utils {
     /// @return v1 The first part.
     /// @return v2 The second part.
     function split(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 v1, uint32 v2) {
-        v2 = multipyByFraction({v: v, a: b, b: a + b});
+        v2 = multiplyByFraction({v: v, a: b, b: a + b});
         v1 = v - v2;
     }
 

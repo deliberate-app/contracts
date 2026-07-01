@@ -6,6 +6,7 @@ import {Initializable} from "@openzeppelin-contracts-5.6.1/proxy/utils/Initializ
 import {UUPSUpgradeable} from "@openzeppelin-contracts-5.6.1/proxy/utils/UUPSUpgradeable.sol";
 import {ERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin-contracts-5.6.1/utils/ReentrancyGuardTransient.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
 
@@ -23,7 +24,14 @@ import {Utils} from "./libs/Utils.sol";
 /// @author Michael Heuer
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is a conventional UUPS
 /// upgradeable contract owned via OpenZeppelin's `OwnableUpgradeable` and using ERC-7201 namespaced storage.
-contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract ArborVote is
+    IArborVote,
+    IArbitrable,
+    Initializable,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuardTransient
+{
     using Utils for uint16[];
     using Utils for uint32;
     using Utils for uint64;
@@ -49,8 +57,6 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
         mapping(uint256 debateId => mapping(address account => User.Data)) users;
         mapping(uint256 debateId => Phase.Data) phases;
     }
-
-    uint16 internal constant _MAX_ARGUMENTS = type(uint16).max;
 
     uint32 internal constant _DEBATE_DEPOSIT = 10;
     uint32 internal constant _FEE_PERCENTAGE = 5;
@@ -283,14 +289,18 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
     }
 
     /// @inheritdoc IArborVote
+    /// @dev Protected by `nonReentrant`. Slither cannot see the transient-storage reentrancy guard (and misreads the
+    /// ERC-7201 assembly accessor as a state write), so its `reentrancy-no-eth` finding here is a false positive.
     function raiseDispute(uint256 debateId, uint16 argumentId, bytes calldata reason)
         external
         override
+        nonReentrant
         onlyPhase(debateId, Phase.Status.Editing)
         onlyArgumentState(debateId, argumentId, Argument.State.Final)
         returns (uint256 disputeId)
     {
         // create dispute
+        // slither-disable-next-line reentrancy-no-eth
         disputeId = _createDispute({debateId: debateId, argumentId: argumentId});
 
         // submit evidence
@@ -312,6 +322,7 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
     function resolveDispute(uint256 debateId, uint16 argumentId)
         external
         override
+        nonReentrant
         onlyPhase(debateId, Phase.Status.Editing)
         onlyArgumentState(debateId, argumentId, Argument.State.Disputed)
     {
@@ -428,7 +439,7 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
          */
         if (userShares.pro > 0) {
             user.tokens += argument.votes
-                .multipyByFraction(
+                .multiplyByFraction(
                     argument.con * userShares.pro, (argument.pro + argument.con) * (argument.pro + argument.proIssued)
                 );
             userShares.pro = 0;
@@ -443,7 +454,7 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
          */
         if (userShares.con > 0) {
             user.tokens += argument.votes
-                .multipyByFraction(
+                .multiplyByFraction(
                     argument.pro * userShares.con, (argument.pro + argument.con) * (argument.con + argument.conIssued)
                 );
             userShares.con = 0;
@@ -637,7 +648,7 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
 
         Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
 
-        investmentData.fee = voteTokenAmount.multipyByFraction({a: _FEE_PERCENTAGE, b: 100});
+        investmentData.fee = voteTokenAmount.multiplyByFraction({a: _FEE_PERCENTAGE, b: 100});
         (uint32 proMint, uint32 conMint) = (voteTokenAmount - investmentData.fee).split(argument.pro, argument.con);
 
         investmentData.proMint = proMint;
@@ -820,12 +831,14 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
             ownImpact = -ownImpact;
         }
 
-        // Apply weight $w_j$
-        uint32 ownVotes = argument.votes;
-        // This works, because the parent contains the votes of all children (the siblings).
-        uint32 ownAndSibilingVotes = parentArgument.childsVote;
+        {
+            // Apply weight $w_j$
+            int64 ownVotes = int64(uint64(argument.votes));
+            // This works, because the parent contains the votes of all children (the siblings).
+            int64 ownAndSibilingVotes = int64(uint64(parentArgument.childsVote));
 
-        ownImpact = ownImpact.multipyByFraction({a: int64(uint64(ownVotes)), b: int64(uint64(ownAndSibilingVotes))});
+            ownImpact = ownImpact.multiplyByFraction({a: ownVotes, b: ownAndSibilingVotes});
+        }
 
         // Update the parent argument impact
         parentArgument.childsImpact += ownImpact;
@@ -906,10 +919,10 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
         uint32 con = argument.con;
 
         // calculate own impact
-        impact = int64(uint64(type(uint32).max.multipyByFraction({a: pro, b: pro + con})));
+        impact = int64(uint64(type(uint32).max.multiplyByFraction({a: pro, b: pro + con})));
 
-        impact = impact.multipyByFraction({a: _MIX_MAX - _MIX_VAL, b: _MIX_MAX})
-            + (argument.childsImpact).multipyByFraction({a: _MIX_VAL, b: _MIX_MAX});
+        impact = impact.multiplyByFraction({a: _MIX_MAX - _MIX_VAL, b: _MIX_MAX})
+            + (argument.childsImpact).multiplyByFraction({a: _MIX_VAL, b: _MIX_MAX});
     }
 
     /// @notice Internal function to calculate the amount of pro tokens obtained from swapping the minted con tokens.
@@ -917,7 +930,7 @@ contract ArborVote is IArborVote, IArbitrable, Initializable, OwnableUpgradeable
     /// @param conMint The amount of con tokens.
     /// @return proSwap The amount of pro tokens obtained from swapping the minted con tokens.
     function _calculateProSwap(uint32 proMint, uint32 conMint) internal pure returns (uint32 proSwap) {
-        conMint; // silence unused-parameter; kept for a symmetric, explicit named call site. TODO Revisit formulas
+        (conMint);
         return proMint - proMint / 2;
     }
 
