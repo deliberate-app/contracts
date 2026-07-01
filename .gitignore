@@ -1,48 +1,21 @@
-# dependencies
-node_modules
+# Foundry
+cache/
+out/
+broadcast/*/31337/
+broadcast/**/dry-run/
 
-# testing
-coverage
+# Soldeer / Node
+dependencies/
+node_modules/
 
-# production
-build
-dist
-dist-ssr
-*.local
-.cache
-storybook-static
-typechain
+# Coverage
+coverage/
+lcov.info
 
-# misc
-.vscode
+# Misc
 .DS_Store
-*.pem
-*.tgz
-
-# debug
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-cache
-artifacts
-.idea
 .env
-
-# deployments
-deployments
-
-# generated
-packages/contracts/docs/core/03-reference-guide/*
-!packages/contracts/docs/core/03-reference-guide/index.md
-generated
-subgraph.yaml
-.bin
-mythx.json
+.env.local
+.vscode/
+.idea/

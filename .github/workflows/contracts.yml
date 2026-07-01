@@ -1,0 +1,64 @@
+name: Contracts
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Contracts Tests
+    runs-on: macos-latest
+    env:
+      FOUNDRY_PROFILE: ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+
+      - name: Show Foundry version
+        run: forge --version
+
+      - name: Show Soldeer version
+        run: forge soldeer version
+
+      - name: Install dependencies
+        run: just deps
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Show Bun version
+        run: bun --version
+
+      - name: Install test tooling
+        run: just tooling
+
+      - name: Run Forge lint
+        run: just lint
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Show Slither version
+        run: slither --version
+
+      - name: Run Slither static analyzer
+        run: just static-analysis
+
+      - name: Run Forge fmt
+        run: just fmt-check
+
+      - name: Run Forge tests
+        run: just test
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}

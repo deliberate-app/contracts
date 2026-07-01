@@ -1,0 +1,56 @@
+# Full reference https://github.com/foundry-rs/foundry/tree/master/crates/config
+[profile.default]
+solc = "0.8.35"
+auto_detect_solc = false
+evm_version = "osaka"
+gas_reports = ["ArborVote"]
+optimizer = true
+via_ir = true
+optimizer_runs = 10_000
+allow_internal_expect_revert = true
+# Deterministic deployment settings (https://book.getfoundry.sh/guides/deterministic-deployments-using-create2#configuring-your-foundrytoml)
+bytecode_hash = "none"
+
+src = "src"
+test = "test"
+out = "out"
+script = "script"
+fs_permissions = [{ access = "read", path = "./" }]
+libs = ["dependencies"]
+auto_detect_remappings = false
+remappings = [
+    "@openzeppelin-contracts-5.6.1/=dependencies/@openzeppelin-contracts-5.6.1/",
+    "@openzeppelin-contracts-upgradeable-5.6.1/=dependencies/@openzeppelin-contracts-upgradeable-5.6.1/",
+    "@openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.6.1/",
+    "forge-std-1.16.1/=dependencies/forge-std-1.16.1/",
+]
+
+[dependencies]
+"@openzeppelin-contracts" = "5.6.1"
+"@openzeppelin-contracts-upgradeable" = "5.6.1"
+"forge-std" = "1.16.1"
+
+[soldeer]
+recursive_deps = true
+remappings_location = "config"
+remappings_generate = true
+remappings_version = true
+
+[fuzz]
+runs = 1_000
+
+[profile.ci]
+fuzz = { runs = 1_000 }
+verbosity = 3
+
+[rpc_endpoints]
+mainnet = "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+sepolia = "https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+arbitrum = "https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+arbitrum-sepolia = "https://arb-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+base = "https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+base-sepolia = "https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+optimism = "https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+optimism-sepolia = "https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+
+localhost = "http://localhost:8545"
