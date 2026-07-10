@@ -418,6 +418,64 @@ contract ArborVoteTest is Test {
         assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
     }
 
+    function test_tallyTree_talliesASupportingArgumentIntoAPositiveOutcome() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 80);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        assertGt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertTrue(_arborVote.outcome(debateId));
+    }
+
+    function test_tallyTree_talliesAnOpposingArgumentIntoANegativeOutcome() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, false, 80);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        assertLt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertFalse(_arborVote.outcome(debateId));
+    }
+
+    function test_tallyTree_talliesRecursivelyUpTheTree() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 80);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+
+        uint16 childArgumentId = _arborVote.addArgument({
+            debateId: debateId,
+            parentArgumentId: argumentId,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            isSupporting: false,
+            initialApproval: 100
+        });
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, childArgumentId);
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        // The fully-approved opposing child weakens its parent from below ...
+        assertLt(_arborVote.getArgument(debateId, argumentId).childsImpact, 0);
+        // ... and every argument ends up tallied.
+        assertEq(_arborVote.getArgument(debateId, argumentId).untalliedChilds, 0);
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);
+    }
+
     // --- outcome ---
 
     function test_outcome_revertsBeforeTheTallyHasRun() public {

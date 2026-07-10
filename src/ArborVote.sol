@@ -703,8 +703,10 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         parentArgument.childsImpact += ownImpact;
         parentArgument.untalliedChilds--;
 
-        // if all childs of the parent are tallied, tally parent
-        if (parentArgument.untalliedChilds == 0) {
+        // If all children of the parent are tallied, tally the parent - unless the parent is the root: the root
+        // (the thesis) has no market and no parent of its own, and its `childsImpact` - which `outcome` reads -
+        // is complete once all of its children have been tallied.
+        if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             _tallyNode({debateId: debateId, argumentId: parentArgumentId});
         }
 
