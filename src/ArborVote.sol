@@ -68,6 +68,11 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     /// @param actual The actual debate phase.
     error PhaseInvalid(Phase.Status expected, Phase.Status actual);
 
+    /// @notice Thrown if the phase of a debate is past the latest permitted phase.
+    /// @param limit The latest permitted debate phase.
+    /// @param actual The actual debate phase.
+    error PhaseExceeded(Phase.Status limit, Phase.Status actual);
+
     /// @notice Thrown if the state of an argument is invalid.
     /// @param expected The expected argument state.
     /// @param actual The actual argument state.
@@ -110,14 +115,6 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     /// @param phase The phase of the debate required.
     modifier onlyPhase(uint256 debateId, Phase.Status phase) {
         _onlyPhase({debateId: debateId, phase: phase});
-        _;
-    }
-
-    /// @notice A modifier to restrict functions to only be called if the debate is not in a certain phase.
-    /// @param debateId The ID of the debate.
-    /// @param phase The phase of the debate excluded.
-    modifier excludePhase(uint256 debateId, Phase.Status phase) {
-        _excludePhase({debateId: debateId, phase: phase});
         _;
     }
 
@@ -195,13 +192,17 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     }
 
     /// @inheritdoc IArborVote
-    function join(uint256 debateId)
-        external
-        override
-        excludePhase(debateId, Phase.Status.Tallying)
-        onlyRole(debateId, User.Role.Unassigned)
-    {
+    function join(uint256 debateId) external override onlyRole(debateId, User.Role.Unassigned) {
         ArborVoteStorage storage $ = _getArborVoteStorage();
+
+        // Joining is only possible while participating is: during the editing and rating phases.
+        Phase.Status currentPhase = $.phases[debateId].currentPhase;
+        if (currentPhase == Phase.Status.Uninitialized) {
+            revert DebateUninitialized({debateId: debateId});
+        }
+        if (currentPhase > Phase.Status.Rating) {
+            revert PhaseExceeded({limit: Phase.Status.Rating, actual: currentPhase});
+        }
 
         if (!$.poh.isRegistered(msg.sender)) {
             revert IdentityProofInvalid();
@@ -746,16 +747,6 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         User.Role currentRole = _getArborVoteStorage().users[debateId][msg.sender].role;
         if (currentRole != role) {
             revert RoleInvalid({expected: role, actual: currentRole});
-        }
-    }
-
-    /// @notice An internal function reverting if the debate is in a certain phase.
-    /// @param debateId The ID of the debate.
-    /// @param phase The phase of the debate excluded.
-    function _excludePhase(uint256 debateId, Phase.Status phase) internal view {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-        if ($.phases[debateId].currentPhase == phase) {
-            revert PhaseInvalid({expected: phase, actual: $.phases[debateId].currentPhase});
         }
     }
 

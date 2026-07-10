@@ -215,6 +215,39 @@ contract ArborVoteTest is Test {
         _arborVote.join(debateId);
     }
 
+    function test_join_succeedsDuringTheRatingPhase() public {
+        uint256 debateId = _createDebate();
+        _endEditing(debateId);
+
+        _join(debateId);
+
+        assertEq(uint256(_arborVote.getUserRole(debateId, address(this))), uint256(User.Role.Participant));
+    }
+
+    function test_join_revertsForAnUninitializedDebate() public {
+        uint256 uninitializedDebateId = 123;
+
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.DebateUninitialized.selector, uninitializedDebateId));
+        _arborVote.join(uninitializedDebateId);
+    }
+
+    function test_join_revertsOnceRatingHasEnded() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Tallying)
+        );
+        _arborVote.join(debateId);
+
+        _arborVote.tallyTree(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Finished)
+        );
+        _arborVote.join(debateId);
+    }
+
     // --- addArgument ---
 
     function test_addArgument_incrementsTheArgumentId() public {
