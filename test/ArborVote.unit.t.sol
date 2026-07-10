@@ -350,8 +350,8 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         Argument.Data memory argument = _arborVote.getArgument(debateId, _addArgument(debateId, true, 80));
-        assertEq(argument.pro, 2);
-        assertEq(argument.con, 8);
+        assertEq(argument.pro, 8);
+        assertEq(argument.con, 2);
         assertEq(argument.votes, 10);
         assertEq(argument.fees, 0);
     }
@@ -361,8 +361,8 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         Argument.Data memory argument = _arborVote.getArgument(debateId, _addArgument(debateId, true, 100));
-        assertEq(argument.pro, 0);
-        assertEq(argument.con, 10);
+        assertEq(argument.pro, 10);
+        assertEq(argument.con, 0);
         assertEq(argument.votes, 10);
         assertEq(argument.fees, 0);
     }

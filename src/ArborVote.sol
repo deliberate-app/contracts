@@ -590,8 +590,8 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
         Argument.Data storage argument = debate.arguments[newArgumentId];
 
-        // Create a child node and add it to the mapping
-        (argument.pro, argument.con) = _DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
+        // Seed the argument market with the deposit at the creator's initial approval (pro share percentage).
+        (argument.pro, argument.con) = _DEBATE_DEPOSIT.split(initialApproval, 100 - initialApproval);
         argument.votes = _DEBATE_DEPOSIT;
 
         argument.creator = msg.sender;
