@@ -162,7 +162,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function createDebate(bytes32 contentURI, uint48 timeUnit)
         external
         override
-        onlyArgumentState(_getArborVoteStorage().debatesCounter, 0, Argument.State.Unitialized)
+        onlyArgumentState(_getArborVoteStorage().debatesCounter, 0, Argument.State.Uninitialized)
         returns (uint256 debateId)
     {
         ArborVoteStorage storage $ = _getArborVoteStorage();
@@ -186,7 +186,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         phaseData.currentPhase = Phase.Status.Editing;
         phaseData.timeUnit = timeUnit;
         phaseData.editingEndTime = Time.timestamp() + 7 * timeUnit;
-        phaseData.votingEndTime = Time.timestamp() + 10 * timeUnit;
+        phaseData.ratingEndTime = Time.timestamp() + 10 * timeUnit;
 
         // increment counters
         newDebate.incrementArgumentCounter();
@@ -198,7 +198,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function join(uint256 debateId)
         external
         override
-        excludePhase(debateId, Phase.Status.Finished)
+        excludePhase(debateId, Phase.Status.Tallying)
         onlyRole(debateId, User.Role.Unassigned)
     {
         ArborVoteStorage storage $ = _getArborVoteStorage();
@@ -274,7 +274,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function investInPro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
-        onlyPhase(debateId, Phase.Status.Voting)
+        onlyPhase(debateId, Phase.Status.Rating)
     {
         User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
 
@@ -299,7 +299,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function investInCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
-        onlyPhase(debateId, Phase.Status.Voting)
+        onlyPhase(debateId, Phase.Status.Rating)
     {
         User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
 
@@ -321,7 +321,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     }
 
     /// @inheritdoc IArborVote
-    function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Finished) {
+    function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Tallying) {
         ArborVoteStorage storage $ = _getArborVoteStorage();
 
         uint16[] memory leafArgumentIds = $.debates[debateId].leafArgumentIds;
@@ -331,7 +331,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
             _tallyNode(debateId, leafArgumentIds[i]);
         }
 
-        $.phases[debateId].currentPhase = Phase.Status.Tallied;
+        $.phases[debateId].currentPhase = Phase.Status.Finished;
     }
 
     /// @inheritdoc IArborVote
@@ -429,10 +429,10 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         external
         view
         override
-        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 votingEndTime, uint48 timeUnit)
+        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit)
     {
         Phase.Data storage phaseData = _getArborVoteStorage().phases[debateId];
-        return (phaseData.currentPhase, phaseData.editingEndTime, phaseData.votingEndTime, phaseData.timeUnit);
+        return (phaseData.currentPhase, phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.timeUnit);
     }
 
     /// @inheritdoc IArborVote
@@ -450,16 +450,16 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function advancePhase(uint256 debateId) public override {
         Phase.Data storage phaseData = _getArborVoteStorage().phases[debateId];
 
-        if (phaseData.currentPhase == Phase.Status.Unitialized) {
+        if (phaseData.currentPhase == Phase.Status.Uninitialized) {
             revert DebateUninitialized({debateId: debateId});
         }
 
         uint48 currentTime = Time.timestamp();
 
-        if (currentTime > phaseData.votingEndTime && phaseData.currentPhase != Phase.Status.Finished) {
-            phaseData.currentPhase = Phase.Status.Finished;
-        } else if (currentTime > phaseData.editingEndTime && phaseData.currentPhase != Phase.Status.Voting) {
-            phaseData.currentPhase = Phase.Status.Voting;
+        if (currentTime > phaseData.ratingEndTime && phaseData.currentPhase != Phase.Status.Tallying) {
+            phaseData.currentPhase = Phase.Status.Tallying;
+        } else if (currentTime > phaseData.editingEndTime && phaseData.currentPhase != Phase.Status.Rating) {
+            phaseData.currentPhase = Phase.Status.Rating;
         }
     }
 

@@ -8,7 +8,7 @@ pragma solidity ^0.8.24;
 library Argument {
     /// @notice The state of an argument.
     enum State {
-        Unitialized,
+        Uninitialized,
         Created,
         Final
     }

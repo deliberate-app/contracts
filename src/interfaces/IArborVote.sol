@@ -41,7 +41,7 @@ interface IArborVote {
 
     /// @notice Creates a new debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.
-    /// @param timeUnit The time unit of the debate determining the editing and voting times.
+    /// @param timeUnit The time unit of the debate determining the editing and rating durations.
     /// @return debateId The ID of the created debate.
     function createDebate(bytes32 contentURI, uint48 timeUnit) external returns (uint256 debateId);
 
@@ -157,12 +157,12 @@ interface IArborVote {
     /// @param debateId The ID of the debate.
     /// @return currentPhase The current phase of the debate.
     /// @return editingEndTime The end time of the editing phase.
-    /// @return votingEndTime The end time of the voting phase.
+    /// @return ratingEndTime The end time of the rating phase.
     /// @return timeUnit The time unit of the debate.
     function phases(uint256 debateId)
         external
         view
-        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 votingEndTime, uint48 timeUnit);
+        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit);
 
     /// @notice Returns the outcome of the debate.
     /// @param debateId The ID of the debate.

@@ -57,6 +57,18 @@ contract ArborVoteTest is Test {
         });
     }
 
+    function _endEditing(uint256 debateId) internal {
+        (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
+        vm.warp(editingEndTime + 1);
+        _arborVote.advancePhase(debateId);
+    }
+
+    function _endRating(uint256 debateId) internal {
+        (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
+        vm.warp(ratingEndTime + 1);
+        _arborVote.advancePhase(debateId);
+    }
+
     // --- initialize ---
 
     function test_initialize_initializesTheContract() public view {
@@ -75,7 +87,7 @@ contract ArborVoteTest is Test {
 
         uint256 uninitializedDebateId = 123;
         (Phase.Status currentPhase,,,) = _arborVote.phases(uninitializedDebateId);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Unitialized));
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Uninitialized));
 
         vm.expectRevert(abi.encodeWithSelector(ArborVote.DebateUninitialized.selector, uninitializedDebateId));
         _arborVote.advancePhase(uninitializedDebateId);
@@ -84,27 +96,27 @@ contract ArborVoteTest is Test {
     function test_advancePhase_advancesThePhasesAfterTheTimeHasPassed() public {
         uint256 debateId = _createDebate();
 
-        (Phase.Status currentPhase, uint48 editingEndTime, uint48 votingEndTime,) = _arborVote.phases(debateId);
+        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime,) = _arborVote.phases(debateId);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Editing));
 
         vm.warp(editingEndTime + 1);
         _arborVote.advancePhase(debateId);
         (currentPhase,,,) = _arborVote.phases(debateId);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Voting));
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Rating));
 
-        vm.warp(votingEndTime + 1);
+        vm.warp(ratingEndTime + 1);
         _arborVote.advancePhase(debateId);
         (currentPhase,,,) = _arborVote.phases(debateId);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
     }
 
     // --- createDebate ---
 
     function test_createDebate_isUninitializedBeforeADebateIsCreated() public view {
-        (Phase.Status currentPhase, uint48 editingEndTime, uint48 votingEndTime, uint48 timeUnit) = _arborVote.phases(0);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Unitialized));
+        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) = _arborVote.phases(0);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Uninitialized));
         assertEq(editingEndTime, 0);
-        assertEq(votingEndTime, 0);
+        assertEq(ratingEndTime, 0);
         assertEq(timeUnit, 0);
     }
 
@@ -120,13 +132,13 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
 
         uint256 currentTime = vm.getBlockTimestamp();
-        (Phase.Status currentPhase, uint48 editingEndTime, uint48 votingEndTime, uint48 timeUnit) =
+        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) =
             _arborVote.phases(debateId);
 
         assertEq(uint256(currentPhase), uint256(Phase.Status.Editing));
         assertEq(timeUnit, _TIME_UNIT);
         assertEq(editingEndTime, currentTime + 7 * _TIME_UNIT);
-        assertEq(votingEndTime, currentTime + 10 * _TIME_UNIT);
+        assertEq(ratingEndTime, currentTime + 10 * _TIME_UNIT);
     }
 
     function test_createDebate_initializesTheRootArgument() public {
@@ -299,5 +311,66 @@ contract ArborVoteTest is Test {
         assertEq(argument.con, 10);
         assertEq(argument.votes, 10);
         assertEq(argument.fees, 0);
+    }
+
+    // --- tallyTree ---
+
+    function test_tallyTree_finishesTheDebate() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        _arborVote.tallyTree(debateId);
+
+        (Phase.Status currentPhase,,,) = _arborVote.phases(debateId);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
+    }
+
+    // --- outcome ---
+
+    function test_outcome_revertsBeforeTheTallyHasRun() public {
+        uint256 debateId = _createDebate();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
+        );
+        _arborVote.outcome(debateId);
+
+        _endRating(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+        );
+        _arborVote.outcome(debateId);
+    }
+
+    function test_outcome_returnsTheOutcomeOnceTheDebateIsFinished() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        _arborVote.tallyTree(debateId);
+
+        assertEq(_arborVote.outcome(debateId), false);
+    }
+
+    // --- redeemArgumentShares ---
+
+    function test_redeemArgumentShares_revertsBeforeTheTallyHasRun() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+        );
+        _arborVote.redeemArgumentShares(debateId, _ROOT_ARGUMENT_ID, address(this));
+    }
+
+    function test_redeemArgumentShares_succeedsOnceTheDebateIsFinished() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        _arborVote.redeemArgumentShares(debateId, _ROOT_ARGUMENT_ID, address(this));
+
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), 0);
     }
 }
