@@ -34,36 +34,44 @@ library Utils {
     /// (see https://ethereum.stackexchange.com/questions/55701) that was previously used to avoid the intermediate
     /// `v * a` overflow; that decomposition divided first on purpose and was exact, but static analyzers flag it as a
     /// `divide-before-multiply` false positive.
-    /// @param v The value.
-    /// @param a The nominator.
-    /// @param b The denominator.
+    /// @param value The value.
+    /// @param numerator The numerator.
+    /// @param denominator The denominator.
     /// @return result The rounded down result of `v * a / b`.
-    function multiplyByFraction(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 result) {
-        result = SafeCast.toUint32(Math.mulDiv(uint256(v), uint256(a), uint256(b)));
+    function multiplyByFraction(uint32 value, uint32 numerator, uint32 denominator)
+        internal
+        pure
+        returns (uint32 result)
+    {
+        result = SafeCast.toUint32(Math.mulDiv(uint256(value), uint256(numerator), uint256(denominator)));
     }
 
     /// @notice Calculates `v * a / b`, rounded toward zero.
     /// @dev Casting `v` to `int256` forces 256-bit arithmetic so the intermediate product `v * a` cannot overflow
     /// before the division (multiply-before-divide, exact); `a` and `b` widen implicitly (`int64` -> `int256`).
     /// OpenZeppelin and Solady provide no signed `mulDiv`, so the widened computation is done directly here.
-    /// @param v The value.
-    /// @param a The nominator.
-    /// @param b The denominator.
+    /// @param value The value.
+    /// @param numerator The numerator.
+    /// @param denominator The denominator.
     /// @return result The result of `v * a / b`, rounded toward zero.
-    function multiplyByFraction(int64 v, int64 a, int64 b) internal pure returns (int64 result) {
-        result = SafeCast.toInt64(int256(v) * int256(a) / int256(b));
+    function multiplyByFraction(int64 value, int64 numerator, int64 denominator) internal pure returns (int64 result) {
+        result = SafeCast.toInt64(int256(value) * int256(numerator) / int256(denominator));
     }
 
     /// @notice Calculates `v * a / b`, rounded toward zero, for a signed value `v` and unsigned weights `a` and `b`.
     /// @dev Absorbs the `uint32` -> `int256` widening (Solidity has no implicit signed/unsigned conversion) so callers
     /// can pass `uint32` amounts without casting at the call site. The `int256` arithmetic also keeps the intermediate
     /// product overflow-free.
-    /// @param v The value.
-    /// @param a The nominator.
-    /// @param b The denominator.
+    /// @param value The value.
+    /// @param numerator The numerator.
+    /// @param denominator The denominator.
     /// @return result The result of `v * a / b`, rounded toward zero.
-    function multiplyByFraction(int64 v, uint32 a, uint32 b) internal pure returns (int64 result) {
-        result = SafeCast.toInt64(int256(v) * int256(uint256(a)) / int256(uint256(b)));
+    function multiplyByFraction(int64 value, uint32 numerator, uint32 denominator)
+        internal
+        pure
+        returns (int64 result)
+    {
+        result = SafeCast.toInt64(int256(value) * int256(uint256(numerator)) / int256(uint256(denominator)));
     }
 
     /// @notice Splits a value `v` into two parts proportional to `a` and `b`.
@@ -73,7 +81,7 @@ library Utils {
     /// @return v1 The first part.
     /// @return v2 The second part.
     function split(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 v1, uint32 v2) {
-        v2 = multiplyByFraction({v: v, a: b, b: a + b});
+        v2 = multiplyByFraction({value: v, numerator: b, denominator: a + b});
         v1 = v - v2;
     }
 

@@ -557,7 +557,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
         Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
 
-        investmentData.fee = voteTokenAmount.multiplyByFraction({a: _FEE_PERCENTAGE, b: 100});
+        investmentData.fee = voteTokenAmount.multiplyByFraction({numerator: _FEE_PERCENTAGE, denominator: 100});
         (uint32 proMint, uint32 conMint) = (voteTokenAmount - investmentData.fee).split(argument.pro, argument.con);
 
         investmentData.proMint = proMint;
@@ -690,7 +690,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         }
 
         // Apply weight $w_j$. The parent holds the summed votes of all its children (the siblings).
-        ownImpact = ownImpact.multiplyByFraction({a: argument.votes, b: parentArgument.childsVote});
+        ownImpact = ownImpact.multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
 
         // Update the parent argument impact
         parentArgument.childsImpact += ownImpact;
@@ -761,10 +761,10 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         uint32 con = argument.con;
 
         // calculate own impact
-        impact = _MAX_APPROVAL.multiplyByFraction({a: pro, b: pro + con});
+        impact = _MAX_APPROVAL.multiplyByFraction({numerator: pro, denominator: pro + con});
 
-        impact = impact.multiplyByFraction({a: _MIX_MAX - _MIX_VAL, b: _MIX_MAX})
-            + argument.childsImpact.multiplyByFraction({a: _MIX_VAL, b: _MIX_MAX});
+        impact = impact.multiplyByFraction({numerator: _MIX_MAX - _MIX_VAL, denominator: _MIX_MAX})
+            + argument.childsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
     }
 
     /// @notice Internal function to calculate the amount of pro tokens obtained from swapping the minted con tokens.
