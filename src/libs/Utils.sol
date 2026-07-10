@@ -39,19 +39,31 @@ library Utils {
     /// @param b The denominator.
     /// @return result The rounded down result of `v * a / b`.
     function multiplyByFraction(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 result) {
-        result = SafeCast.toUint32(Math.mulDiv(v, a, b));
+        result = SafeCast.toUint32(Math.mulDiv(uint256(v), uint256(a), uint256(b)));
     }
 
     /// @notice Calculates `v * a / b`, rounded toward zero.
-    /// @dev Widens the operands to `int256` so the intermediate product `v * a` cannot overflow before the division,
-    /// keeping the result exact (multiply-before-divide). OpenZeppelin and Solady provide no signed `mulDiv`, so the
-    /// widened computation is done directly here.
+    /// @dev Casting `v` to `int256` forces 256-bit arithmetic so the intermediate product `v * a` cannot overflow
+    /// before the division (multiply-before-divide, exact); `a` and `b` widen implicitly (`int64` -> `int256`).
+    /// OpenZeppelin and Solady provide no signed `mulDiv`, so the widened computation is done directly here.
     /// @param v The value.
     /// @param a The nominator.
     /// @param b The denominator.
     /// @return result The result of `v * a / b`, rounded toward zero.
     function multiplyByFraction(int64 v, int64 a, int64 b) internal pure returns (int64 result) {
         result = SafeCast.toInt64(int256(v) * int256(a) / int256(b));
+    }
+
+    /// @notice Calculates `v * a / b`, rounded toward zero, for a signed value `v` and unsigned weights `a` and `b`.
+    /// @dev Absorbs the `uint32` -> `int256` widening (Solidity has no implicit signed/unsigned conversion) so callers
+    /// can pass `uint32` amounts without casting at the call site. The `int256` arithmetic also keeps the intermediate
+    /// product overflow-free.
+    /// @param v The value.
+    /// @param a The nominator.
+    /// @param b The denominator.
+    /// @return result The result of `v * a / b`, rounded toward zero.
+    function multiplyByFraction(int64 v, uint32 a, uint32 b) internal pure returns (int64 result) {
+        result = SafeCast.toInt64(int256(v) * int256(uint256(a)) / int256(uint256(b)));
     }
 
     /// @notice Splits a value `v` into two parts proportional to `a` and `b`.

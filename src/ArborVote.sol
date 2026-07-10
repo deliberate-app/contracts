@@ -67,6 +67,9 @@ contract ArborVote is
     int64 internal constant _MIX_VAL = type(int64).max / 2;
     int64 internal constant _MIX_MAX = type(int64).max;
 
+    /// @notice The fixed-point scale of an argument's own approval impact (full approval equals `type(uint32).max`).
+    int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
+
     /// @notice The ERC-7201 storage location of the ArborVote contract (see https://eips.ethereum.org/EIPS/eip-7201).
     /// @dev Obtained from
     /// `keccak256(abi.encode(uint256(keccak256("arborvote.storage.ArborVote")) - 1)) & ~bytes32(uint256(0xff))`.
@@ -831,14 +834,8 @@ contract ArborVote is
             ownImpact = -ownImpact;
         }
 
-        {
-            // Apply weight $w_j$
-            int64 ownVotes = int64(uint64(argument.votes));
-            // This works, because the parent contains the votes of all children (the siblings).
-            int64 ownAndSibilingVotes = int64(uint64(parentArgument.childsVote));
-
-            ownImpact = ownImpact.multiplyByFraction({a: ownVotes, b: ownAndSibilingVotes});
-        }
+        // Apply weight $w_j$. The parent holds the summed votes of all its children (the siblings).
+        ownImpact = ownImpact.multiplyByFraction({a: argument.votes, b: parentArgument.childsVote});
 
         // Update the parent argument impact
         parentArgument.childsImpact += ownImpact;
@@ -919,10 +916,10 @@ contract ArborVote is
         uint32 con = argument.con;
 
         // calculate own impact
-        impact = int64(uint64(type(uint32).max.multiplyByFraction({a: pro, b: pro + con})));
+        impact = _MAX_APPROVAL.multiplyByFraction({a: pro, b: pro + con});
 
         impact = impact.multiplyByFraction({a: _MIX_MAX - _MIX_VAL, b: _MIX_MAX})
-            + (argument.childsImpact).multiplyByFraction({a: _MIX_VAL, b: _MIX_MAX});
+            + argument.childsImpact.multiplyByFraction({a: _MIX_VAL, b: _MIX_MAX});
     }
 
     /// @notice Internal function to calculate the amount of pro tokens obtained from swapping the minted con tokens.
