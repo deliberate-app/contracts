@@ -573,6 +573,19 @@ contract ArborVoteTest is Test {
         assertFalse(_arborVote.outcome(debateId));
     }
 
+    function test_tallyTree_ignoresUnfinalizedArguments() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        _addArgument(debateId, true, 100); // stays Created: never finalized
+        _endRating(debateId);
+
+        _arborVote.tallyTree(debateId);
+
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertFalse(_arborVote.outcome(debateId));
+    }
+
     function test_tallyTree_talliesRecursivelyUpTheTree() public {
         uint256 debateId = _createDebate();
         _join(debateId);

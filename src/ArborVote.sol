@@ -705,16 +705,22 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
             revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
         }
 
-        // Calculate own impact $r_j$
-        int64 ownImpact = _calculateImpact({debateId: debateId, argumentId: argumentId});
+        // Only Final arguments carry impact. An argument never finalized contributes nothing: it can have
+        // neither children nor investors (both require a Final argument), only its author's never-locked-in signal.
+        int64 ownImpact = 0;
+        if (argument.state == Argument.State.Final) {
+            // Calculate own impact $r_j$
+            ownImpact = _calculateImpact({debateId: debateId, argumentId: argumentId});
 
-        // Apply pre-factor $\sigma_j$
-        if (!argument.isSupporting) {
-            ownImpact = -ownImpact;
+            // Apply pre-factor $\sigma_j$
+            if (!argument.isSupporting) {
+                ownImpact = -ownImpact;
+            }
+
+            // Apply weight $w_j$. The parent holds the summed votes of all its children (the siblings).
+            ownImpact =
+                ownImpact.multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
         }
-
-        // Apply weight $w_j$. The parent holds the summed votes of all its children (the siblings).
-        ownImpact = ownImpact.multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
 
         // Update the parent argument impact
         parentArgument.childsImpact += ownImpact;
