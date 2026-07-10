@@ -9,8 +9,7 @@ library User {
     /// @notice The role of a user in a debate.
     enum Role {
         Unassigned,
-        Participant,
-        Juror
+        Participant
     }
 
     /// @notice The pro and con shares a user holds in an argument.

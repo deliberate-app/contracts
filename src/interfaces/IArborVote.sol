@@ -11,19 +11,6 @@ import {IProofOfHumanity} from "./IProofOfHumanity.sol";
 /// @author Michael Heuer
 /// @notice The interface of the ArborVote voting module for deliberative decision-making using argument trees.
 interface IArborVote {
-    /// @notice Emitted when an argument in a debate gets disputed.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    /// @param disputeId The ID of the dispute raised.
-    /// @param reason The reason for the dispute.
-    event DisputeRaised(uint256 indexed debateId, uint16 indexed argumentId, uint256 disputeId, bytes reason);
-
-    /// @notice Emitted when a dispute of an argument in a debate is resolved.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    /// @param disputeId The ID of the dispute resolved.
-    event DisputeResolved(uint256 indexed debateId, uint16 indexed argumentId, uint256 disputeId);
-
     /// @notice Emitted when an argument in a debate is updated.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
@@ -98,20 +85,6 @@ interface IArborVote {
     /// @param contentURI The URI pointing to the argument content.
     function alterArgument(uint256 debateId, uint16 argumentId, bytes32 contentURI) external;
 
-    /// @notice Raises a dispute for an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to dispute.
-    /// @param reason The reason for raising the dispute.
-    /// @return disputeId The ID of the dispute.
-    function raiseDispute(uint256 debateId, uint16 argumentId, bytes calldata reason)
-        external
-        returns (uint256 disputeId);
-
-    /// @notice Resolves a dispute for an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument being disputed.
-    function resolveDispute(uint256 debateId, uint16 argumentId) external;
-
     /// @notice Invests an amount of vote tokens into pro shares.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument to invest in.
@@ -145,11 +118,6 @@ interface IArborVote {
     /// @return leafArgumentIds The leaf argument IDs.
     function getLeafArgumentIds(uint256 debateId) external view returns (uint16[] memory leafArgumentIds);
 
-    /// @notice Returns the disputed argument IDs of a debate.
-    /// @param debateId The ID of the debate.
-    /// @return disputedArgumentIds The disputed argument IDs.
-    function getDisputedArgumentIds(uint256 debateId) external view returns (uint16[] memory disputedArgumentIds);
-
     /// @notice Returns the role of a user in a debate.
     /// @param debateId The ID of the debate.
     /// @param account The account of the user.
@@ -177,12 +145,6 @@ interface IArborVote {
     /// @return totalVotes The total votes cast in the debate.
     /// @return argumentsCount The number of arguments in the debate.
     function debates(uint256 debateId) external view returns (uint32 totalVotes, uint16 argumentsCount);
-
-    /// @notice Returns the dispute ID of an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    /// @return disputeId The ID of the dispute.
-    function disputes(uint256 debateId, uint16 argumentId) external view returns (uint256 disputeId);
 
     /// @notice Returns the role and tokens of a user in a debate.
     /// @param debateId The ID of the debate.

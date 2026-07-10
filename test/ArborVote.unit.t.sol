@@ -10,16 +10,12 @@ import {ArborVote} from "../src/ArborVote.sol";
 import {Argument} from "../src/libs/Argument.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
-import {MockArbitrator} from "./mocks/MockArbitrator.m.sol";
-import {MockERC20} from "./mocks/MockERC20.m.sol";
 import {MockProofOfHumanity} from "./mocks/MockProofOfHumanity.m.sol";
 
 contract ArborVoteTest is Test {
     ArborVote internal _arborVote;
 
     MockProofOfHumanity internal _mockProofOfHumanity;
-    MockArbitrator internal _mockArbitrator;
-    MockERC20 internal _mockERC20;
 
     uint48 internal constant _TIME_UNIT = 1 * 60; // 1 minute
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
@@ -28,7 +24,6 @@ contract ArborVoteTest is Test {
 
     function setUp() public {
         _mockProofOfHumanity = new MockProofOfHumanity();
-        _mockArbitrator = new MockArbitrator();
 
         // Deploy the implementation behind an ERC1967 UUPS proxy and initialize it in the same transaction.
         ArborVote implementation = new ArborVote();
@@ -37,9 +32,6 @@ contract ArborVoteTest is Test {
                 new ERC1967Proxy(address(implementation), abi.encodeCall(ArborVote.initialize, (_mockProofOfHumanity)))
             )
         );
-
-        _mockERC20 = new MockERC20(1000, address(this));
-        _mockERC20.approve(address(_arborVote), 1000);
     }
 
     // --- helpers ---
@@ -157,7 +149,6 @@ contract ArborVoteTest is Test {
         assertEq(rootArgument.childsVote, 0);
 
         assertEq(_arborVote.getLeafArgumentIds(debateId).length, 0);
-        assertEq(_arborVote.getDisputedArgumentIds(debateId).length, 0);
     }
 
     // --- join ---
@@ -226,7 +217,6 @@ contract ArborVoteTest is Test {
         uint16[] memory leafArgumentIds = _arborVote.getLeafArgumentIds(debateId);
         assertEq(leafArgumentIds.length, 1);
         assertEq(leafArgumentIds[0], proArgumentId);
-        assertEq(_arborVote.getDisputedArgumentIds(debateId).length, 0);
     }
 
     function test_addArgument_addsAConArgument() public {
@@ -254,7 +244,6 @@ contract ArborVoteTest is Test {
         uint16[] memory leafArgumentIds = _arborVote.getLeafArgumentIds(debateId);
         assertEq(leafArgumentIds.length, 1);
         assertEq(leafArgumentIds[0], conArgumentId);
-        assertEq(_arborVote.getDisputedArgumentIds(debateId).length, 0);
     }
 
     function test_addArgument_revertsForInitialApprovalsBelow50() public {

@@ -4,14 +4,9 @@ pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin-contracts-5.6.1/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-contracts-5.6.1/proxy/utils/UUPSUpgradeable.sol";
-import {ERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin-contracts-5.6.1/utils/ReentrancyGuardTransient.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
 
-import {IArbitrable} from "./interfaces/IArbitrable.sol";
-import {IArbitrator} from "./interfaces/IArbitrator.sol";
 import {IArborVote} from "./interfaces/IArborVote.sol";
 import {IProofOfHumanity} from "./interfaces/IProofOfHumanity.sol";
 import {Argument} from "./libs/Argument.sol";
@@ -24,36 +19,24 @@ import {Utils} from "./libs/Utils.sol";
 /// @author Michael Heuer
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is a conventional UUPS
 /// upgradeable contract owned via OpenZeppelin's `OwnableUpgradeable` and using ERC-7201 namespaced storage.
-contract ArborVote is
-    IArborVote,
-    IArbitrable,
-    Initializable,
-    OwnableUpgradeable,
-    UUPSUpgradeable,
-    ReentrancyGuardTransient
-{
+contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using Utils for uint16[];
     using Utils for uint32;
     using Utils for uint64;
     using Utils for int64;
-    using SafeERC20 for ERC20;
     using Debate for Debate.Data;
 
     /// @notice The [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) storage of the contract.
     /// @param poh The proof of humanity registry contract (PoH mainnet: 0x1dAD862095d40d43c2109370121cf087632874dB).
-    /// @param arbitrator The arbitrator resolving disputes over arguments.
     /// @param debatesCounter The counter tracking the number of created debates.
     /// @param debates The debates by their ID.
-    /// @param disputes The dispute IDs by debate and argument ID.
     /// @param users The users by debate ID and account.
     /// @param phases The phase data by debate ID.
     /// @custom:storage-location erc7201:arborvote.storage.ArborVote
     struct ArborVoteStorage {
         IProofOfHumanity poh;
-        IArbitrator arbitrator;
         uint256 debatesCounter;
         mapping(uint256 debateId => Debate.Data) debates;
-        mapping(uint256 debateId => mapping(uint16 argumentId => uint256 disputeId)) disputes;
         mapping(uint256 debateId => mapping(address account => User.Data)) users;
         mapping(uint256 debateId => Phase.Data) phases;
     }
@@ -121,10 +104,6 @@ contract ArborVote is
     /// @notice Thrown if the childs of the argument are not tallied.
     /// @param untalliedChilds The number of untallied childs.
     error ChildsUntallied(uint16 untalliedChilds);
-
-    /// @notice Thrown if a debate is tallied while disputed arguments remain.
-    /// @param remaining The number of disputed arguments remaining.
-    error DisputedArgumentsRemaining(uint256 remaining);
 
     /// @notice A modifier to restrict functions to only be called if the debate is in a certain phase.
     /// @param debateId The ID of the debate.
@@ -292,67 +271,6 @@ contract ArborVote is
     }
 
     /// @inheritdoc IArborVote
-    /// @dev Protected by `nonReentrant`. Slither cannot see the transient-storage reentrancy guard (and misreads the
-    /// ERC-7201 assembly accessor as a state write), so its `reentrancy-no-eth` finding here is a false positive.
-    function raiseDispute(uint256 debateId, uint16 argumentId, bytes calldata reason)
-        external
-        override
-        nonReentrant
-        onlyPhase(debateId, Phase.Status.Editing)
-        onlyArgumentState(debateId, argumentId, Argument.State.Final)
-        returns (uint256 disputeId)
-    {
-        // create dispute
-        // slither-disable-next-line reentrancy-no-eth
-        disputeId = _createDispute({debateId: debateId, argumentId: argumentId});
-
-        // submit evidence
-        _submitEvidence({
-            debateId: debateId,
-            argumentId: argumentId,
-            disputeId: disputeId,
-            contentURI: _getArborVoteStorage().debates[debateId].arguments[argumentId].contentURI,
-            reason: reason
-        });
-
-        // state changes
-        _addDispute({debateId: debateId, argumentId: argumentId, disputeId: disputeId});
-
-        emit DisputeRaised({debateId: debateId, argumentId: argumentId, disputeId: disputeId, reason: reason});
-    }
-
-    /// @inheritdoc IArborVote
-    function resolveDispute(uint256 debateId, uint16 argumentId)
-        external
-        override
-        nonReentrant
-        onlyPhase(debateId, Phase.Status.Editing)
-        onlyArgumentState(debateId, argumentId, Argument.State.Disputed)
-    {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        uint256 disputeId = $.disputes[debateId][argumentId];
-
-        // fetch ruling
-        (address subject, uint256 ruling) = $.arbitrator.rule(disputeId);
-        if (subject != address(this)) {
-            revert AddressInvalid({expected: address(this), actual: subject});
-        }
-
-        Debate.Data storage debate = $.debates[debateId];
-
-        debate.disputedArgumentIds.removeByValue({value: argumentId});
-        if (ruling == 0) {
-            debate.arguments[argumentId].state = Argument.State.Final;
-        } else {
-            debate.arguments[argumentId].state = Argument.State.Invalid;
-        }
-
-        emit Ruled({arbitrator: $.arbitrator, disputeId: disputeId, ruling: ruling});
-        emit DisputeResolved({debateId: debateId, argumentId: argumentId, disputeId: disputeId});
-    }
-
-    /// @inheritdoc IArborVote
     function investInPro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
@@ -405,11 +323,6 @@ contract ArborVote is
     /// @inheritdoc IArborVote
     function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Finished) {
         ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        uint256 remaining = $.debates[debateId].disputedArgumentIds.length;
-        if (remaining != 0) {
-            revert DisputedArgumentsRemaining(remaining);
-        }
 
         uint16[] memory leafArgumentIds = $.debates[debateId].leafArgumentIds;
 
@@ -480,16 +393,6 @@ contract ArborVote is
     }
 
     /// @inheritdoc IArborVote
-    function getDisputedArgumentIds(uint256 debateId)
-        external
-        view
-        override
-        returns (uint16[] memory disputedArgumentIds)
-    {
-        return _getArborVoteStorage().debates[debateId].disputedArgumentIds;
-    }
-
-    /// @inheritdoc IArborVote
     function getUserRole(uint256 debateId, address account) external view override returns (User.Role role) {
         return _getArborVoteStorage().users[debateId][account].role;
     }
@@ -513,11 +416,6 @@ contract ArborVote is
     function debates(uint256 debateId) external view override returns (uint32 totalVotes, uint16 argumentsCount) {
         Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
         return (debate.totalVotes, debate.argumentsCount);
-    }
-
-    /// @inheritdoc IArborVote
-    function disputes(uint256 debateId, uint16 argumentId) external view override returns (uint256 disputeId) {
-        return _getArborVoteStorage().disputes[debateId][argumentId];
     }
 
     /// @inheritdoc IArborVote
@@ -715,57 +613,6 @@ contract ArborVote is
             // append
             debate.leafArgumentIds.push(parentArgumentId);
         }
-    }
-
-    /// @notice Internal function to create a dispute for an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to be disputed.
-    /// @return disputeId The ID of the dispute created.
-    function _createDispute(uint256 debateId, uint16 argumentId) internal returns (uint256 disputeId) {
-        IArbitrator arbitrator = _getArborVoteStorage().arbitrator;
-
-        (address recipient, ERC20 feeToken, uint256 feeAmount) = arbitrator.getDisputeFees();
-
-        feeToken.safeTransferFrom(msg.sender, address(this), feeAmount);
-        feeToken.forceApprove(recipient, feeAmount);
-        // reset just in case non-compliant tokens (that fail on non-zero to non-zero approvals) are used
-        disputeId = arbitrator.createDispute(2, abi.encodePacked(address(this), debateId, argumentId));
-        feeToken.forceApprove(recipient, 0);
-    }
-
-    /// @notice Internal function to submit evidence for a dispute for an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to dispute.
-    /// @param disputeId The ID of the dispute to submit the evidence for.
-    /// @param contentURI The URI pointing to the argument content.
-    /// @param reason The reason for raising the dispute.
-    function _submitEvidence(
-        uint256 debateId,
-        uint16 argumentId,
-        uint256 disputeId,
-        bytes32 contentURI,
-        bytes calldata reason
-    ) internal {
-        IArbitrator arbitrator = _getArborVoteStorage().arbitrator;
-
-        arbitrator.submitEvidence(disputeId, msg.sender, abi.encode(debateId, argumentId, contentURI));
-        arbitrator.submitEvidence(disputeId, msg.sender, reason);
-        arbitrator.closeEvidencePeriod(disputeId);
-    }
-
-    /// @notice Internal function to record a dispute for an argument in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to dispute.
-    /// @param disputeId The ID of the dispute.
-    function _addDispute(uint256 debateId, uint16 argumentId, uint256 disputeId) internal {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        Debate.Data storage debate = $.debates[debateId];
-
-        debate.arguments[argumentId].state = Argument.State.Disputed;
-        debate.disputedArgumentIds.push(argumentId);
-
-        $.disputes[debateId][argumentId] = disputeId;
     }
 
     /// @notice Internal function to execute an investment to obtain pro tokens on the argument's market in a debate.

@@ -10,9 +10,7 @@ library Argument {
     enum State {
         Unitialized,
         Created,
-        Final,
-        Disputed,
-        Invalid
+        Final
     }
 
     /// @notice The data associated with an argument.

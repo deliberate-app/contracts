@@ -13,13 +13,11 @@ library Debate {
     /// @param totalVotes The total votes cast in the debate.
     /// @param argumentsCount The number of arguments in the debate.
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
-    /// @param disputedArgumentIds The IDs of the disputed arguments of the debate.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
-        uint32 totalVotes; //            ┐   4
-        uint16 argumentsCount; //        ┘ + 2 = 6
-        uint16[] leafArgumentIds; //     ]  32 * x
-        uint16[] disputedArgumentIds; // ]  32 * y
+        uint32 totalVotes; //        ┐   4
+        uint16 argumentsCount; //    ┘ + 2 = 6
+        uint16[] leafArgumentIds; // ]  32 * x
     }
 
     /// @notice Increments the argument counter of a debate.
