@@ -482,6 +482,55 @@ contract ArborVoteTest is Test {
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
     }
 
+    // --- investInPro / investInCon ---
+
+    function test_investInPro_convertsVoteTokensIntoProShares() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        _arborVote.investInPro(debateId, argumentId, 20);
+
+        // 100 initial - 10 deposit - 20 investment
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), 70);
+
+        User.Shares memory shares = _arborVote.getUserShares(debateId, argumentId, address(this));
+        assertGt(shares.pro, 0);
+        assertEq(shares.con, 0);
+
+        Argument.Data memory argument = _arborVote.getArgument(debateId, argumentId);
+        assertEq(argument.votes, 29); // 10 deposit + 20 invested - 1 fee
+        assertEq(argument.fees, 1); // 5% of 20
+    }
+
+    function test_investInPro_revertsForANonFinalArgument() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50); // stays Created: never finalized
+        _endEditing(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
+        );
+        _arborVote.investInPro(debateId, argumentId, 10);
+    }
+
+    function test_investInCon_revertsForANonexistentArgument() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+        _endEditing(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
+        );
+        _arborVote.investInCon(debateId, 42, 10);
+    }
+
     // --- tallyTree ---
 
     function test_tallyTree_finishesTheDebate() public {

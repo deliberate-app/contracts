@@ -284,6 +284,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
+        onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
         User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
 
@@ -309,6 +310,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
+        onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
         User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
 
