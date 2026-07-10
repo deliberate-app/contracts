@@ -2,8 +2,9 @@
 
 ## Commit discipline
 
-- **One commit, one change.** A commit does exactly one thing — a single fix, feature, refactor, rename sweep, or doc change — and its message says which. Never mix a mechanical rename with a behavior change; land the rename first, then the fix on top.
-- **Every commit is green.** The full check gate passes on every commit, not just on the branch tip. If a commit needs a follow-up to compile or pass tests, it is not one commit.
+- **One commit, one change.** A commit does exactly one thing — a single fix, feature, refactor, rename sweep, or doc change — and its message says which.
+- **Fix before renaming.** Keep mechanical renames separate from behavior changes, and land semantic fixes first, in the old vocabulary: a faithful rename of buggy code re-expresses the bug in the new vocabulary, where it reads as intended behavior. Only when fix and rename are so entangled that no ordering leaves every intermediate commit coherent may they land together, in one commit whose message says so.
+- **Every commit is green and coherent.** The full check gate passes on every commit, not just on the branch tip — and no commit leaves code that makes a known defect read as deliberate.
 - **Fixes carry their regression test.** A bug fix and the test that demonstrates the bug land in the same commit (test red before the fix, green after).
 
 ## Commit messages
