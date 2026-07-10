@@ -395,6 +395,18 @@ contract ArborVoteTest is Test {
         assertEq(totalVotes, 20);
     }
 
+    function test_addArgument_revertsOutsideTheEditingPhase() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        _endEditing(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Editing, Phase.Status.Rating)
+        );
+        _addArgument(debateId, true, 50);
+    }
+
     function test_addArgument_keepsTheLeavesConsistentAcrossSiblingAdds() public {
         // Regression: removing the parent from the leaf list searched an unsorted array by bisection and,
         // on a miss, silently removed the last element - adding a second child to the same parent

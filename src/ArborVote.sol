@@ -514,6 +514,7 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     )
         public
         override
+        onlyPhase(debateId, Phase.Status.Editing)
         onlyRole(debateId, User.Role.Participant)
         onlyArgumentState(debateId, parentArgumentId, Argument.State.Final)
         returns (uint16 newArgumentId)
