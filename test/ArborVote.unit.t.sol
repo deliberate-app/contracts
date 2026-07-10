@@ -367,6 +367,45 @@ contract ArborVoteTest is Test {
         assertEq(argument.fees, 0);
     }
 
+    function test_addArgument_addsTheDepositToTheParentWeightAndDebateTotal() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        _addArgument(debateId, true, 50);
+        _addArgument(debateId, false, 50);
+
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
+
+        (uint32 totalVotes,) = _arborVote.debates(debateId);
+        assertEq(totalVotes, 20);
+    }
+
+    // --- moveArgument ---
+
+    function test_moveArgument_movesTheVoteWeightBetweenParents() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 parentArgumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, parentArgumentId);
+
+        uint16 childArgumentId = _arborVote.addArgument({
+            debateId: debateId,
+            parentArgumentId: parentArgumentId,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            isSupporting: true,
+            initialApproval: 50
+        });
+        assertEq(_arborVote.getArgument(debateId, parentArgumentId).childsVote, 10);
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 10);
+
+        _arborVote.moveArgument(debateId, childArgumentId, _ROOT_ARGUMENT_ID);
+
+        assertEq(_arborVote.getArgument(debateId, parentArgumentId).childsVote, 0);
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
+    }
+
     // --- tallyTree ---
 
     function test_tallyTree_finishesTheDebate() public {

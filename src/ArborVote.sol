@@ -228,12 +228,14 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         // change old parent's argument state
         uint16 oldParentArgumentId = movedArgument.parentArgumentId;
         _updateParentAfterChildRemoval({debateId: debateId, parentArgumentId: oldParentArgumentId});
+        debate.arguments[oldParentArgumentId].childsVote -= movedArgument.votes;
 
         // change argument state
         movedArgument.parentArgumentId = newParentArgumentId;
 
         // change new parent argument state
         debate.arguments[newParentArgumentId].untalliedChilds++;
+        debate.arguments[newParentArgumentId].childsVote += movedArgument.votes;
 
         emit ArgumentUpdated({
             debateId: debateId,
@@ -532,8 +534,13 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
             initialApproval: initialApproval
         });
 
-        // Update parent
-        debate.arguments[parentArgumentId].untalliedChilds++;
+        // Update the parent: one more child to tally whose deposit counts toward the children's vote weight.
+        Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
+        parentArgument.untalliedChilds++;
+        parentArgument.childsVote += _DEBATE_DEPOSIT;
+
+        // The deposit is committed to the new argument's market and counts toward the debate total.
+        debate.totalVotes += _DEBATE_DEPOSIT;
 
         // Update the debate's leaf arguments if this is not the root argument
         if (parentArgumentId != 0) {
