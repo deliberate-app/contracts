@@ -72,6 +72,30 @@ contract ArborVoteTest is Test {
         }
     }
 
+    function _fillDebateToTheArgumentCap(uint256 debateId) internal {
+        uint16 maxArguments = _arborVote.MAX_ARGUMENTS();
+        uint16 added = 0; // the thesis already counts toward the cap
+        uint256 participantIndex = 0;
+        while (added < maxArguments - 1) {
+            address participant = makeAddr(string.concat("participant", vm.toString(participantIndex)));
+            vm.startPrank(participant);
+            _arborVote.join(debateId);
+            // Each participant's budget affords ten argument deposits.
+            for (uint256 i = 0; i < 10 && added < maxArguments - 1; i++) {
+                _arborVote.addArgument({
+                    debateId: debateId,
+                    parentArgumentId: _ROOT_ARGUMENT_ID,
+                    contentURI: _PRO_ARGUMENT_CONTENT,
+                    isSupporting: added % 2 == 0,
+                    initialApproval: 50
+                });
+                added++;
+            }
+            vm.stopPrank();
+            participantIndex++;
+        }
+    }
+
     function _endEditing(uint256 debateId) internal {
         (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
         vm.warp(editingEndTime + 1);
@@ -407,6 +431,15 @@ contract ArborVoteTest is Test {
         _addArgument(debateId, true, 50);
     }
 
+    function test_addArgument_revertsWhenTheArgumentLimitIsReached() public {
+        uint256 debateId = _createDebate();
+        _fillDebateToTheArgumentCap(debateId);
+        _join(debateId);
+
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentLimitReached.selector, _arborVote.MAX_ARGUMENTS()));
+        _addArgument(debateId, true, 50);
+    }
+
     function test_addArgument_keepsTheLeavesConsistentAcrossSiblingAdds() public {
         // Regression: removing the parent from the leaf list searched an unsorted array by bisection and,
         // on a miss, silently removed the last element - adding a second child to the same parent
@@ -583,6 +616,27 @@ contract ArborVoteTest is Test {
 
         assertLt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
         assertFalse(_arborVote.outcome(debateId));
+    }
+
+    function test_tallyTree_staysWithinTheBlockGasLimitAtTheArgumentCap() public {
+        uint256 debateId = _createDebate();
+        _fillDebateToTheArgumentCap(debateId);
+
+        // Finalize every argument so all of them carry impact (the expensive path).
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        uint16 maxArguments = _arborVote.MAX_ARGUMENTS();
+        for (uint16 i = 1; i < maxArguments; i++) {
+            _arborVote.finalizeArgument(debateId, i);
+        }
+
+        _endRating(debateId);
+
+        uint256 gasBefore = gasleft();
+        _arborVote.tallyTree(debateId);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // The tally is atomic, so the maximally-sized tree must fit within a mainnet block (~36M today).
+        assertLt(gasUsed, 30_000_000);
     }
 
     function test_tallyTree_ignoresUnfinalizedArguments() public {

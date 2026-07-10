@@ -48,6 +48,12 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     /// @notice The initial vote token balance granted to a user upon joining a debate.
     uint32 public constant INITIAL_TOKENS = 100;
 
+    /// @notice The maximum number of arguments per debate, the thesis included.
+    /// @dev Bounds the atomic tally: the whole tree must be tallyable within one block's gas (asserted by the gas
+    /// benchmark test). Depth needs no bound of its own - each tree level takes one time unit of finalization
+    /// latency inside the seven-time-unit editing window - so the cap effectively governs breadth.
+    uint16 public constant MAX_ARGUMENTS = 1024;
+
     int64 internal constant _MIX_VAL = type(int64).max / 2;
     int64 internal constant _MIX_MAX = type(int64).max;
 
@@ -106,6 +112,10 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     /// @param required The required vote tokens.
     /// @param actual The actual vote token balance.
     error InsufficientVoteTokens(uint32 required, uint32 actual);
+
+    /// @notice Thrown if a debate has reached its maximum number of arguments.
+    /// @param limit The maximum number of arguments per debate.
+    error ArgumentLimitReached(uint16 limit);
 
     /// @notice Thrown if the childs of the argument are not tallied.
     /// @param untalliedChilds The number of untallied childs.
@@ -555,6 +565,10 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
         // initialize market
         Debate.Data storage debate = $.debates[debateId];
+
+        if (debate.getArgumentsCount() >= MAX_ARGUMENTS) {
+            revert ArgumentLimitReached({limit: MAX_ARGUMENTS});
+        }
 
         user.tokens -= _DEBATE_DEPOSIT;
 
