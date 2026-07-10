@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin-contracts-5.6.1/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin-contracts-5.6.1/proxy/utils/UUPSUpgradeable.sol";
+import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
+import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
 
@@ -20,9 +22,8 @@ import {Utils} from "./libs/Utils.sol";
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is a conventional UUPS
 /// upgradeable contract owned via OpenZeppelin's `OwnableUpgradeable` and using ERC-7201 namespaced storage.
 contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgradeable {
-    using Utils for uint16[];
+    using EnumerableSet for EnumerableSet.UintSet;
     using Utils for uint32;
-    using Utils for uint64;
     using Utils for int64;
     using Debate for Debate.Data;
 
@@ -236,6 +237,11 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         // change new parent argument state
         debate.arguments[newParentArgumentId].untalliedChilds++;
         debate.arguments[newParentArgumentId].childsVote += movedArgument.votes;
+        if (newParentArgumentId != 0) {
+            // The removal is idempotent: a no-op if the new parent was already interior.
+            // slither-disable-next-line unused-return
+            debate.leafArgumentIds.remove(newParentArgumentId);
+        }
 
         emit ArgumentUpdated({
             debateId: debateId,
@@ -327,11 +333,11 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Tallying) {
         ArborVoteStorage storage $ = _getArborVoteStorage();
 
-        uint16[] memory leafArgumentIds = $.debates[debateId].leafArgumentIds;
+        uint256[] memory leafArgumentIds = $.debates[debateId].leafArgumentIds.values();
 
         uint256 arrayLength = leafArgumentIds.length;
         for (uint256 i = 0; i < arrayLength; i++) {
-            _tallyNode(debateId, leafArgumentIds[i]);
+            _tallyNode(debateId, SafeCast.toUint16(leafArgumentIds[i]));
         }
 
         $.phases[debateId].currentPhase = Phase.Status.Finished;
@@ -392,7 +398,12 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
     /// @inheritdoc IArborVote
     function getLeafArgumentIds(uint256 debateId) external view override returns (uint16[] memory leafArgumentIds) {
-        return _getArborVoteStorage().debates[debateId].leafArgumentIds;
+        uint256[] memory ids = _getArborVoteStorage().debates[debateId].leafArgumentIds.values();
+
+        leafArgumentIds = new uint16[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            leafArgumentIds[i] = SafeCast.toUint16(ids[i]);
+        }
     }
 
     /// @inheritdoc IArborVote
@@ -542,11 +553,14 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         // The deposit is committed to the new argument's market and counts toward the debate total.
         debate.totalVotes += _DEBATE_DEPOSIT;
 
-        // Update the debate's leaf arguments if this is not the root argument
+        // Update the debate's leaves: the parent stops being one (a no-op if it was already interior,
+        // and the root is never a leaf), the new argument starts as one.
         if (parentArgumentId != 0) {
-            debate.leafArgumentIds.removeByValue({value: parentArgumentId});
+            // slither-disable-next-line unused-return
+            debate.leafArgumentIds.remove(parentArgumentId);
         }
-        debate.leafArgumentIds.push(newArgumentId);
+        // slither-disable-next-line unused-return
+        debate.leafArgumentIds.add(newArgumentId);
 
         emit ArgumentUpdated({
             debateId: debateId, argumentId: newArgumentId, parentArgumentId: parentArgumentId, contentURI: contentURI
@@ -623,10 +637,11 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
         parentArgument.untalliedChilds--;
 
-        // Eventually, the parent argument becomes a leaf after the removal
-        if (parentArgument.untalliedChilds == 0) {
-            // append
-            debate.leafArgumentIds.push(parentArgumentId);
+        // Eventually, the parent argument becomes a leaf after the removal - unless it is the root,
+        // which has no market and is never tallied as a leaf.
+        if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
+            // slither-disable-next-line unused-return
+            debate.leafArgumentIds.add(parentArgumentId);
         }
     }
 

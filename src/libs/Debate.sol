@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
+
 import {Argument} from "./Argument.sol";
 
 /// @title Debate
@@ -15,9 +17,9 @@ library Debate {
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
-        uint32 totalVotes; //        ┐   4
-        uint16 argumentsCount; //    ┘ + 2 = 6
-        uint16[] leafArgumentIds; // ]  32 * x
+        uint32 totalVotes; //                       ┐   4
+        uint16 argumentsCount; //                   ┘ + 2 = 6
+        EnumerableSet.UintSet leafArgumentIds;
     }
 
     /// @notice Increments the argument counter of a debate.

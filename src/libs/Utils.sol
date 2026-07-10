@@ -7,37 +7,18 @@ import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
 
 /// @title Utils
 /// @author Michael Heuer
-/// @notice A library with math and array helper functions.
+/// @notice A library with math helper functions.
 library Utils {
-    /// @notice Removes a value in an array by its index.
-    /// @param array The array.
-    /// @param i The index to be removed.
-    function removeByIndex(uint16[] storage array, uint16 i) internal {
-        uint256 length = array.length;
-        while (i < length - 1) {
-            array[i] = array[i + 1];
-            i++;
-        }
-        array.pop();
-    }
-
-    /// @notice Removes a value from an array.
-    /// @param array The array.
-    /// @param value The value to be removed.
-    function removeByValue(uint16[] storage array, uint16 value) internal {
-        removeByIndex({array: array, i: findIndex({array: array, value: value})});
-    }
-
-    /// @notice Calculates `floor(v * a / b)`.
-    /// @dev Delegates to OpenZeppelin `Math.mulDiv`, which forms the full-precision (512-bit) product `v * a` before
-    /// dividing, so it neither overflows nor loses precision. This supersedes the manual `v / b`-based decomposition
-    /// (see https://ethereum.stackexchange.com/questions/55701) that was previously used to avoid the intermediate
-    /// `v * a` overflow; that decomposition divided first on purpose and was exact, but static analyzers flag it as a
-    /// `divide-before-multiply` false positive.
+    /// @notice Calculates `floor(value * numerator / denominator)`.
+    /// @dev Delegates to OpenZeppelin `Math.mulDiv`, which forms the full-precision (512-bit) product
+    /// `value * numerator` before dividing, so it neither overflows nor loses precision. This supersedes the manual
+    /// `value / denominator`-based decomposition (see https://ethereum.stackexchange.com/questions/55701) that was
+    /// previously used to avoid the intermediate product overflow; that decomposition divided first on purpose and
+    /// was exact, but static analyzers flag it as a `divide-before-multiply` false positive.
     /// @param value The value.
     /// @param numerator The numerator.
     /// @param denominator The denominator.
-    /// @return result The rounded down result of `v * a / b`.
+    /// @return result The rounded down result of `value * numerator / denominator`.
     function multiplyByFraction(uint32 value, uint32 numerator, uint32 denominator)
         internal
         pure
@@ -46,26 +27,28 @@ library Utils {
         result = SafeCast.toUint32(Math.mulDiv(uint256(value), uint256(numerator), uint256(denominator)));
     }
 
-    /// @notice Calculates `v * a / b`, rounded toward zero.
-    /// @dev Casting `v` to `int256` forces 256-bit arithmetic so the intermediate product `v * a` cannot overflow
-    /// before the division (multiply-before-divide, exact); `a` and `b` widen implicitly (`int64` -> `int256`).
-    /// OpenZeppelin and Solady provide no signed `mulDiv`, so the widened computation is done directly here.
+    /// @notice Calculates `value * numerator / denominator`, rounded toward zero.
+    /// @dev Casting `value` to `int256` forces 256-bit arithmetic so the intermediate product cannot overflow
+    /// before the division (multiply-before-divide, exact); `numerator` and `denominator` widen implicitly
+    /// (`int64` -> `int256`). OpenZeppelin and Solady provide no signed `mulDiv`, so the widened computation is
+    /// done directly here.
     /// @param value The value.
     /// @param numerator The numerator.
     /// @param denominator The denominator.
-    /// @return result The result of `v * a / b`, rounded toward zero.
+    /// @return result The result of `value * numerator / denominator`, rounded toward zero.
     function multiplyByFraction(int64 value, int64 numerator, int64 denominator) internal pure returns (int64 result) {
         result = SafeCast.toInt64(int256(value) * int256(numerator) / int256(denominator));
     }
 
-    /// @notice Calculates `v * a / b`, rounded toward zero, for a signed value `v` and unsigned weights `a` and `b`.
+    /// @notice Calculates `value * numerator / denominator`, rounded toward zero, for a signed value and unsigned
+    /// weights.
     /// @dev Absorbs the `uint32` -> `int256` widening (Solidity has no implicit signed/unsigned conversion) so callers
     /// can pass `uint32` amounts without casting at the call site. The `int256` arithmetic also keeps the intermediate
     /// product overflow-free.
     /// @param value The value.
     /// @param numerator The numerator.
     /// @param denominator The denominator.
-    /// @return result The result of `v * a / b`, rounded toward zero.
+    /// @return result The result of `value * numerator / denominator`, rounded toward zero.
     function multiplyByFraction(int64 value, uint32 numerator, uint32 denominator)
         internal
         pure
@@ -83,40 +66,5 @@ library Utils {
     function split(uint32 v, uint32 a, uint32 b) internal pure returns (uint32 v1, uint32 v2) {
         v2 = multiplyByFraction({value: v, numerator: b, denominator: a + b});
         v1 = v - v2;
-    }
-
-    /// @notice Finds a value in an array interval using bisection search and returns its index.
-    /// @dev Taken from https://gist.github.com/chriseth/0c671e0dac08c3630f47.
-    /// @param array The array to be searched.
-    /// @param begin The start of the search interval.
-    /// @param end The end of the search interval.
-    /// @param value The value to be searched.
-    /// @return index The index of the value in the array interval.
-    function findIndexInInterval(uint16[] memory array, uint16 begin, uint16 end, uint16 value)
-        internal
-        pure
-        returns (uint16 index)
-    {
-        uint16 len = end - begin;
-        if (len == 0 || (len == 1 && array[begin] != value)) {
-            return type(uint16).max;
-        }
-        uint16 mid = begin + len / 2;
-        uint16 v = array[mid];
-        if (value < v) {
-            return findIndexInInterval({array: array, begin: begin, end: mid, value: value});
-        } else if (value > v) {
-            return findIndexInInterval({array: array, begin: mid + 1, end: end, value: value});
-        } else {
-            return mid;
-        }
-    }
-
-    /// @notice Finds a value in an array and returns its index.
-    /// @param array The array to be searched.
-    /// @param value The value to be searched.
-    /// @return index The index of the value in the array.
-    function findIndex(uint16[] memory array, uint16 value) internal pure returns (uint16 index) {
-        return findIndexInInterval({array: array, begin: 0, end: uint16(array.length), value: value});
     }
 }

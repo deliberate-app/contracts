@@ -57,6 +57,21 @@ contract ArborVoteTest is Test {
         });
     }
 
+    function _assertLeafSet(uint256 debateId, uint16[] memory expectedIds) internal view {
+        uint16[] memory actualIds = _arborVote.getLeafArgumentIds(debateId);
+        assertEq(actualIds.length, expectedIds.length);
+        for (uint256 i = 0; i < expectedIds.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < actualIds.length; j++) {
+                if (actualIds[j] == expectedIds[i]) {
+                    found = true;
+                    break;
+                }
+            }
+            assertTrue(found);
+        }
+    }
+
     function _endEditing(uint256 debateId) internal {
         (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
         vm.warp(editingEndTime + 1);
@@ -380,7 +395,68 @@ contract ArborVoteTest is Test {
         assertEq(totalVotes, 20);
     }
 
+    function test_addArgument_keepsTheLeavesConsistentAcrossSiblingAdds() public {
+        // Regression: removing the parent from the leaf list searched an unsorted array by bisection and,
+        // on a miss, silently removed the last element - adding a second child to the same parent
+        // dropped an unrelated leaf (and with it the subtree the tally would start from).
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentA = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentA);
+
+        uint16 argumentB = _addArgument(debateId, false, 50);
+        uint16 argumentC = _arborVote.addArgument({
+            debateId: debateId,
+            parentArgumentId: argumentA,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            isSupporting: true,
+            initialApproval: 50
+        });
+        uint16 argumentD = _arborVote.addArgument({
+            debateId: debateId,
+            parentArgumentId: argumentA,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            isSupporting: false,
+            initialApproval: 50
+        });
+
+        uint16[] memory expectedIds = new uint16[](3);
+        expectedIds[0] = argumentB;
+        expectedIds[1] = argumentC;
+        expectedIds[2] = argumentD;
+        _assertLeafSet(debateId, expectedIds);
+    }
+
     // --- moveArgument ---
+
+    function test_moveArgument_updatesTheLeaves() public {
+        // The new parent must stop being a leaf, and the old parent - childless again - must return to being one.
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentA = _addArgument(debateId, true, 50);
+        uint16 argumentB = _addArgument(debateId, false, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentA);
+        _arborVote.finalizeArgument(debateId, argumentB);
+
+        uint16 argumentC = _arborVote.addArgument({
+            debateId: debateId,
+            parentArgumentId: argumentA,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            isSupporting: true,
+            initialApproval: 50
+        });
+
+        _arborVote.moveArgument(debateId, argumentC, argumentB);
+
+        uint16[] memory expectedIds = new uint16[](2);
+        expectedIds[0] = argumentA;
+        expectedIds[1] = argumentC;
+        _assertLeafSet(debateId, expectedIds);
+    }
 
     function test_moveArgument_movesTheVoteWeightBetweenParents() public {
         uint256 debateId = _createDebate();

@@ -17,6 +17,8 @@ out = "out"
 script = "script"
 fs_permissions = [{ access = "read", path = "./" }]
 libs = ["dependencies"]
+# Dependency code is not ours to fix - e.g. OZ's EnumerableSet trips solc's future-keyword warning for `at`.
+ignored_warnings_from = ["dependencies"]
 auto_detect_remappings = false
 remappings = [
     "@openzeppelin-contracts-5.6.1/=dependencies/@openzeppelin-contracts-5.6.1/",
