@@ -674,4 +674,50 @@ contract ArborVoteTest is Test {
 
         assertEq(_arborVote.getUserTokens(debateId, address(this)), 0);
     }
+
+    // --- claimFees ---
+
+    function test_claimFees_creditsTheAccruedFeesToTheArgumentCreator() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        // A second participant invests 20; the 5% fee (1 token) accrues to the argument.
+        address investor = makeAddr("investor");
+        vm.prank(investor);
+        _arborVote.join(debateId);
+        vm.prank(investor);
+        _arborVote.investInPro(debateId, argumentId, 20);
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), 90); // 100 - 10 deposit
+
+        _arborVote.claimFees(debateId, argumentId);
+
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), 91); // + 1 fee
+        assertEq(_arborVote.getArgument(debateId, argumentId).fees, 0);
+
+        // A second claim is a no-op.
+        _arborVote.claimFees(debateId, argumentId);
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), 91);
+    }
+
+    function test_claimFees_revertsWhileTheDebateIsNotFinished() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        _endRating(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+        );
+        _arborVote.claimFees(debateId, argumentId);
+    }
 }

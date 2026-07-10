@@ -35,6 +35,13 @@ interface IArborVote {
     /// @param impact The impact value of the argument.
     event ArgumentImpactCalculated(uint256 indexed debateId, uint16 indexed argumentId, int64 impact);
 
+    /// @notice Emitted when the investment fees accrued by an argument are claimed for its creator.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    /// @param creator The creator of the argument the fees are credited to.
+    /// @param fees The amount of vote token fees claimed.
+    event FeesClaimed(uint256 indexed debateId, uint16 indexed argumentId, address indexed creator, uint32 fees);
+
     /// @notice Initializes the contract.
     /// @param poh The proof of humanity registry contract.
     function initialize(IProofOfHumanity poh) external;
@@ -106,6 +113,11 @@ interface IArborVote {
     /// @param argumentId The ID of the argument.
     /// @param account The account to redeem the shares for.
     function redeemArgumentShares(uint256 debateId, uint16 argumentId, address account) external;
+
+    /// @notice Claims the investment fees accrued by an argument's market, crediting them to the argument's creator.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    function claimFees(uint256 debateId, uint16 argumentId) external;
 
     /// @notice Returns an argument from a debate.
     /// @param debateId The ID of the debate.

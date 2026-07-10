@@ -389,6 +389,25 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     }
 
     /// @inheritdoc IArborVote
+    function claimFees(uint256 debateId, uint16 argumentId)
+        external
+        override
+        onlyPhase(debateId, Phase.Status.Finished)
+    {
+        ArborVoteStorage storage $ = _getArborVoteStorage();
+
+        Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
+
+        uint32 fees = argument.fees;
+        if (fees > 0) {
+            argument.fees = 0;
+            $.users[debateId][argument.creator].tokens += fees;
+
+            emit FeesClaimed({debateId: debateId, argumentId: argumentId, creator: argument.creator, fees: fees});
+        }
+    }
+
+    /// @inheritdoc IArborVote
     function getArgument(uint256 debateId, uint16 argumentId)
         external
         view
