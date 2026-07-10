@@ -30,17 +30,12 @@ _Avoid_: rating market
 The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con share investments.
 _Avoid_: debate tokens
 
+**Investment fee**:
+The share of each argument-market investment that accrues to the argument's creator, claimable once the debate is finished — the authorship incentive for arguments that attract rating volume.
+
 **Participant**:
 A Proof-of-Humanity-verified account that has joined a debate and received vote tokens.
 _Avoid_: voter, debater (both are just participants acting in a phase)
-
-**Dispute**:
-A challenge to a finalized argument during the Editing phase, ruled on by the arbitrator.
-_Avoid_: flag, removal request
-
-**Arbitrator**:
-The external arbitration protocol that rules on disputes; ArborVote has no court of its own.
-_Avoid_: curator, juror, digital court
 
 **Bounty**:
 The stake the creator attaches to a debate, paid out to above-average participants after tallying.
@@ -59,4 +54,8 @@ The phase in which participants rate arguments by investing vote tokens in their
 _Avoid_: voting phase, voting stage
 
 **Tallying phase**:
-The phase in which the tally runs and the outcome becomes final.
+The phase after rating ends in which the tally runs.
+
+**Finished**:
+The terminal state of a debate once the tally has run: the outcome is final and argument shares can be redeemed. Not a phase — a debate is finished, it is not finishing.
+_Avoid_: tallied, closed, ended
