@@ -450,15 +450,22 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
     function advancePhase(uint256 debateId) public override {
         Phase.Data storage phaseData = _getArborVoteStorage().phases[debateId];
 
-        if (phaseData.currentPhase == Phase.Status.Uninitialized) {
+        Phase.Status currentPhase = phaseData.currentPhase;
+
+        if (currentPhase == Phase.Status.Uninitialized) {
             revert DebateUninitialized({debateId: debateId});
+        }
+
+        // The terminal phase is entered by the tally and can never be left.
+        if (currentPhase == Phase.Status.Finished) {
+            return;
         }
 
         uint48 currentTime = Time.timestamp();
 
-        if (currentTime > phaseData.ratingEndTime && phaseData.currentPhase != Phase.Status.Tallying) {
+        if (currentTime > phaseData.ratingEndTime) {
             phaseData.currentPhase = Phase.Status.Tallying;
-        } else if (currentTime > phaseData.editingEndTime && phaseData.currentPhase != Phase.Status.Rating) {
+        } else if (currentTime > phaseData.editingEndTime) {
             phaseData.currentPhase = Phase.Status.Rating;
         }
     }

@@ -110,6 +110,27 @@ contract ArborVoteTest is Test {
         assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
     }
 
+    function test_advancePhase_isIdempotentAfterRatingHasEnded() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        _arborVote.advancePhase(debateId);
+
+        (Phase.Status currentPhase,,,) = _arborVote.phases(debateId);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
+    }
+
+    function test_advancePhase_doesNotLeaveTheFinishedPhase() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        _arborVote.advancePhase(debateId);
+
+        (Phase.Status currentPhase,,,) = _arborVote.phases(debateId);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
+    }
+
     // --- createDebate ---
 
     function test_createDebate_isUninitializedBeforeADebateIsCreated() public view {
