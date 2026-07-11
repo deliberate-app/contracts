@@ -507,6 +507,44 @@ contract ArborVoteTest is Test {
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
     }
 
+    function test_moveArgument_revertsForANonFinalNewParent() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentA = _addArgument(debateId, true, 50);
+        uint16 argumentB = _addArgument(debateId, false, 50); // stays Created
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
+        );
+        _arborVote.moveArgument(debateId, argumentA, argumentB);
+    }
+
+    function test_moveArgument_revertsWhenMovedUnderItself() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+
+        // The moved argument is necessarily Created, never Final - self-parenting is a state error.
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
+        );
+        _arborVote.moveArgument(debateId, argumentId, argumentId);
+    }
+
+    function test_moveArgument_revertsForANonexistentNewParent() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
+        );
+        _arborVote.moveArgument(debateId, argumentId, 42);
+    }
+
     // --- investInPro / investInCon ---
 
     function test_investInPro_convertsVoteTokensIntoProShares() public {

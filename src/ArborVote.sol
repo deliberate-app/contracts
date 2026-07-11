@@ -217,12 +217,16 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
+    /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
+    /// attach beneath Final arguments while only Created arguments can move, so a Created argument is always
+    /// childless - its subtree is itself alone, and it is not Final.
     function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId)
         external
         override
         onlyPhase(debateId, Phase.Status.Editing)
         onlyCreator(debateId, argumentId)
         onlyArgumentState(debateId, argumentId, Argument.State.Created)
+        onlyArgumentState(debateId, newParentArgumentId, Argument.State.Final)
     {
         Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
         Argument.Data storage movedArgument = debate.arguments[argumentId];
