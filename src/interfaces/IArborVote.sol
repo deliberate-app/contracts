@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {Argument} from "../libs/Argument.sol";
 import {Phase} from "../libs/Phase.sol";
 import {User} from "../libs/User.sol";
-import {IProofOfHumanity} from "./IProofOfHumanity.sol";
 
 /// @title IArborVote
 /// @author Michael Heuer
@@ -41,10 +40,6 @@ interface IArborVote {
     /// @param creator The creator of the argument the fees are credited to.
     /// @param fees The amount of vote token fees claimed.
     event FeesClaimed(uint256 indexed debateId, uint16 indexed argumentId, address indexed creator, uint32 fees);
-
-    /// @notice Initializes the contract.
-    /// @param poh The proof of humanity registry contract.
-    function initialize(IProofOfHumanity poh) external;
 
     /// @notice Creates a new debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.

@@ -2,12 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin-contracts-5.6.1/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin-contracts-5.6.1/proxy/utils/UUPSUpgradeable.sol";
 import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
-import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
 
 import {IArborVote} from "./interfaces/IArborVote.sol";
 import {IProofOfHumanity} from "./interfaces/IProofOfHumanity.sol";
@@ -19,9 +16,9 @@ import {Utils} from "./libs/Utils.sol";
 
 /// @title ArborVote
 /// @author Michael Heuer
-/// @notice A voting module for deliberative decision-making using argument trees. The contract is a conventional UUPS
-/// upgradeable contract owned via OpenZeppelin's `OwnableUpgradeable` and using ERC-7201 namespaced storage.
-contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgradeable {
+/// @notice A voting module for deliberative decision-making using argument trees. The contract is deployed once,
+/// has no owner, and is not upgradeable (ADR-0006); state lives in ERC-7201 namespaced storage.
+contract ArborVote is IArborVote {
     using EnumerableSet for EnumerableSet.UintSet;
     using Utils for uint32;
     using Utils for int64;
@@ -154,15 +151,9 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
         _;
     }
 
-    /// @notice Disables the initializers on the implementation contract to prevent it from being initialized.
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /// @inheritdoc IArborVote
-    function initialize(IProofOfHumanity poh) external override initializer {
-        __Ownable_init(msg.sender);
+    /// @notice Deploys the contract with the Proof of Humanity registry gating debate joining.
+    /// @param poh The proof of humanity registry contract.
+    constructor(IProofOfHumanity poh) {
         _getArborVoteStorage().poh = poh;
     }
 
@@ -769,11 +760,6 @@ contract ArborVote is IArborVote, Initializable, OwnableUpgradeable, UUPSUpgrade
 
         emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: ownImpact});
     }
-
-    /// @notice Authorizes an upgrade of the contract via the UUPS proxy pattern.
-    /// @dev The caller must be the owner of the contract.
-    // solhint-disable-next-line no-empty-blocks
-    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice An internal function reverting if the debate is not in a certain phase.
     /// @param debateId The ID of the debate.

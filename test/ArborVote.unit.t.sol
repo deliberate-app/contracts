@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-import {ERC1967Proxy} from "@openzeppelin-contracts-5.6.1/proxy/ERC1967/ERC1967Proxy.sol";
-import {Initializable} from "@openzeppelin-contracts-5.6.1/proxy/utils/Initializable.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {ArborVote} from "../src/ArborVote.sol";
@@ -24,14 +22,7 @@ contract ArborVoteTest is Test {
 
     function setUp() public {
         _mockProofOfHumanity = new MockProofOfHumanity();
-
-        // Deploy the implementation behind an ERC1967 UUPS proxy and initialize it in the same transaction.
-        ArborVote implementation = new ArborVote();
-        _arborVote = ArborVote(
-            address(
-                new ERC1967Proxy(address(implementation), abi.encodeCall(ArborVote.initialize, (_mockProofOfHumanity)))
-            )
-        );
+        _arborVote = new ArborVote(_mockProofOfHumanity);
     }
 
     // --- helpers ---
@@ -106,17 +97,6 @@ contract ArborVoteTest is Test {
         (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
         vm.warp(ratingEndTime + 1);
         _arborVote.advancePhase(debateId);
-    }
-
-    // --- initialize ---
-
-    function test_initialize_initializesTheContract() public view {
-        assertEq(_arborVote.owner(), address(this));
-    }
-
-    function test_initialize_revertsWhenInitializedAgain() public {
-        vm.expectRevert(Initializable.InvalidInitialization.selector);
-        _arborVote.initialize(_mockProofOfHumanity);
     }
 
     // --- advancePhase ---

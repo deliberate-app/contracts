@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-import {ERC1967Proxy} from "@openzeppelin-contracts-5.6.1/proxy/ERC1967/ERC1967Proxy.sol";
 import {Script} from "forge-std-1.16.1/src/Script.sol";
 
 import {ArborVote} from "../src/ArborVote.sol";
@@ -10,8 +9,8 @@ import {IProofOfHumanity} from "../src/interfaces/IProofOfHumanity.sol";
 import {MockProofOfHumanity} from "../test/mocks/MockProofOfHumanity.m.sol";
 
 /// @title DeployLocal
-/// @notice A script for local anvil chains: deploys ArborVote behind an ERC1967 UUPS proxy with a mock
-/// Proof of Humanity that registers every account, and seeds a sample debate so a frontend has data to show.
+/// @notice A script for local anvil chains: deploys ArborVote with a mock Proof of Humanity that registers
+/// every account, and seeds a sample debate so a frontend has data to show.
 contract DeployLocal is Script {
     uint48 internal constant _TIME_UNIT = 1 hours;
 
@@ -20,12 +19,7 @@ contract DeployLocal is Script {
 
         MockProofOfHumanity poh = new MockProofOfHumanity();
 
-        ArborVote implementation = new ArborVote();
-        arborVote = address(
-            new ERC1967Proxy(
-                address(implementation), abi.encodeCall(ArborVote.initialize, (IProofOfHumanity(address(poh))))
-            )
-        );
+        arborVote = address(new ArborVote(IProofOfHumanity(address(poh))));
 
         // Seed a debate. Only depth-1 arguments can be added here: child arguments require
         // a finalized parent, and finalization needs one time unit to pass.
