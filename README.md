@@ -2,10 +2,10 @@
 
 A voting module for deliberative decision-making using argument trees.
 
-ArborVote lets participants build a tree of pro/con arguments below a debate thesis, invest vote tokens into
-argument markets, dispute arguments through an external arbitrator, and finally tally the tree to determine the
-outcome. The `ArborVote` contract is a conventional [UUPS](https://eips.ethereum.org/EIPS/eip-1822) upgradeable
-contract owned via OpenZeppelin's `OwnableUpgradeable`.
+ArborVote lets participants build a tree of pro/con arguments below a debate thesis, stake vote tokens on
+argument markets to rate them, and finally tally the tree to determine the outcome. The `ArborVote` contract
+is deployed once, has no owner, and is not upgradeable (ADR-0006); moderation happens through the rating
+markets themselves (ADR-0005).
 
 ## Prerequisites
 
@@ -74,20 +74,31 @@ slither .
 
 #### Deployment
 
-The `ArborVote` implementation is deployed behind an `ERC1967Proxy` and initialized with the address of a
-[Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB) registry. To simulate
-deployment on sepolia, run
+`ArborVote` takes the address of a [Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB)
+registry as its only constructor argument. Against a real registry:
 
 ```sh
 forge script script/DeployArborVote.s.sol:DeployArborVote \
   --sig "run(address)" <PROOF_OF_HUMANITY> \
-  --rpc-url sepolia
+  --rpc-url <network>
 ```
 
-Append the
+On test networks without a registry, `runWithMockPoH()` deploys a `MockProofOfHumanity`
+(everyone counts as registered) alongside. For Base Sepolia, verified on Blockscout (keyless),
+with a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`):
 
-- `--broadcast` flag to deploy to the network,
-- `--verify` flag for subsequent contract verification.
+```sh
+forge script script/DeployArborVote.s.sol:DeployArborVote \
+  --sig "runWithMockPoH()" \
+  --rpc-url https://sepolia.base.org \
+  --account <KEYSTORE_ACCOUNT> \
+  --broadcast \
+  --verify --verifier blockscout --verifier-url https://base-sepolia.blockscout.com/api/
+```
+
+The script prints both addresses; the `arborVote` address and its deployment block feed the
+indexer's `config.base-sepolia.yaml` and the frontend's `VITE_ARBORVOTE_ADDRESS`
+(deployment pipeline: contracts -> indexer -> frontend).
 
 ## Layout
 
