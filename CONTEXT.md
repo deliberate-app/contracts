@@ -26,6 +26,10 @@ The on-chain, leaves-to-root aggregation of argument impact that produces the de
 The per-argument market in which participants buy an argument's pro or con shares with vote tokens.
 _Avoid_: rating market
 
+**Approval**:
+An argument market's current rating of the argument — the price of belief in it, rising as participants invest in pro shares and falling as they invest in con shares.
+_Avoid_: score, rating value
+
 **Vote tokens**:
 The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con share investments.
 _Avoid_: debate tokens
