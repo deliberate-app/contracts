@@ -747,7 +747,7 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
-        assertGt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertGt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
         assertTrue(_arborVote.outcome(debateId));
     }
 
@@ -762,7 +762,7 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
-        assertLt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertLt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
         assertFalse(_arborVote.outcome(debateId));
     }
 
@@ -796,7 +796,7 @@ contract ArborVoteTest is Test {
 
         _arborVote.tallyTree(debateId);
 
-        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsImpact, 0);
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
         assertFalse(_arborVote.outcome(debateId));
     }
 
@@ -822,7 +822,7 @@ contract ArborVoteTest is Test {
         _arborVote.tallyTree(debateId);
 
         // The fully-approved opposing child weakens its parent from below ...
-        assertLt(_arborVote.getArgument(debateId, argumentId).childsImpact, 0);
+        assertLt(_arborVote.getArgument(debateId, argumentId).descendantsImpact, 0);
         // ... and every argument ends up tallied.
         assertEq(_arborVote.getArgument(debateId, argumentId).untalliedChilds, 0);
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);

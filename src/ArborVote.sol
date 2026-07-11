@@ -312,7 +312,7 @@ contract ArborVote is IArborVote {
 
         _phases[debateId].currentPhase = Phase.Status.Finished;
 
-        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].childsImpact > 0});
+        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsImpact > 0});
     }
 
     /// @inheritdoc IArborVote
@@ -442,7 +442,7 @@ contract ArborVote is IArborVote {
             revert PhaseInvalid({expected: Phase.Status.Finished, actual: _phases[debateId].currentPhase});
         }
 
-        approved = _debates[debateId].arguments[0].childsImpact > 0;
+        approved = _debates[debateId].arguments[0].descendantsImpact > 0;
     }
 
     /// @inheritdoc IArborVote
@@ -731,11 +731,11 @@ contract ArborVote is IArborVote {
         }
 
         // Update the parent argument impact
-        parentArgument.childsImpact += ownImpact;
+        parentArgument.descendantsImpact += ownImpact;
         parentArgument.untalliedChilds--;
 
         // If all children of the parent are tallied, tally the parent - unless the parent is the root: the root
-        // (the thesis) has no market and no parent of its own, and its `childsImpact` - which `outcome` reads -
+        // (the thesis) has no market and no parent of its own, and its `descendantsImpact` - which `outcome` reads -
         // is complete once all of its children have been tallied.
         if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             _tallyNode({debateId: debateId, argumentId: parentArgumentId});
@@ -799,6 +799,6 @@ contract ArborVote is IArborVote {
         impact = _MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
 
         impact = impact.multiplyByFraction({numerator: _MIX_MAX - _MIX_VAL, denominator: _MIX_MAX})
-            + argument.childsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
+            + argument.descendantsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
     }
 }

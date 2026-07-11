@@ -26,7 +26,7 @@ library Argument {
     /// @param votes The vote tokens collateralizing the argument market (deposit and net investments).
     /// @param fees The fees accrued by the argument for its creator.
     /// @param childsVote The votes invested in the child arguments.
-    /// @param childsImpact The aggregate impact of the child arguments.
+    /// @param descendantsImpact The tallied impact of all descendants: each child folds its own approval and its subtree into what it adds here.
     struct Data {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
@@ -40,7 +40,7 @@ library Argument {
         uint32 votes; //            | + 4
         uint32 fees; //             | + 4
         uint32 childsVote; //       ┘ + 4 = 20
-        int64 childsImpact; //      ]   8
+        int64 descendantsImpact; //      ]   8
     }
 
     /// @notice The container holding the amounts computed for an investment into an argument market.
