@@ -17,7 +17,7 @@ import {Utils} from "./libs/Utils.sol";
 /// @title ArborVote
 /// @author Michael Heuer
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is deployed once,
-/// has no owner, and is not upgradeable (ADR-0006); state lives in ERC-7201 namespaced storage.
+/// has no owner, and is not upgradeable; state lives in ERC-7201 namespaced storage.
 contract ArborVote is IArborVote {
     using EnumerableSet for EnumerableSet.UintSet;
     using Utils for uint32;
@@ -113,6 +113,9 @@ contract ArborVote is IArborVote {
     /// @notice Thrown if a debate has reached its maximum number of arguments.
     /// @param limit The maximum number of arguments per debate.
     error ArgumentLimitReached(uint16 limit);
+
+    /// @notice Thrown if the thesis (argument 0), which has no market, is invested in.
+    error ThesisHasNoMarket();
 
     /// @notice Thrown if the childs of the argument are not tallied.
     /// @param untalliedChilds The number of untallied childs.
@@ -291,23 +294,7 @@ contract ArborVote is IArborVote {
         onlyPhase(debateId, Phase.Status.Rating)
         onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
-        User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
-
-        if (user.tokens < voteTokenAmount) {
-            revert InsufficientVoteTokens({required: voteTokenAmount, actual: user.tokens});
-        }
-
-        user.tokens -= voteTokenAmount;
-
-        Argument.Investment memory data =
-            calculateInvestment({debateId: debateId, argumentId: argumentId, voteTokenAmount: voteTokenAmount});
-        data.conSwap = 0;
-
-        _executeProInvestment({debateId: debateId, argumentId: argumentId, investment: data});
-
-        user.shares[argumentId].pro += data.proMint + data.proSwap;
-
-        emit Invested({debateId: debateId, argumentId: argumentId, investor: msg.sender, data: data});
+        _invest({debateId: debateId, argumentId: argumentId, isPro: true, voteTokenAmount: voteTokenAmount});
     }
 
     /// @inheritdoc IArborVote
@@ -317,23 +304,7 @@ contract ArborVote is IArborVote {
         onlyPhase(debateId, Phase.Status.Rating)
         onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
-        User.Data storage user = _getArborVoteStorage().users[debateId][msg.sender];
-
-        if (user.tokens < voteTokenAmount) {
-            revert InsufficientVoteTokens({required: voteTokenAmount, actual: user.tokens});
-        }
-
-        user.tokens -= voteTokenAmount;
-
-        Argument.Investment memory data =
-            calculateInvestment({debateId: debateId, argumentId: argumentId, voteTokenAmount: voteTokenAmount});
-        data.proSwap = 0;
-
-        _executeConInvestment({debateId: debateId, argumentId: argumentId, investment: data});
-
-        user.shares[argumentId].con += data.conMint + data.conSwap;
-
-        emit Invested({debateId: debateId, argumentId: argumentId, investor: msg.sender, data: data});
+        _invest({debateId: debateId, argumentId: argumentId, isPro: false, voteTokenAmount: voteTokenAmount});
     }
 
     /// @inheritdoc IArborVote
@@ -362,33 +333,16 @@ contract ArborVote is IArborVote {
         User.Shares storage userShares = $.users[debateId][account].shares[argumentId];
         Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
 
-        /**
-         * def y_share(self, y_amount):
-         *     return y_amount / (self.__y + self.__y_issued)
-         * def returns_y_in_b(self, y_amount):
-         *     b_share = self.__b * self.approval()
-         *     return self.y_share(y_amount) * b_share
-         */
+        uint32 marketSize = argument.pro + argument.con;
+
+        // Each pro share pays out the final approval - the con reserve's share of the market
+        // - and each con share the complement. Rounding down keeps the market solvent.
         if (userShares.pro > 0) {
-            user.tokens += argument.votes
-                .multiplyByFraction(
-                    argument.con * userShares.pro, (argument.pro + argument.con) * (argument.pro + argument.proIssued)
-                );
+            user.tokens += userShares.pro.multiplyByFraction({numerator: argument.con, denominator: marketSize});
             userShares.pro = 0;
         }
-
-        /**
-         * def n_share(self, n_amount):
-         *     return n_amount / (self.__n + self.__n_issued)
-         * def returns_n_in_b(self, n_amount):
-         *     b_share = self.__b * self.disapproval()
-         *     return self.n_share(n_amount) * b_share
-         */
         if (userShares.con > 0) {
-            user.tokens += argument.votes
-                .multiplyByFraction(
-                    argument.pro * userShares.con, (argument.pro + argument.con) * (argument.con + argument.conIssued)
-                );
+            user.tokens += userShares.con.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
             userShares.con = 0;
         }
     }
@@ -550,8 +504,9 @@ contract ArborVote is IArborVote {
         if (initialApproval < 50) {
             revert InitialApprovalOutOfBounds({limit: 50, actual: initialApproval});
         }
-        if (initialApproval > 100) {
-            revert InitialApprovalOutOfBounds({limit: 100, actual: initialApproval});
+        // 100 is not seedable: it would empty the pro reserve and freeze the market.
+        if (initialApproval > 99) {
+            revert InitialApprovalOutOfBounds({limit: 99, actual: initialApproval});
         }
 
         if (user.tokens < _DEBATE_DEPOSIT) {
@@ -599,24 +554,28 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function calculateInvestment(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
+    function calculateInvestment(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
         public
         view
         override
         returns (Argument.Investment memory investmentData)
     {
-        investmentData.voteTokensInvested = voteTokenAmount;
-
         Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
 
+        investmentData.isPro = isPro;
+        investmentData.voteTokensInvested = voteTokenAmount;
         investmentData.fee = voteTokenAmount.multiplyByFraction({numerator: _FEE_PERCENTAGE, denominator: 100});
-        (uint32 proMint, uint32 conMint) = (voteTokenAmount - investmentData.fee).split(argument.pro, argument.con);
 
-        investmentData.proMint = proMint;
-        investmentData.conMint = conMint;
+        uint32 net = voteTokenAmount - investmentData.fee;
 
-        investmentData.proSwap = _calculateProSwap({proMint: proMint, conMint: conMint});
-        investmentData.conSwap = _calculateConSwap({proMint: proMint, conMint: conMint});
+        // Constant-product pricing: the opposite reserve absorbs the net investment,
+        // the bought reserve is restored to the invariant - rounded up, so a reserve can never be
+        // drained to zero - and the investor receives the freed shares plus the net amount.
+        (uint32 bought, uint32 opposite) = isPro ? (argument.pro, argument.con) : (argument.con, argument.pro);
+        uint32 newOpposite = opposite + net;
+        uint32 newBought = bought.multiplyByFractionCeil({numerator: opposite, denominator: newOpposite});
+
+        investmentData.sharesOut = bought + net - newBought;
     }
 
     /// @notice Internal function to create an argument below a parent argument with a certain initial approval.
@@ -642,8 +601,10 @@ contract ArborVote is IArborVote {
 
         Argument.Data storage argument = debate.arguments[newArgumentId];
 
-        // Seed the argument market with the deposit at the creator's initial approval (pro share percentage).
-        (argument.pro, argument.con) = _DEBATE_DEPOSIT.split(initialApproval, 100 - initialApproval);
+        // Seed the market reserves at the creator's initial approval. Approval is the pro-share
+        // PRICE, so a high approval means a scarce pro reserve: the con side receives
+        // the initialApproval fraction of the deposit, the pro side the complement.
+        (argument.pro, argument.con) = _DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
         argument.votes = _DEBATE_DEPOSIT;
 
         argument.creator = msg.sender;
@@ -676,48 +637,54 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @notice Internal function to execute an investment to obtain pro tokens on the argument's market in a debate.
+    /// @notice Internal function investing vote tokens into one side of an argument's constant-product market.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument to invest in.
-    /// @param investment The container containing the investment data.
-    function _executeProInvestment(uint256 debateId, uint16 argumentId, Argument.Investment memory investment)
-        internal
-    {
-        uint32 votes = investment.voteTokensInvested - investment.fee;
+    /// @param isPro Whether pro or con shares are bought.
+    /// @param voteTokenAmount The amount of vote tokens to invest.
+    function _invest(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount) internal {
+        ArborVoteStorage storage $ = _getArborVoteStorage();
 
-        Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
+        // The thesis is rated through its argument tree, not through a market of its own.
+        if (argumentId == 0) {
+            revert ThesisHasNoMarket();
+        }
+
+        User.Data storage user = $.users[debateId][msg.sender];
+
+        if (user.tokens < voteTokenAmount) {
+            revert InsufficientVoteTokens({required: voteTokenAmount, actual: user.tokens});
+        }
+
+        user.tokens -= voteTokenAmount;
+
+        Argument.Investment memory investment = calculateInvestment({
+            debateId: debateId, argumentId: argumentId, isPro: isPro, voteTokenAmount: voteTokenAmount
+        });
+
+        uint32 net = voteTokenAmount - investment.fee;
+
+        Debate.Data storage debate = $.debates[debateId];
         Argument.Data storage argument = debate.arguments[argumentId];
 
-        debate.totalVotes += votes;
-        debate.arguments[argument.parentArgumentId].childsVote += votes;
+        // Reconstruct the post-trade reserves from the quote: the bought side shrinks by the
+        // shares that leave the pool, the opposite side absorbs the net investment.
+        if (isPro) {
+            argument.pro = argument.pro + net - investment.sharesOut;
+            argument.con += net;
+            user.shares[argumentId].pro += investment.sharesOut;
+        } else {
+            argument.con = argument.con + net - investment.sharesOut;
+            argument.pro += net;
+            user.shares[argumentId].con += investment.sharesOut;
+        }
 
-        argument.votes += votes;
+        argument.votes += net;
         argument.fees += investment.fee;
-        argument.pro -= investment.proSwap;
-        argument.proIssued += investment.proMint + investment.proSwap;
-        argument.con += investment.conMint;
-    }
+        debate.totalVotes += net;
+        debate.arguments[argument.parentArgumentId].childsVote += net;
 
-    /// @notice Internal function to execute an investment to obtain con tokens on the argument's market in a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to invest in.
-    /// @param investment The container containing the investment data.
-    function _executeConInvestment(uint256 debateId, uint16 argumentId, Argument.Investment memory investment)
-        internal
-    {
-        uint32 votes = investment.voteTokensInvested - investment.fee;
-
-        Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
-        Argument.Data storage argument = debate.arguments[argumentId];
-
-        debate.totalVotes += votes;
-        debate.arguments[argument.parentArgumentId].childsVote += votes;
-
-        argument.votes += votes;
-        argument.fees += investment.fee;
-        argument.pro += investment.proMint;
-        argument.con -= investment.conSwap;
-        argument.conIssued += investment.conMint + investment.conSwap;
+        emit Invested({debateId: debateId, argumentId: argumentId, investor: msg.sender, data: investment});
     }
 
     /// @notice Internal function to tally an argument in a debate.
@@ -816,28 +783,12 @@ contract ArborVote is IArborVote {
         uint32 pro = argument.pro;
         uint32 con = argument.con;
 
-        // calculate own impact
-        impact = _MAX_APPROVAL.multiplyByFraction({numerator: pro, denominator: pro + con});
+        // Calculate the own approval impact. Approval is the pro-share PRICE of the market:
+        // the scarcer the pro reserve, the higher the approval - i.e. con/(pro+con).
+        impact = _MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
 
         impact = impact.multiplyByFraction({numerator: _MIX_MAX - _MIX_VAL, denominator: _MIX_MAX})
             + argument.childsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
-    }
-
-    /// @notice Internal function to calculate the amount of pro tokens obtained from swapping the minted con tokens.
-    /// @param proMint The amount of pro tokens.
-    /// @param conMint The amount of con tokens.
-    /// @return proSwap The amount of pro tokens obtained from swapping the minted con tokens.
-    function _calculateProSwap(uint32 proMint, uint32 conMint) internal pure returns (uint32 proSwap) {
-        (conMint);
-        return proMint - proMint / 2;
-    }
-
-    /// @notice Internal function to calculate the amount of con tokens obtained from swapping the minted pro tokens.
-    /// @param proMint The amount of pro tokens.
-    /// @param conMint The amount of con tokens.
-    /// @return conSwap The amount of con tokens obtained from swapping the minted pro tokens.
-    function _calculateConSwap(uint32 proMint, uint32 conMint) internal pure returns (uint32 conSwap) {
-        conSwap = proMint - proMint / (1 + proMint / conMint); // TODO Revisit formulas
     }
 
     /// @notice Returns the ERC-7201 namespaced storage struct of the contract.

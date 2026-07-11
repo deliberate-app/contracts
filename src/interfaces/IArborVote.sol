@@ -176,13 +176,14 @@ interface IArborVote {
     /// @return approved Whether the debate approved the root thesis or not.
     function outcome(uint256 debateId) external view returns (bool approved);
 
-    /// @notice Calculates the amounts of mintable and swapable pro and con shares to be returned for an amount of vote
-    /// token to be invested.
+    /// @notice Quotes an investment into one side of an argument's market: the fee and the shares
+    /// the investor would receive under constant-product pricing.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument to invest in.
+    /// @param isPro Whether pro or con shares are bought.
     /// @param voteTokenAmount The amount of vote tokens to be invested.
-    /// @return investmentData The container containing the calculated amounts.
-    function calculateInvestment(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
+    /// @return investmentData The container containing the quoted amounts.
+    function calculateInvestment(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
         external
         view
         returns (Argument.Investment memory investmentData);

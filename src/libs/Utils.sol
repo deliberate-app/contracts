@@ -27,6 +27,23 @@ library Utils {
         result = SafeCast.toUint32(Math.mulDiv(uint256(value), uint256(numerator), uint256(denominator)));
     }
 
+    /// @notice Calculates `ceil(value * numerator / denominator)`.
+    /// @dev The rounded-up counterpart of `multiplyByFraction`, used where rounding must favor the pool
+    /// (an argument market reserve can never be rounded down to zero).
+    /// @param value The value.
+    /// @param numerator The numerator.
+    /// @param denominator The denominator.
+    /// @return result The rounded up result of `value * numerator / denominator`.
+    function multiplyByFractionCeil(uint32 value, uint32 numerator, uint32 denominator)
+        internal
+        pure
+        returns (uint32 result)
+    {
+        result = SafeCast.toUint32(
+            Math.mulDiv(uint256(value), uint256(numerator), uint256(denominator), Math.Rounding.Ceil)
+        );
+    }
+
     /// @notice Calculates `value * numerator / denominator`, rounded toward zero.
     /// @dev Casting `value` to `int256` forces 256-bit arithmetic so the intermediate product cannot overflow
     /// before the division (multiply-before-divide, exact); `numerator` and `denominator` widen implicitly

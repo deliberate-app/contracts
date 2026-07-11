@@ -342,13 +342,14 @@ contract ArborVoteTest is Test {
         _addArgument(debateId, true, initialApproval);
     }
 
-    function test_addArgument_revertsForInitialApprovalsAbove100() public {
+    function test_addArgument_revertsForInitialApprovalsAbove99() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint32 initialApproval = 101;
+        // 100 would empty the pro reserve and freeze the market.
+        uint32 initialApproval = 100;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, uint32(100), initialApproval)
+            abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, uint32(99), initialApproval)
         );
         _addArgument(debateId, true, initialApproval);
     }
@@ -368,20 +369,21 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
+        // Approval is the pro-share price: 80% approval means a scarce pro reserve.
         Argument.Data memory argument = _arborVote.getArgument(debateId, _addArgument(debateId, true, 80));
-        assertEq(argument.pro, 8);
-        assertEq(argument.con, 2);
+        assertEq(argument.pro, 2);
+        assertEq(argument.con, 8);
         assertEq(argument.votes, 10);
         assertEq(argument.fees, 0);
     }
 
-    function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf100() public {
+    function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf95() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        Argument.Data memory argument = _arborVote.getArgument(debateId, _addArgument(debateId, true, 100));
-        assertEq(argument.pro, 10);
-        assertEq(argument.con, 0);
+        Argument.Data memory argument = _arborVote.getArgument(debateId, _addArgument(debateId, true, 95));
+        assertEq(argument.pro, 1);
+        assertEq(argument.con, 9);
         assertEq(argument.votes, 10);
         assertEq(argument.fees, 0);
     }
@@ -547,11 +549,11 @@ contract ArborVoteTest is Test {
 
     // --- investInPro / investInCon ---
 
-    function test_investInPro_convertsVoteTokensIntoProShares() public {
+    function test_investInPro_buysProSharesAndRaisesTheApproval() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint16 argumentId = _addArgument(debateId, true, 50);
+        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
@@ -561,13 +563,140 @@ contract ArborVoteTest is Test {
         // 100 initial - 10 deposit - 20 investment
         assertEq(_arborVote.getUserTokens(debateId, address(this)), 70);
 
+        // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
         User.Shares memory shares = _arborVote.getUserShares(debateId, argumentId, address(this));
-        assertGt(shares.pro, 0);
+        assertEq(shares.pro, 22);
         assertEq(shares.con, 0);
 
         Argument.Data memory argument = _arborVote.getArgument(debateId, argumentId);
+        assertEq(argument.pro, 2);
+        assertEq(argument.con, 24); // approval con/(pro+con) rose from 50% to 24/26 = 92.3%
         assertEq(argument.votes, 29); // 10 deposit + 20 invested - 1 fee
         assertEq(argument.fees, 1); // 5% of 20
+    }
+
+    function test_investInCon_buysConSharesAndLowersTheApproval() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        _arborVote.investInCon(debateId, argumentId, 20);
+
+        // fee 1, net 19: pro 5+19=24, con ceil(25/24)=2, shares out 22
+        User.Shares memory shares = _arborVote.getUserShares(debateId, argumentId, address(this));
+        assertEq(shares.con, 22);
+        assertEq(shares.pro, 0);
+
+        Argument.Data memory argument = _arborVote.getArgument(debateId, argumentId);
+        assertEq(argument.pro, 24);
+        assertEq(argument.con, 2); // approval fell from 50% to 2/26 = 7.7% - rated as bad
+    }
+
+    /// @dev Pins the market's defining behavior: buying a side always moves the approval - the
+    /// price of belief, con/(pro+con) - toward that side, never away from it. Compared through
+    /// cross-multiplication to avoid integer division.
+    function testFuzz_invest_movesTheApprovalTowardTheBoughtSide(uint32 initialApproval, bool isPro, uint32 amount)
+        public
+    {
+        initialApproval = uint32(bound(initialApproval, 50, 99));
+        amount = uint32(bound(amount, 1, 100));
+
+        uint256 debateId = _createDebate();
+        _join(debateId);
+        uint16 argumentId = _addArgument(debateId, true, initialApproval);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        Argument.Data memory before = _arborVote.getArgument(debateId, argumentId);
+
+        address investor = makeAddr("investor");
+        vm.startPrank(investor);
+        _arborVote.join(debateId);
+        if (isPro) {
+            _arborVote.investInPro(debateId, argumentId, amount);
+        } else {
+            _arborVote.investInCon(debateId, argumentId, amount);
+        }
+        vm.stopPrank();
+
+        Argument.Data memory afterwards = _arborVote.getArgument(debateId, argumentId);
+
+        // Neither reserve can ever be drained.
+        assertGe(afterwards.pro, 1);
+        assertGe(afterwards.con, 1);
+
+        // newApproval >= oldApproval for pro buys (and mirrored for con buys), cross-multiplied.
+        uint256 newApprovalCross = uint256(afterwards.con) * (uint256(before.pro) + uint256(before.con));
+        uint256 oldApprovalCross = uint256(before.con) * (uint256(afterwards.pro) + uint256(afterwards.con));
+        if (isPro) {
+            assertGe(newApprovalCross, oldApprovalCross);
+        } else {
+            assertLe(newApprovalCross, oldApprovalCross);
+        }
+    }
+
+    /// @dev Redemption can never pay out more than the market's collateral, whatever is traded.
+    function testFuzz_redeem_staysWithinTheMarketCollateral(
+        uint32 initialApproval,
+        bool firstIsPro,
+        uint32 firstAmount,
+        bool secondIsPro,
+        uint32 secondAmount
+    ) public {
+        initialApproval = uint32(bound(initialApproval, 50, 99));
+        firstAmount = uint32(bound(firstAmount, 1, 100));
+        secondAmount = uint32(bound(secondAmount, 1, 100));
+
+        uint256 debateId = _createDebate();
+        _join(debateId);
+        uint16 argumentId = _addArgument(debateId, true, initialApproval);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        address firstInvestor = makeAddr("firstInvestor");
+        address secondInvestor = makeAddr("secondInvestor");
+
+        vm.startPrank(firstInvestor);
+        _arborVote.join(debateId);
+        if (firstIsPro) _arborVote.investInPro(debateId, argumentId, firstAmount);
+        else _arborVote.investInCon(debateId, argumentId, firstAmount);
+        vm.stopPrank();
+
+        vm.startPrank(secondInvestor);
+        _arborVote.join(debateId);
+        if (secondIsPro) _arborVote.investInPro(debateId, argumentId, secondAmount);
+        else _arborVote.investInCon(debateId, argumentId, secondAmount);
+        vm.stopPrank();
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        uint32 collateral = _arborVote.getArgument(debateId, argumentId).votes;
+        uint32 firstBefore = _arborVote.getUserTokens(debateId, firstInvestor);
+        uint32 secondBefore = _arborVote.getUserTokens(debateId, secondInvestor);
+
+        _arborVote.redeemArgumentShares(debateId, argumentId, firstInvestor);
+        _arborVote.redeemArgumentShares(debateId, argumentId, secondInvestor);
+
+        uint256 paidOut = (uint256(_arborVote.getUserTokens(debateId, firstInvestor)) - firstBefore)
+            + (uint256(_arborVote.getUserTokens(debateId, secondInvestor)) - secondBefore);
+        assertLe(paidOut, uint256(collateral));
+    }
+
+    function test_investInPro_revertsForTheThesis() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+        _endEditing(debateId);
+
+        // The thesis is Final from creation but has no market of its own.
+        vm.expectRevert(ArborVote.ThesisHasNoMarket.selector);
+        _arborVote.investInPro(debateId, _ROOT_ARGUMENT_ID, 10);
     }
 
     function test_investInPro_revertsForANonFinalArgument() public {
@@ -661,7 +790,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        _addArgument(debateId, true, 100); // stays Created: never finalized
+        _addArgument(debateId, true, 95); // stays Created: never finalized
         _endRating(debateId);
 
         _arborVote.tallyTree(debateId);
@@ -683,7 +812,7 @@ contract ArborVoteTest is Test {
             parentArgumentId: argumentId,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: false,
-            initialApproval: 100
+            initialApproval: 95
         });
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
         _arborVote.finalizeArgument(debateId, childArgumentId);
@@ -745,6 +874,43 @@ contract ArborVoteTest is Test {
         _arborVote.redeemArgumentShares(debateId, _ROOT_ARGUMENT_ID, address(this));
 
         assertEq(_arborVote.getUserTokens(debateId, address(this)), 0);
+    }
+
+    function test_redeemArgumentShares_paysTheEarlyCorrectInvestorAProfit() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        address earlyInvestor = makeAddr("earlyInvestor");
+        address lateInvestor = makeAddr("lateInvestor");
+
+        // The early investor buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
+        vm.startPrank(earlyInvestor);
+        _arborVote.join(debateId);
+        _arborVote.investInPro(debateId, argumentId, 10);
+        vm.stopPrank();
+
+        // The crowd confirms the rating later, at a higher price: 20 shares for 20 tokens (-> 97.1%).
+        vm.startPrank(lateInvestor);
+        _arborVote.join(debateId);
+        _arborVote.investInPro(debateId, argumentId, 20);
+        vm.stopPrank();
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        _arborVote.redeemArgumentShares(debateId, argumentId, earlyInvestor);
+        _arborVote.redeemArgumentShares(debateId, argumentId, lateInvestor);
+
+        // Early: 13 shares x 34/35 = 12 tokens back on 10 invested - correcting the rating early pays.
+        assertEq(_arborVote.getUserTokens(debateId, earlyInvestor), 102);
+        // Late: 20 shares x 34/35 = 19 tokens back on 20 invested - fee and slippage eat the late trade.
+        assertEq(_arborVote.getUserTokens(debateId, lateInvestor), 99);
+        // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
     }
 
     // --- claimFees ---
