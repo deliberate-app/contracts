@@ -193,7 +193,14 @@ contract ArborVote is IArborVote {
         // increment counters
         newDebate.incrementArgumentCounter();
 
-        emit ArgumentUpdated({debateId: debateId, argumentId: 0, parentArgumentId: 0, contentURI: contentURI});
+        emit DebateCreated({
+            debateId: debateId,
+            creator: msg.sender,
+            contentURI: contentURI,
+            timeUnit: timeUnit,
+            editingEndTime: phaseData.editingEndTime,
+            ratingEndTime: phaseData.ratingEndTime
+        });
     }
 
     /// @inheritdoc IArborVote
@@ -217,6 +224,8 @@ contract ArborVote is IArborVote {
 
         user.role = User.Role.Participant;
         user.tokens = INITIAL_TOKENS;
+
+        emit Joined({debateId: debateId, account: msg.sender, tokens: INITIAL_TOKENS});
     }
 
     /// @inheritdoc IArborVote
@@ -251,11 +260,11 @@ contract ArborVote is IArborVote {
             debate.leafArgumentIds.remove(newParentArgumentId);
         }
 
-        emit ArgumentUpdated({
+        emit ArgumentMoved({
             debateId: debateId,
             argumentId: argumentId,
-            parentArgumentId: newParentArgumentId,
-            contentURI: movedArgument.contentURI
+            newParentArgumentId: newParentArgumentId,
+            oldParentArgumentId: oldParentArgumentId
         });
     }
 
@@ -279,11 +288,8 @@ contract ArborVote is IArborVote {
         alteredArgument.finalizationTime = newFinalizationTime;
         alteredArgument.contentURI = contentURI;
 
-        emit ArgumentUpdated({
-            debateId: debateId,
-            argumentId: argumentId,
-            parentArgumentId: alteredArgument.parentArgumentId,
-            contentURI: contentURI
+        emit ArgumentAltered({
+            debateId: debateId, argumentId: argumentId, contentURI: contentURI, finalizationTime: newFinalizationTime
         });
     }
 
@@ -319,6 +325,8 @@ contract ArborVote is IArborVote {
         }
 
         $.phases[debateId].currentPhase = Phase.Status.Finished;
+
+        emit DebateFinished({debateId: debateId, approved: $.debates[debateId].arguments[0].childsImpact > 0});
     }
 
     /// @inheritdoc IArborVote
@@ -333,18 +341,35 @@ contract ArborVote is IArborVote {
         User.Shares storage userShares = $.users[debateId][account].shares[argumentId];
         Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
 
+        uint32 proShares = userShares.pro;
+        uint32 conShares = userShares.con;
+        if (proShares == 0 && conShares == 0) {
+            return;
+        }
+
         uint32 marketSize = argument.pro + argument.con;
 
         // Each pro share pays out the final approval - the con reserve's share of the market
         // - and each con share the complement. Rounding down keeps the market solvent.
-        if (userShares.pro > 0) {
-            user.tokens += userShares.pro.multiplyByFraction({numerator: argument.con, denominator: marketSize});
+        uint32 payout = 0;
+        if (proShares > 0) {
+            payout += proShares.multiplyByFraction({numerator: argument.con, denominator: marketSize});
             userShares.pro = 0;
         }
-        if (userShares.con > 0) {
-            user.tokens += userShares.con.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
+        if (conShares > 0) {
+            payout += conShares.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
             userShares.con = 0;
         }
+        user.tokens += payout;
+
+        emit SharesRedeemed({
+            debateId: debateId,
+            argumentId: argumentId,
+            account: account,
+            proShares: proShares,
+            conShares: conShares,
+            payout: payout
+        });
     }
 
     /// @inheritdoc IArborVote
@@ -462,6 +487,10 @@ contract ArborVote is IArborVote {
         } else if (currentTime > phaseData.editingEndTime) {
             phaseData.currentPhase = Phase.Status.Rating;
         }
+
+        if (phaseData.currentPhase != currentPhase) {
+            emit PhaseAdvanced({debateId: debateId, newPhase: phaseData.currentPhase});
+        }
     }
 
     /// @inheritdoc IArborVote
@@ -479,6 +508,8 @@ contract ArborVote is IArborVote {
         }
 
         argument.state = Argument.State.Final;
+
+        emit ArgumentFinalized({debateId: debateId, argumentId: argumentId});
     }
 
     /// @inheritdoc IArborVote
@@ -548,8 +579,17 @@ contract ArborVote is IArborVote {
         // slither-disable-next-line unused-return
         debate.leafArgumentIds.add(newArgumentId);
 
-        emit ArgumentUpdated({
-            debateId: debateId, argumentId: newArgumentId, parentArgumentId: parentArgumentId, contentURI: contentURI
+        Argument.Data storage newArgument = debate.arguments[newArgumentId];
+        emit ArgumentAdded({
+            debateId: debateId,
+            argumentId: newArgumentId,
+            parentArgumentId: parentArgumentId,
+            creator: msg.sender,
+            isSupporting: isSupporting,
+            contentURI: contentURI,
+            pro: newArgument.pro,
+            con: newArgument.con,
+            finalizationTime: newArgument.finalizationTime
         });
     }
 

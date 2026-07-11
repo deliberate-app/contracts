@@ -10,14 +10,86 @@ import {User} from "../libs/User.sol";
 /// @author Michael Heuer
 /// @notice The interface of the ArborVote voting module for deliberative decision-making using argument trees.
 interface IArborVote {
-    /// @notice Emitted when an argument in a debate is updated.
+    /// @notice Emitted when a debate is created. The thesis is the debate's root argument (ID 0).
+    /// @param debateId The ID of the debate.
+    /// @param creator The creator of the debate.
+    /// @param contentURI The URI pointing to the content of the debate thesis.
+    /// @param timeUnit The time unit of the debate determining the editing and rating durations.
+    /// @param editingEndTime The end time of the editing phase.
+    /// @param ratingEndTime The end time of the rating phase.
+    event DebateCreated(
+        uint256 indexed debateId,
+        address indexed creator,
+        bytes32 contentURI,
+        uint48 timeUnit,
+        uint48 editingEndTime,
+        uint48 ratingEndTime
+    );
+
+    /// @notice Emitted when a user joins a debate.
+    /// @param debateId The ID of the debate.
+    /// @param account The account that joined.
+    /// @param tokens The vote tokens the account received.
+    event Joined(uint256 indexed debateId, address indexed account, uint32 tokens);
+
+    /// @notice Emitted when a debate advances into a later phase along its time gates.
+    /// The terminal transition into `Finished` is emitted as `DebateFinished` by the tally instead.
+    /// @param debateId The ID of the debate.
+    /// @param newPhase The phase the debate advanced into.
+    event PhaseAdvanced(uint256 indexed debateId, Phase.Status newPhase);
+
+    /// @notice Emitted when the tally completes, moving the debate into the terminal `Finished` phase.
+    /// @param debateId The ID of the debate.
+    /// @param approved Whether the debate approved the thesis.
+    event DebateFinished(uint256 indexed debateId, bool approved);
+
+    /// @notice Emitted when an argument is added to a debate.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @param parentArgumentId The ID of the parent argument.
+    /// @param creator The creator of the argument.
+    /// @param isSupporting Whether the argument supports or opposes the parent argument.
     /// @param contentURI The URI pointing to the content of the argument.
-    event ArgumentUpdated(
-        uint256 indexed debateId, uint16 indexed argumentId, uint16 indexed parentArgumentId, bytes32 contentURI
+    /// @param pro The pro reserve the argument's market is seeded with.
+    /// @param con The con reserve the argument's market is seeded with.
+    /// @param finalizationTime The time from which the argument can be finalized.
+    event ArgumentAdded(
+        uint256 indexed debateId,
+        uint16 indexed argumentId,
+        uint16 indexed parentArgumentId,
+        address creator,
+        bool isSupporting,
+        bytes32 contentURI,
+        uint32 pro,
+        uint32 con,
+        uint48 finalizationTime
     );
+
+    /// @notice Emitted when an argument is moved below a new parent argument.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    /// @param newParentArgumentId The ID of the new parent argument.
+    /// @param oldParentArgumentId The ID of the old parent argument.
+    event ArgumentMoved(
+        uint256 indexed debateId,
+        uint16 indexed argumentId,
+        uint16 indexed newParentArgumentId,
+        uint16 oldParentArgumentId
+    );
+
+    /// @notice Emitted when an argument's content is altered, which restarts its editing window.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    /// @param contentURI The URI pointing to the new content of the argument.
+    /// @param finalizationTime The new time from which the argument can be finalized.
+    event ArgumentAltered(
+        uint256 indexed debateId, uint16 indexed argumentId, bytes32 contentURI, uint48 finalizationTime
+    );
+
+    /// @notice Emitted when an argument is finalized, locking it in for rating and tallying.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    event ArgumentFinalized(uint256 indexed debateId, uint16 indexed argumentId);
 
     /// @notice Emitted when a debater invests vote tokens in an argument in a debate.
     /// @param debateId The ID of the debate.
@@ -26,6 +98,22 @@ interface IArborVote {
     /// @param data The data of the investment that was made.
     event Invested(
         uint256 indexed debateId, uint16 indexed argumentId, address indexed investor, Argument.Investment data
+    );
+
+    /// @notice Emitted when a user redeems their shares in an argument after the debate finished.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    /// @param account The account whose shares were redeemed.
+    /// @param proShares The pro shares redeemed.
+    /// @param conShares The con shares redeemed.
+    /// @param payout The vote tokens paid out for the shares.
+    event SharesRedeemed(
+        uint256 indexed debateId,
+        uint16 indexed argumentId,
+        address indexed account,
+        uint32 proShares,
+        uint32 conShares,
+        uint32 payout
     );
 
     /// @notice Emitted when the impact of an argument in a debate was calculated.

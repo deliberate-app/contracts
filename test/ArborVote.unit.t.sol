@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {ArborVote} from "../src/ArborVote.sol";
+import {IArborVote} from "../src/interfaces/IArborVote.sol";
 import {Argument} from "../src/libs/Argument.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
@@ -957,5 +958,196 @@ contract ArborVoteTest is Test {
             abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
         );
         _arborVote.claimFees(debateId, argumentId);
+    }
+
+    // --- events ---
+    // Every state transition emits an event carrying the resulting state, so an indexer can
+    // mirror the debate without reading the contract (and without redoing the market rounding).
+
+    function test_createDebate_emitsDebateCreated() public {
+        uint48 creationTime = uint48(vm.getBlockTimestamp());
+
+        vm.expectEmit();
+        emit IArborVote.DebateCreated({
+            debateId: 0,
+            creator: address(this),
+            contentURI: _THESIS_CONTENT,
+            timeUnit: _TIME_UNIT,
+            editingEndTime: creationTime + 7 * _TIME_UNIT,
+            ratingEndTime: creationTime + 10 * _TIME_UNIT
+        });
+        _createDebate();
+    }
+
+    function test_join_emitsJoined() public {
+        uint256 debateId = _createDebate();
+
+        vm.expectEmit();
+        emit IArborVote.Joined({debateId: debateId, account: address(this), tokens: _arborVote.INITIAL_TOKENS()});
+        _join(debateId);
+    }
+
+    function test_addArgument_emitsArgumentAddedWithTheSeededMarket() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        // An 80% initial approval seeds a scarce pro reserve: 2 pro / 8 con.
+        vm.expectEmit();
+        emit IArborVote.ArgumentAdded({
+            debateId: debateId,
+            argumentId: 1,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            creator: address(this),
+            isSupporting: true,
+            contentURI: _PRO_ARGUMENT_CONTENT,
+            pro: 2,
+            con: 8,
+            finalizationTime: uint48(vm.getBlockTimestamp()) + _TIME_UNIT
+        });
+        _addArgument(debateId, true, 80);
+    }
+
+    function test_moveArgument_emitsArgumentMoved() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 newParentArgumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, newParentArgumentId);
+
+        uint16 movedArgumentId = _addArgument(debateId, false, 50);
+
+        vm.expectEmit();
+        emit IArborVote.ArgumentMoved({
+            debateId: debateId,
+            argumentId: movedArgumentId,
+            newParentArgumentId: newParentArgumentId,
+            oldParentArgumentId: _ROOT_ARGUMENT_ID
+        });
+        _arborVote.moveArgument(debateId, movedArgumentId, newParentArgumentId);
+    }
+
+    function test_alterArgument_emitsArgumentAltered() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        bytes32 newContentURI = "An even better idea.";
+
+        vm.expectEmit();
+        emit IArborVote.ArgumentAltered({
+            debateId: debateId,
+            argumentId: argumentId,
+            contentURI: newContentURI,
+            finalizationTime: uint48(vm.getBlockTimestamp()) + _TIME_UNIT
+        });
+        _arborVote.alterArgument(debateId, argumentId, newContentURI);
+    }
+
+    function test_finalizeArgument_emitsArgumentFinalized() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+
+        vm.expectEmit();
+        emit IArborVote.ArgumentFinalized({debateId: debateId, argumentId: argumentId});
+        _arborVote.finalizeArgument(debateId, argumentId);
+    }
+
+    function test_advancePhase_emitsPhaseAdvancedOnEachTransition() public {
+        uint256 debateId = _createDebate();
+        (, uint48 editingEndTime, uint48 ratingEndTime,) = _arborVote.phases(debateId);
+
+        vm.warp(editingEndTime + 1);
+        vm.expectEmit();
+        emit IArborVote.PhaseAdvanced({debateId: debateId, newPhase: Phase.Status.Rating});
+        _arborVote.advancePhase(debateId);
+
+        vm.warp(ratingEndTime + 1);
+        vm.expectEmit();
+        emit IArborVote.PhaseAdvanced({debateId: debateId, newPhase: Phase.Status.Tallying});
+        _arborVote.advancePhase(debateId);
+    }
+
+    function test_advancePhase_emitsNothingBelowTheTimeGates() public {
+        uint256 debateId = _createDebate();
+
+        vm.recordLogs();
+        _arborVote.advancePhase(debateId);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function test_investInPro_emitsInvested() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
+        vm.expectEmit();
+        emit IArborVote.Invested({
+            debateId: debateId,
+            argumentId: argumentId,
+            investor: address(this),
+            data: Argument.Investment({isPro: true, voteTokensInvested: 20, fee: 1, sharesOut: 22})
+        });
+        _arborVote.investInPro(debateId, argumentId, 20);
+    }
+
+    function test_tallyTree_emitsDebateFinishedWithTheOutcome() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 80); // a supporting argument rated well
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endRating(debateId);
+
+        vm.expectEmit();
+        emit IArborVote.DebateFinished({debateId: debateId, approved: true});
+        _arborVote.tallyTree(debateId);
+    }
+
+    function test_redeemArgumentShares_emitsSharesRedeemed() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 80); // reserves 2/8
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argumentId);
+        _endEditing(debateId);
+
+        // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
+        _arborVote.investInCon(debateId, argumentId, 20);
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        // 26 con shares x 21/22 of the market, rounded down: 24 tokens.
+        vm.expectEmit();
+        emit IArborVote.SharesRedeemed({
+            debateId: debateId, argumentId: argumentId, account: address(this), proShares: 0, conShares: 26, payout: 24
+        });
+        _arborVote.redeemArgumentShares(debateId, argumentId, address(this));
+    }
+
+    function test_redeemArgumentShares_emitsNothingWithoutShares() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        vm.recordLogs();
+        _arborVote.redeemArgumentShares(debateId, argumentId, makeAddr("uninvolved"));
+
+        assertEq(vm.getRecordedLogs().length, 0);
     }
 }
