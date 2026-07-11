@@ -10,6 +10,7 @@ import {IArborVote} from "./interfaces/IArborVote.sol";
 import {IProofOfHumanity} from "./interfaces/IProofOfHumanity.sol";
 import {Argument} from "./libs/Argument.sol";
 import {Debate} from "./libs/Debate.sol";
+import {Parameters} from "./libs/Parameters.sol";
 import {Phase} from "./libs/Phase.sol";
 import {User} from "./libs/User.sol";
 import {Utils} from "./libs/Utils.sol";
@@ -23,24 +24,6 @@ contract ArborVote is IArborVote {
     using Utils for uint32;
     using Utils for int64;
     using Debate for Debate.Data;
-
-    uint32 internal constant _DEBATE_DEPOSIT = 10;
-    uint32 internal constant _FEE_PERCENTAGE = 5;
-
-    /// @notice The initial vote token balance granted to a user upon joining a debate.
-    uint32 public constant INITIAL_TOKENS = 100;
-
-    /// @notice The maximum number of arguments per debate, the thesis included.
-    /// @dev Bounds the atomic tally: the whole tree must be tallyable within one block's gas (asserted by the gas
-    /// benchmark test). Depth needs no bound of its own - each tree level takes one time unit of finalization
-    /// latency inside the seven-time-unit editing window - so the cap effectively governs breadth.
-    uint16 public constant MAX_ARGUMENTS = 1024;
-
-    int64 internal constant _MIX_VAL = type(int64).max / 2;
-    int64 internal constant _MIX_MAX = type(int64).max;
-
-    /// @notice The fixed-point scale of an argument's own approval impact (full approval equals `type(uint32).max`).
-    int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
 
     /// @notice The proof of humanity registry contract (PoH mainnet: 0x1dAD862095d40d43c2109370121cf087632874dB).
     IProofOfHumanity internal immutable _POH;
@@ -213,9 +196,9 @@ contract ArborVote is IArborVote {
         User.Data storage user = _users[debateId][msg.sender];
 
         user.role = User.Role.Participant;
-        user.tokens = INITIAL_TOKENS;
+        user.tokens = Parameters.INITIAL_TOKENS;
 
-        emit Joined({debateId: debateId, account: msg.sender, tokens: INITIAL_TOKENS});
+        emit Joined({debateId: debateId, account: msg.sender, tokens: Parameters.INITIAL_TOKENS});
     }
 
     /// @inheritdoc IArborVote
@@ -518,18 +501,18 @@ contract ArborVote is IArborVote {
             revert InitialApprovalOutOfBounds({limit: 99, actual: initialApproval});
         }
 
-        if (user.tokens < _DEBATE_DEPOSIT) {
-            revert InsufficientVoteTokens({required: _DEBATE_DEPOSIT, actual: user.tokens});
+        if (user.tokens < Parameters._DEBATE_DEPOSIT) {
+            revert InsufficientVoteTokens({required: Parameters._DEBATE_DEPOSIT, actual: user.tokens});
         }
 
         // initialize market
         Debate.Data storage debate = _debates[debateId];
 
-        if (debate.getArgumentsCount() >= MAX_ARGUMENTS) {
-            revert ArgumentLimitReached({limit: MAX_ARGUMENTS});
+        if (debate.getArgumentsCount() >= Parameters.MAX_ARGUMENTS) {
+            revert ArgumentLimitReached({limit: Parameters.MAX_ARGUMENTS});
         }
 
-        user.tokens -= _DEBATE_DEPOSIT;
+        user.tokens -= Parameters._DEBATE_DEPOSIT;
 
         // Create new argument
         newArgumentId = _createArgument({
@@ -543,10 +526,10 @@ contract ArborVote is IArborVote {
         // Update the parent: one more child to tally whose deposit counts toward the children's vote weight.
         Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
         parentArgument.untalliedChilds++;
-        parentArgument.childsVote += _DEBATE_DEPOSIT;
+        parentArgument.childsVote += Parameters._DEBATE_DEPOSIT;
 
         // The deposit is committed to the new argument's market and counts toward the debate total.
-        debate.totalVotes += _DEBATE_DEPOSIT;
+        debate.totalVotes += Parameters._DEBATE_DEPOSIT;
 
         // Update the debate's leaves: the parent stops being one (a no-op if it was already interior,
         // and the root is never a leaf), the new argument starts as one.
@@ -582,7 +565,7 @@ contract ArborVote is IArborVote {
 
         stakeData.isPro = isPro;
         stakeData.voteTokensStaked = voteTokenAmount;
-        stakeData.fee = voteTokenAmount.multiplyByFraction({numerator: _FEE_PERCENTAGE, denominator: 100});
+        stakeData.fee = voteTokenAmount.multiplyByFraction({numerator: Parameters._FEE_PERCENTAGE, denominator: 100});
 
         uint32 net = voteTokenAmount - stakeData.fee;
 
@@ -620,8 +603,8 @@ contract ArborVote is IArborVote {
         // Seed the market reserves at the creator's initial approval. Approval is the pro-share
         // PRICE, so a high approval means a scarce pro reserve: the con side receives
         // the initialApproval fraction of the deposit, the pro side the complement.
-        (argument.pro, argument.con) = _DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
-        argument.votes = _DEBATE_DEPOSIT;
+        (argument.pro, argument.con) = Parameters._DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
+        argument.votes = Parameters._DEBATE_DEPOSIT;
 
         argument.creator = msg.sender;
         argument.finalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
@@ -795,9 +778,12 @@ contract ArborVote is IArborVote {
 
         // Calculate the own approval impact. Approval is the pro-share PRICE of the market:
         // the scarcer the pro reserve, the higher the approval - i.e. con/(pro+con).
-        impact = _MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
+        impact = Parameters._MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
 
-        impact = impact.multiplyByFraction({numerator: _MIX_MAX - _MIX_VAL, denominator: _MIX_MAX})
-            + argument.descendantsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
+        impact = impact.multiplyByFraction({
+            numerator: Parameters._MIX_MAX - Parameters._MIX_VAL, denominator: Parameters._MIX_MAX
+        })
+        + argument.descendantsImpact
+            .multiplyByFraction({numerator: Parameters._MIX_VAL, denominator: Parameters._MIX_MAX});
     }
 }

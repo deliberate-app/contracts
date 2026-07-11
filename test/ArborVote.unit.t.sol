@@ -7,6 +7,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {ArborVote} from "../src/ArborVote.sol";
 import {IArborVote} from "../src/interfaces/IArborVote.sol";
 import {Argument} from "../src/libs/Argument.sol";
+import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
 import {MockProofOfHumanity} from "./mocks/MockProofOfHumanity.m.sol";
@@ -65,7 +66,7 @@ contract ArborVoteTest is Test {
     }
 
     function _fillDebateToTheArgumentCap(uint256 debateId) internal {
-        uint16 maxArguments = _arborVote.MAX_ARGUMENTS();
+        uint16 maxArguments = Parameters.MAX_ARGUMENTS;
         uint16 added = 0; // the thesis already counts toward the cap
         uint256 participantIndex = 0;
         while (added < maxArguments - 1) {
@@ -219,7 +220,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         assertEq(uint256(_arborVote.getUserRole(debateId, address(this))), uint256(User.Role.Participant));
-        assertEq(_arborVote.getUserTokens(debateId, address(this)), _arborVote.INITIAL_TOKENS());
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS);
 
         shares = _arborVote.getUserShares(debateId, _ROOT_ARGUMENT_ID, address(this));
         assertEq(shares.pro, 0);
@@ -419,7 +420,7 @@ contract ArborVoteTest is Test {
         _fillDebateToTheArgumentCap(debateId);
         _join(debateId);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentLimitReached.selector, _arborVote.MAX_ARGUMENTS()));
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentLimitReached.selector, Parameters.MAX_ARGUMENTS));
         _addArgument(debateId, true, 50);
     }
 
@@ -772,7 +773,7 @@ contract ArborVoteTest is Test {
 
         // Finalize every argument so all of them carry impact (the expensive path).
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        uint16 maxArguments = _arborVote.MAX_ARGUMENTS();
+        uint16 maxArguments = Parameters.MAX_ARGUMENTS;
         for (uint16 i = 1; i < maxArguments; i++) {
             _arborVote.finalizeArgument(debateId, i);
         }
@@ -983,7 +984,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
 
         vm.expectEmit();
-        emit IArborVote.Joined({debateId: debateId, account: address(this), tokens: _arborVote.INITIAL_TOKENS()});
+        emit IArborVote.Joined({debateId: debateId, account: address(this), tokens: Parameters.INITIAL_TOKENS});
         _join(debateId);
     }
 
