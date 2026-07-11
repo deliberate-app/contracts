@@ -17,27 +17,12 @@ import {Utils} from "./libs/Utils.sol";
 /// @title ArborVote
 /// @author Michael Heuer
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is deployed once,
-/// has no owner, and is not upgradeable; state lives in ERC-7201 namespaced storage.
+/// has no owner, and is not upgradeable.
 contract ArborVote is IArborVote {
     using EnumerableSet for EnumerableSet.UintSet;
     using Utils for uint32;
     using Utils for int64;
     using Debate for Debate.Data;
-
-    /// @notice The [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) storage of the contract.
-    /// @param poh The proof of humanity registry contract (PoH mainnet: 0x1dAD862095d40d43c2109370121cf087632874dB).
-    /// @param debatesCounter The counter tracking the number of created debates.
-    /// @param debates The debates by their ID.
-    /// @param users The users by debate ID and account.
-    /// @param phases The phase data by debate ID.
-    /// @custom:storage-location erc7201:arborvote.storage.ArborVote
-    struct ArborVoteStorage {
-        IProofOfHumanity poh;
-        uint256 debatesCounter;
-        mapping(uint256 debateId => Debate.Data) debates;
-        mapping(uint256 debateId => mapping(address account => User.Data)) users;
-        mapping(uint256 debateId => Phase.Data) phases;
-    }
 
     uint32 internal constant _DEBATE_DEPOSIT = 10;
     uint32 internal constant _FEE_PERCENTAGE = 5;
@@ -57,11 +42,20 @@ contract ArborVote is IArborVote {
     /// @notice The fixed-point scale of an argument's own approval impact (full approval equals `type(uint32).max`).
     int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
 
-    /// @notice The ERC-7201 storage location of the ArborVote contract (see https://eips.ethereum.org/EIPS/eip-7201).
-    /// @dev Obtained from
-    /// `keccak256(abi.encode(uint256(keccak256("arborvote.storage.ArborVote")) - 1)) & ~bytes32(uint256(0xff))`.
-    bytes32 internal constant _ARBORVOTE_STORAGE_LOCATION =
-        0x7bc2c952758c3eed6da7b2b2d780739da4d5723529f239fb18a0ce0c647a4300;
+    /// @notice The proof of humanity registry contract (PoH mainnet: 0x1dAD862095d40d43c2109370121cf087632874dB).
+    IProofOfHumanity internal immutable _POH;
+
+    /// @notice The counter tracking the number of created debates.
+    uint256 internal _debatesCounter;
+
+    /// @notice The debates by their ID.
+    mapping(uint256 debateId => Debate.Data debate) internal _debates;
+
+    /// @notice The users by debate ID and account.
+    mapping(uint256 debateId => mapping(address account => User.Data user)) internal _users;
+
+    /// @notice The phase data by debate ID.
+    mapping(uint256 debateId => Phase.Data phase) internal _phases;
 
     /// @notice Thrown if a debate is uninitialized.
     /// @param debateId The ID of the debate.
@@ -157,23 +151,21 @@ contract ArborVote is IArborVote {
     /// @notice Deploys the contract with the Proof of Humanity registry gating debate joining.
     /// @param poh The proof of humanity registry contract.
     constructor(IProofOfHumanity poh) {
-        _getArborVoteStorage().poh = poh;
+        _POH = poh;
     }
 
     /// @inheritdoc IArborVote
     function createDebate(bytes32 contentURI, uint48 timeUnit)
         external
         override
-        onlyArgumentState(_getArborVoteStorage().debatesCounter, 0, Argument.State.Uninitialized)
+        onlyArgumentState(_debatesCounter, 0, Argument.State.Uninitialized)
         returns (uint256 debateId)
     {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        debateId = $.debatesCounter;
-        $.debatesCounter++;
+        debateId = _debatesCounter;
+        _debatesCounter++;
 
         // Create the root Argument
-        Debate.Data storage newDebate = $.debates[debateId];
+        Debate.Data storage newDebate = _debates[debateId];
         Argument.Data storage rootArgument = newDebate.arguments[0];
 
         // Create the root argument of the tree
@@ -184,7 +176,7 @@ contract ArborVote is IArborVote {
         rootArgument.state = Argument.State.Final;
 
         // Store the phase related data
-        Phase.Data storage phaseData = $.phases[debateId];
+        Phase.Data storage phaseData = _phases[debateId];
         phaseData.currentPhase = Phase.Status.Editing;
         phaseData.timeUnit = timeUnit;
         phaseData.editingEndTime = Time.timestamp() + 7 * timeUnit;
@@ -205,10 +197,8 @@ contract ArborVote is IArborVote {
 
     /// @inheritdoc IArborVote
     function join(uint256 debateId) external override onlyRole(debateId, User.Role.Unassigned) {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
         // Joining is only possible while participating is: during the editing and rating phases.
-        Phase.Status currentPhase = $.phases[debateId].currentPhase;
+        Phase.Status currentPhase = _phases[debateId].currentPhase;
         if (currentPhase == Phase.Status.Uninitialized) {
             revert DebateUninitialized({debateId: debateId});
         }
@@ -216,11 +206,11 @@ contract ArborVote is IArborVote {
             revert PhaseExceeded({limit: Phase.Status.Rating, actual: currentPhase});
         }
 
-        if (!$.poh.isRegistered(msg.sender)) {
+        if (!_POH.isRegistered(msg.sender)) {
             revert IdentityProofInvalid();
         } // not failsafe - takes 3.5 days to switch address
 
-        User.Data storage user = $.users[debateId][msg.sender];
+        User.Data storage user = _users[debateId][msg.sender];
 
         user.role = User.Role.Participant;
         user.tokens = INITIAL_TOKENS;
@@ -240,7 +230,7 @@ contract ArborVote is IArborVote {
         onlyArgumentState(debateId, argumentId, Argument.State.Created)
         onlyArgumentState(debateId, newParentArgumentId, Argument.State.Final)
     {
-        Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
         Argument.Data storage movedArgument = debate.arguments[argumentId];
 
         // change old parent's argument state
@@ -276,15 +266,13 @@ contract ArborVote is IArborVote {
         onlyCreator(debateId, argumentId)
         onlyArgumentState(debateId, argumentId, Argument.State.Created)
     {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
+        uint48 newFinalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
 
-        uint48 newFinalizationTime = Time.timestamp() + $.phases[debateId].timeUnit;
-
-        if (newFinalizationTime > $.phases[debateId].editingEndTime) {
-            revert TimeOutOfBounds({limit: $.phases[debateId].editingEndTime, actual: newFinalizationTime});
+        if (newFinalizationTime > _phases[debateId].editingEndTime) {
+            revert TimeOutOfBounds({limit: _phases[debateId].editingEndTime, actual: newFinalizationTime});
         }
 
-        Argument.Data storage alteredArgument = $.debates[debateId].arguments[argumentId];
+        Argument.Data storage alteredArgument = _debates[debateId].arguments[argumentId];
         alteredArgument.finalizationTime = newFinalizationTime;
         alteredArgument.contentURI = contentURI;
 
@@ -315,18 +303,16 @@ contract ArborVote is IArborVote {
 
     /// @inheritdoc IArborVote
     function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Tallying) {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        uint256[] memory leafArgumentIds = $.debates[debateId].leafArgumentIds.values();
+        uint256[] memory leafArgumentIds = _debates[debateId].leafArgumentIds.values();
 
         uint256 arrayLength = leafArgumentIds.length;
         for (uint256 i = 0; i < arrayLength; i++) {
             _tallyNode(debateId, SafeCast.toUint16(leafArgumentIds[i]));
         }
 
-        $.phases[debateId].currentPhase = Phase.Status.Finished;
+        _phases[debateId].currentPhase = Phase.Status.Finished;
 
-        emit DebateFinished({debateId: debateId, approved: $.debates[debateId].arguments[0].childsImpact > 0});
+        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].childsImpact > 0});
     }
 
     /// @inheritdoc IArborVote
@@ -335,11 +321,9 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Finished)
     {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        User.Data storage user = $.users[debateId][account];
-        User.Shares storage userShares = $.users[debateId][account].shares[argumentId];
-        Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
+        User.Data storage user = _users[debateId][account];
+        User.Shares storage userShares = _users[debateId][account].shares[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         uint32 proShares = userShares.pro;
         uint32 conShares = userShares.con;
@@ -378,14 +362,12 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Finished)
     {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         uint32 fees = argument.fees;
         if (fees > 0) {
             argument.fees = 0;
-            $.users[debateId][argument.creator].tokens += fees;
+            _users[debateId][argument.creator].tokens += fees;
 
             emit FeesClaimed({debateId: debateId, argumentId: argumentId, creator: argument.creator, fees: fees});
         }
@@ -398,12 +380,12 @@ contract ArborVote is IArborVote {
         override
         returns (Argument.Data memory argument)
     {
-        return _getArborVoteStorage().debates[debateId].arguments[argumentId];
+        return _debates[debateId].arguments[argumentId];
     }
 
     /// @inheritdoc IArborVote
     function getLeafArgumentIds(uint256 debateId) external view override returns (uint16[] memory leafArgumentIds) {
-        uint256[] memory ids = _getArborVoteStorage().debates[debateId].leafArgumentIds.values();
+        uint256[] memory ids = _debates[debateId].leafArgumentIds.values();
 
         leafArgumentIds = new uint16[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
@@ -413,12 +395,12 @@ contract ArborVote is IArborVote {
 
     /// @inheritdoc IArborVote
     function getUserRole(uint256 debateId, address account) external view override returns (User.Role role) {
-        return _getArborVoteStorage().users[debateId][account].role;
+        return _users[debateId][account].role;
     }
 
     /// @inheritdoc IArborVote
     function getUserTokens(uint256 debateId, address account) external view override returns (uint32 tokens) {
-        return _getArborVoteStorage().users[debateId][account].tokens;
+        return _users[debateId][account].tokens;
     }
 
     /// @inheritdoc IArborVote
@@ -428,18 +410,18 @@ contract ArborVote is IArborVote {
         override
         returns (User.Shares memory shares)
     {
-        return _getArborVoteStorage().users[debateId][account].shares[argumentId];
+        return _users[debateId][account].shares[argumentId];
     }
 
     /// @inheritdoc IArborVote
     function debates(uint256 debateId) external view override returns (uint32 totalVotes, uint16 argumentsCount) {
-        Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
         return (debate.totalVotes, debate.argumentsCount);
     }
 
     /// @inheritdoc IArborVote
     function users(uint256 debateId, address account) external view override returns (User.Role role, uint32 tokens) {
-        User.Data storage user = _getArborVoteStorage().users[debateId][account];
+        User.Data storage user = _users[debateId][account];
         return (user.role, user.tokens);
     }
 
@@ -450,24 +432,22 @@ contract ArborVote is IArborVote {
         override
         returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit)
     {
-        Phase.Data storage phaseData = _getArborVoteStorage().phases[debateId];
+        Phase.Data storage phaseData = _phases[debateId];
         return (phaseData.currentPhase, phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.timeUnit);
     }
 
     /// @inheritdoc IArborVote
     function outcome(uint256 debateId) external view override returns (bool approved) {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        if ($.phases[debateId].currentPhase != Phase.Status.Finished) {
-            revert PhaseInvalid({expected: Phase.Status.Finished, actual: $.phases[debateId].currentPhase});
+        if (_phases[debateId].currentPhase != Phase.Status.Finished) {
+            revert PhaseInvalid({expected: Phase.Status.Finished, actual: _phases[debateId].currentPhase});
         }
 
-        approved = $.debates[debateId].arguments[0].childsImpact > 0;
+        approved = _debates[debateId].arguments[0].childsImpact > 0;
     }
 
     /// @inheritdoc IArborVote
     function advancePhase(uint256 debateId) public override {
-        Phase.Data storage phaseData = _getArborVoteStorage().phases[debateId];
+        Phase.Data storage phaseData = _phases[debateId];
 
         Phase.Status currentPhase = phaseData.currentPhase;
 
@@ -499,7 +479,7 @@ contract ArborVote is IArborVote {
         override
         onlyArgumentState(debateId, argumentId, Argument.State.Created)
     {
-        Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         uint48 currentTime = Time.timestamp();
 
@@ -528,9 +508,7 @@ contract ArborVote is IArborVote {
         onlyArgumentState(debateId, parentArgumentId, Argument.State.Final)
         returns (uint16 newArgumentId)
     {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        User.Data storage user = $.users[debateId][msg.sender];
+        User.Data storage user = _users[debateId][msg.sender];
 
         if (initialApproval < 50) {
             revert InitialApprovalOutOfBounds({limit: 50, actual: initialApproval});
@@ -545,7 +523,7 @@ contract ArborVote is IArborVote {
         }
 
         // initialize market
-        Debate.Data storage debate = $.debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
 
         if (debate.getArgumentsCount() >= MAX_ARGUMENTS) {
             revert ArgumentLimitReached({limit: MAX_ARGUMENTS});
@@ -600,7 +578,7 @@ contract ArborVote is IArborVote {
         override
         returns (Argument.Investment memory investmentData)
     {
-        Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         investmentData.isPro = isPro;
         investmentData.voteTokensInvested = voteTokenAmount;
@@ -632,9 +610,7 @@ contract ArborVote is IArborVote {
         bool isSupporting,
         uint32 initialApproval
     ) internal returns (uint16 newArgumentId) {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        Debate.Data storage debate = $.debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
 
         newArgumentId = debate.getArgumentsCount();
         debate.incrementArgumentCounter();
@@ -648,7 +624,7 @@ contract ArborVote is IArborVote {
         argument.votes = _DEBATE_DEPOSIT;
 
         argument.creator = msg.sender;
-        argument.finalizationTime = Time.timestamp() + $.phases[debateId].timeUnit;
+        argument.finalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
         argument.parentArgumentId = parentArgumentId;
         argument.isSupporting = isSupporting;
         argument.state = Argument.State.Created;
@@ -660,7 +636,7 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param parentArgumentId The ID of the parent argument.
     function _updateParentAfterChildRemoval(uint256 debateId, uint16 parentArgumentId) internal {
-        Debate.Data storage debate = _getArborVoteStorage().debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
         Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
 
         if (parentArgument.state != Argument.State.Final) {
@@ -683,14 +659,12 @@ contract ArborVote is IArborVote {
     /// @param isPro Whether pro or con shares are bought.
     /// @param voteTokenAmount The amount of vote tokens to invest.
     function _invest(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount) internal {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
         // The thesis is rated through its argument tree, not through a market of its own.
         if (argumentId == 0) {
             revert ThesisHasNoMarket();
         }
 
-        User.Data storage user = $.users[debateId][msg.sender];
+        User.Data storage user = _users[debateId][msg.sender];
 
         if (user.tokens < voteTokenAmount) {
             revert InsufficientVoteTokens({required: voteTokenAmount, actual: user.tokens});
@@ -704,7 +678,7 @@ contract ArborVote is IArborVote {
 
         uint32 net = voteTokenAmount - investment.fee;
 
-        Debate.Data storage debate = $.debates[debateId];
+        Debate.Data storage debate = _debates[debateId];
         Argument.Data storage argument = debate.arguments[argumentId];
 
         // Reconstruct the post-trade reserves from the quote: the bought side shrinks by the
@@ -731,11 +705,9 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     function _tallyNode(uint256 debateId, uint16 argumentId) internal {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-
-        Argument.Data storage argument = $.debates[debateId].arguments[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
         uint16 parentArgumentId = argument.parentArgumentId;
-        Argument.Data storage parentArgument = $.debates[debateId].arguments[parentArgumentId];
+        Argument.Data storage parentArgument = _debates[debateId].arguments[parentArgumentId];
 
         if (argument.untalliedChilds > 0) {
             revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
@@ -776,9 +748,8 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param phase The phase of the debate required.
     function _onlyPhase(uint256 debateId, Phase.Status phase) internal view {
-        ArborVoteStorage storage $ = _getArborVoteStorage();
-        if ($.phases[debateId].currentPhase != phase) {
-            revert PhaseInvalid({expected: phase, actual: $.phases[debateId].currentPhase});
+        if (_phases[debateId].currentPhase != phase) {
+            revert PhaseInvalid({expected: phase, actual: _phases[debateId].currentPhase});
         }
     }
 
@@ -786,7 +757,7 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     function _onlyCreator(uint256 debateId, uint16 argumentId) internal view {
-        address creator = _getArborVoteStorage().debates[debateId].arguments[argumentId].creator;
+        address creator = _debates[debateId].arguments[argumentId].creator;
         if (msg.sender != creator) {
             revert AddressInvalid({expected: creator, actual: msg.sender});
         }
@@ -797,7 +768,7 @@ contract ArborVote is IArborVote {
     /// @param argumentId The ID of the argument.
     /// @param state The state of the argument required.
     function _onlyArgumentState(uint256 debateId, uint16 argumentId, Argument.State state) internal view {
-        Argument.State currentState = _getArborVoteStorage().debates[debateId].arguments[argumentId].state;
+        Argument.State currentState = _debates[debateId].arguments[argumentId].state;
         if (currentState != state) {
             revert StateInvalid({expected: state, actual: currentState});
         }
@@ -807,7 +778,7 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param role The role required.
     function _onlyRole(uint256 debateId, User.Role role) internal view {
-        User.Role currentRole = _getArborVoteStorage().users[debateId][msg.sender].role;
+        User.Role currentRole = _users[debateId][msg.sender].role;
         if (currentRole != role) {
             revert RoleInvalid({expected: role, actual: currentRole});
         }
@@ -818,7 +789,7 @@ contract ArborVote is IArborVote {
     /// @param argumentId The ID of the argument.
     /// @return impact The impact of the argument.
     function _calculateImpact(uint256 debateId, uint16 argumentId) internal view returns (int64 impact) {
-        Argument.Data storage argument = _getArborVoteStorage().debates[debateId].arguments[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         uint32 pro = argument.pro;
         uint32 con = argument.con;
@@ -829,16 +800,5 @@ contract ArborVote is IArborVote {
 
         impact = impact.multiplyByFraction({numerator: _MIX_MAX - _MIX_VAL, denominator: _MIX_MAX})
             + argument.childsImpact.multiplyByFraction({numerator: _MIX_VAL, denominator: _MIX_MAX});
-    }
-
-    /// @notice Returns the ERC-7201 namespaced storage struct of the contract.
-    /// @return arborVoteStorage The storage struct of the ArborVote contract.
-    function _getArborVoteStorage() internal pure returns (ArborVoteStorage storage arborVoteStorage) {
-        // solhint-disable no-inline-assembly
-        // slither-disable-next-line assembly
-        assembly {
-            arborVoteStorage.slot := _ARBORVOTE_STORAGE_LOCATION
-        }
-        // solhint-enable no-inline-assembly
     }
 }
