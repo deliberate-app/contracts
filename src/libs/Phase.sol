@@ -12,7 +12,7 @@ library Phase {
         Uninitialized,
         /// Participants add, alter, move, and finalize arguments beneath the thesis.
         Editing,
-        /// Participants rate arguments by investing vote tokens in their argument markets.
+        /// Participants rate arguments by staking vote tokens on their argument markets.
         Rating,
         /// Rating has ended; the tally aggregating argument impact leaves-to-root can run.
         Tallying,

@@ -91,14 +91,12 @@ interface IArborVote {
     /// @param argumentId The ID of the argument.
     event ArgumentFinalized(uint256 indexed debateId, uint16 indexed argumentId);
 
-    /// @notice Emitted when a debater invests vote tokens in an argument in a debate.
+    /// @notice Emitted when a debater stakes vote tokens on one side of an argument's market.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @param investor The address of the investor.
-    /// @param data The data of the investment that was made.
-    event Invested(
-        uint256 indexed debateId, uint16 indexed argumentId, address indexed investor, Argument.Investment data
-    );
+    /// @param staker The address of the staker.
+    /// @param data The data of the stake that was placed.
+    event Staked(uint256 indexed debateId, uint16 indexed argumentId, address indexed staker, Argument.Stake data);
 
     /// @notice Emitted when a user redeems their shares in an argument after the debate finished.
     /// @param debateId The ID of the debate.
@@ -122,7 +120,7 @@ interface IArborVote {
     /// @param impact The impact value of the argument.
     event ArgumentImpactCalculated(uint256 indexed debateId, uint16 indexed argumentId, int64 impact);
 
-    /// @notice Emitted when the investment fees accrued by an argument are claimed for its creator.
+    /// @notice Emitted when the market fees accrued by an argument are claimed for its creator.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @param creator The creator of the argument the fees are credited to.
@@ -175,17 +173,17 @@ interface IArborVote {
     /// @param contentURI The URI pointing to the argument content.
     function alterArgument(uint256 debateId, uint16 argumentId, bytes32 contentURI) external;
 
-    /// @notice Invests an amount of vote tokens into pro shares.
+    /// @notice Stakes an amount of vote tokens on the pro side, buying pro shares.
     /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to invest in.
-    /// @param voteTokenAmount The amount of vote tokens to be invested.
-    function investInPro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount) external;
+    /// @param argumentId The ID of the argument to stake on.
+    /// @param voteTokenAmount The amount of vote tokens to be staked.
+    function stakePro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount) external;
 
-    /// @notice Invests an amount of vote tokens into con shares.
+    /// @notice Stakes an amount of vote tokens on the con side, buying con shares.
     /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to invest in.
-    /// @param voteTokenAmount The amount of vote tokens to be invested.
-    function investInCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount) external;
+    /// @param argumentId The ID of the argument to stake on.
+    /// @param voteTokenAmount The amount of vote tokens to be staked.
+    function stakeCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount) external;
 
     /// @notice Tallies the argument tree of a debate.
     /// @param debateId The ID of the debate.
@@ -197,7 +195,7 @@ interface IArborVote {
     /// @param account The account to redeem the shares for.
     function redeemArgumentShares(uint256 debateId, uint16 argumentId, address account) external;
 
-    /// @notice Claims the investment fees accrued by an argument's market, crediting them to the argument's creator.
+    /// @notice Claims the market fees accrued by an argument's market, crediting them to the argument's creator.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     function claimFees(uint256 debateId, uint16 argumentId) external;
@@ -264,15 +262,15 @@ interface IArborVote {
     /// @return approved Whether the debate approved the root thesis or not.
     function outcome(uint256 debateId) external view returns (bool approved);
 
-    /// @notice Quotes an investment into one side of an argument's market: the fee and the shares
-    /// the investor would receive under constant-product pricing.
+    /// @notice Quotes a stake on one side of an argument's market: the fee and the shares
+    /// the staker would receive under constant-product pricing.
     /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to invest in.
-    /// @param isPro Whether pro or con shares are bought.
-    /// @param voteTokenAmount The amount of vote tokens to be invested.
-    /// @return investmentData The container containing the quoted amounts.
-    function calculateInvestment(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
+    /// @param argumentId The ID of the argument to stake on.
+    /// @param isPro Whether the stake buys pro or con shares.
+    /// @param voteTokenAmount The amount of vote tokens to be staked.
+    /// @return stakeData The container holding the quoted amounts.
+    function quoteStake(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
         external
         view
-        returns (Argument.Investment memory investmentData);
+        returns (Argument.Stake memory stakeData);
 }

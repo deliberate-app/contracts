@@ -108,7 +108,7 @@ contract ArborVote is IArborVote {
     /// @param limit The maximum number of arguments per debate.
     error ArgumentLimitReached(uint16 limit);
 
-    /// @notice Thrown if the thesis (argument 0), which has no market, is invested in.
+    /// @notice Thrown if the thesis (argument 0), which has no market, is staked on.
     error ThesisHasNoMarket();
 
     /// @notice Thrown if the childs of the argument are not tallied.
@@ -282,23 +282,23 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function investInPro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
+    function stakePro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
         onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
-        _invest({debateId: debateId, argumentId: argumentId, isPro: true, voteTokenAmount: voteTokenAmount});
+        _stake({debateId: debateId, argumentId: argumentId, isPro: true, voteTokenAmount: voteTokenAmount});
     }
 
     /// @inheritdoc IArborVote
-    function investInCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
+    function stakeCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
         onlyArgumentState(debateId, argumentId, Argument.State.Final)
     {
-        _invest({debateId: debateId, argumentId: argumentId, isPro: false, voteTokenAmount: voteTokenAmount});
+        _stake({debateId: debateId, argumentId: argumentId, isPro: false, voteTokenAmount: voteTokenAmount});
     }
 
     /// @inheritdoc IArborVote
@@ -572,28 +572,28 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function calculateInvestment(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
+    function quoteStake(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
         public
         view
         override
-        returns (Argument.Investment memory investmentData)
+        returns (Argument.Stake memory stakeData)
     {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
-        investmentData.isPro = isPro;
-        investmentData.voteTokensInvested = voteTokenAmount;
-        investmentData.fee = voteTokenAmount.multiplyByFraction({numerator: _FEE_PERCENTAGE, denominator: 100});
+        stakeData.isPro = isPro;
+        stakeData.voteTokensStaked = voteTokenAmount;
+        stakeData.fee = voteTokenAmount.multiplyByFraction({numerator: _FEE_PERCENTAGE, denominator: 100});
 
-        uint32 net = voteTokenAmount - investmentData.fee;
+        uint32 net = voteTokenAmount - stakeData.fee;
 
-        // Constant-product pricing: the opposite reserve absorbs the net investment,
+        // Constant-product pricing: the opposite reserve absorbs the net stake,
         // the bought reserve is restored to the invariant - rounded up, so a reserve can never be
-        // drained to zero - and the investor receives the freed shares plus the net amount.
+        // drained to zero - and the staker receives the freed shares plus the net amount.
         (uint32 bought, uint32 opposite) = isPro ? (argument.pro, argument.con) : (argument.con, argument.pro);
         uint32 newOpposite = opposite + net;
         uint32 newBought = bought.multiplyByFractionCeil({numerator: opposite, denominator: newOpposite});
 
-        investmentData.sharesOut = bought + net - newBought;
+        stakeData.sharesOut = bought + net - newBought;
     }
 
     /// @notice Internal function to create an argument below a parent argument with a certain initial approval.
@@ -653,12 +653,12 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @notice Internal function investing vote tokens into one side of an argument's constant-product market.
+    /// @notice Internal function staking vote tokens on one side of an argument's constant-product market.
     /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to invest in.
+    /// @param argumentId The ID of the argument to stake on.
     /// @param isPro Whether pro or con shares are bought.
-    /// @param voteTokenAmount The amount of vote tokens to invest.
-    function _invest(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount) internal {
+    /// @param voteTokenAmount The amount of vote tokens to stake.
+    function _stake(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount) internal {
         // The thesis is rated through its argument tree, not through a market of its own.
         if (argumentId == 0) {
             revert ThesisHasNoMarket();
@@ -672,33 +672,32 @@ contract ArborVote is IArborVote {
 
         user.tokens -= voteTokenAmount;
 
-        Argument.Investment memory investment = calculateInvestment({
-            debateId: debateId, argumentId: argumentId, isPro: isPro, voteTokenAmount: voteTokenAmount
-        });
+        Argument.Stake memory stakeData =
+            quoteStake({debateId: debateId, argumentId: argumentId, isPro: isPro, voteTokenAmount: voteTokenAmount});
 
-        uint32 net = voteTokenAmount - investment.fee;
+        uint32 net = voteTokenAmount - stakeData.fee;
 
         Debate.Data storage debate = _debates[debateId];
         Argument.Data storage argument = debate.arguments[argumentId];
 
         // Reconstruct the post-trade reserves from the quote: the bought side shrinks by the
-        // shares that leave the pool, the opposite side absorbs the net investment.
+        // shares that leave the pool, the opposite side absorbs the net stake.
         if (isPro) {
-            argument.pro = argument.pro + net - investment.sharesOut;
+            argument.pro = argument.pro + net - stakeData.sharesOut;
             argument.con += net;
-            user.shares[argumentId].pro += investment.sharesOut;
+            user.shares[argumentId].pro += stakeData.sharesOut;
         } else {
-            argument.con = argument.con + net - investment.sharesOut;
+            argument.con = argument.con + net - stakeData.sharesOut;
             argument.pro += net;
-            user.shares[argumentId].con += investment.sharesOut;
+            user.shares[argumentId].con += stakeData.sharesOut;
         }
 
         argument.votes += net;
-        argument.fees += investment.fee;
+        argument.fees += stakeData.fee;
         debate.totalVotes += net;
         debate.arguments[argument.parentArgumentId].childsVote += net;
 
-        emit Invested({debateId: debateId, argumentId: argumentId, investor: msg.sender, data: investment});
+        emit Staked({debateId: debateId, argumentId: argumentId, staker: msg.sender, data: stakeData});
     }
 
     /// @notice Internal function to tally an argument in a debate.
@@ -714,7 +713,7 @@ contract ArborVote is IArborVote {
         }
 
         // Only Final arguments carry impact. An argument never finalized contributes nothing: it can have
-        // neither children nor investors (both require a Final argument), only its author's never-locked-in signal.
+        // neither children nor stakers (both require a Final argument), only its author's never-locked-in signal.
         int64 ownImpact = 0;
         if (argument.state == Argument.State.Final) {
             // Calculate own impact $r_j$

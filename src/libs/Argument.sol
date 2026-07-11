@@ -23,9 +23,9 @@ library Argument {
     /// @param finalizationTime The time at which the argument can be finalized.
     /// @param pro The pro share reserve of the argument market (scarce pro = high approval).
     /// @param con The con share reserve of the argument market.
-    /// @param votes The vote tokens collateralizing the argument market (deposit and net investments).
+    /// @param votes The vote tokens collateralizing the argument market (deposit and net stakes).
     /// @param fees The fees accrued by the argument for its creator.
-    /// @param childsVote The votes invested in the child arguments.
+    /// @param childsVote The votes staked on the child arguments.
     /// @param descendantsImpact The tallied impact of all descendants: each child folds its own approval and its subtree into what it adds here.
     struct Data {
         bytes32 contentURI; //      ]  32
@@ -43,14 +43,14 @@ library Argument {
         int64 descendantsImpact; //      ]   8
     }
 
-    /// @notice The container holding the amounts computed for an investment into an argument market.
-    /// @param isPro Whether the investment buys pro or con shares.
-    /// @param voteTokensInvested The amount of vote tokens invested.
-    /// @param fee The fee charged for the investment, accruing to the argument's creator.
-    /// @param sharesOut The amount of shares the investor receives.
-    struct Investment {
+    /// @notice The container holding the amounts computed for a stake on an argument market.
+    /// @param isPro Whether the stake buys pro or con shares.
+    /// @param voteTokensStaked The amount of vote tokens staked.
+    /// @param fee The fee charged for the stake, accruing to the argument's creator.
+    /// @param sharesOut The amount of shares the staker receives.
+    struct Stake {
         bool isPro; //                ┐   1
-        uint32 voteTokensInvested; // | + 4
+        uint32 voteTokensStaked; // | + 4
         uint32 fee; //                | + 4
         uint32 sharesOut; //          ┘ + 4 = 13
     }

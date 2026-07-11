@@ -548,9 +548,9 @@ contract ArborVoteTest is Test {
         _arborVote.moveArgument(debateId, argumentId, 42);
     }
 
-    // --- investInPro / investInCon ---
+    // --- stakePro / stakeCon ---
 
-    function test_investInPro_buysProSharesAndRaisesTheApproval() public {
+    function test_stakePro_buysProSharesAndRaisesTheApproval() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
@@ -559,9 +559,9 @@ contract ArborVoteTest is Test {
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
-        _arborVote.investInPro(debateId, argumentId, 20);
+        _arborVote.stakePro(debateId, argumentId, 20);
 
-        // 100 initial - 10 deposit - 20 investment
+        // 100 initial - 10 deposit - 20 staked
         assertEq(_arborVote.getUserTokens(debateId, address(this)), 70);
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
@@ -572,11 +572,11 @@ contract ArborVoteTest is Test {
         Argument.Data memory argument = _arborVote.getArgument(debateId, argumentId);
         assertEq(argument.pro, 2);
         assertEq(argument.con, 24); // approval con/(pro+con) rose from 50% to 24/26 = 92.3%
-        assertEq(argument.votes, 29); // 10 deposit + 20 invested - 1 fee
+        assertEq(argument.votes, 29); // 10 deposit + 20 staked - 1 fee
         assertEq(argument.fees, 1); // 5% of 20
     }
 
-    function test_investInCon_buysConSharesAndLowersTheApproval() public {
+    function test_stakeCon_buysConSharesAndLowersTheApproval() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
@@ -585,7 +585,7 @@ contract ArborVoteTest is Test {
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
-        _arborVote.investInCon(debateId, argumentId, 20);
+        _arborVote.stakeCon(debateId, argumentId, 20);
 
         // fee 1, net 19: pro 5+19=24, con ceil(25/24)=2, shares out 22
         User.Shares memory shares = _arborVote.getUserShares(debateId, argumentId, address(this));
@@ -600,7 +600,7 @@ contract ArborVoteTest is Test {
     /// @dev Pins the market's defining behavior: buying a side always moves the approval - the
     /// price of belief, con/(pro+con) - toward that side, never away from it. Compared through
     /// cross-multiplication to avoid integer division.
-    function testFuzz_invest_movesTheApprovalTowardTheBoughtSide(uint32 initialApproval, bool isPro, uint32 amount)
+    function testFuzz_stake_movesTheApprovalTowardTheBoughtSide(uint32 initialApproval, bool isPro, uint32 amount)
         public
     {
         initialApproval = uint32(bound(initialApproval, 50, 99));
@@ -615,13 +615,13 @@ contract ArborVoteTest is Test {
 
         Argument.Data memory before = _arborVote.getArgument(debateId, argumentId);
 
-        address investor = makeAddr("investor");
-        vm.startPrank(investor);
+        address staker = makeAddr("staker");
+        vm.startPrank(staker);
         _arborVote.join(debateId);
         if (isPro) {
-            _arborVote.investInPro(debateId, argumentId, amount);
+            _arborVote.stakePro(debateId, argumentId, amount);
         } else {
-            _arborVote.investInCon(debateId, argumentId, amount);
+            _arborVote.stakeCon(debateId, argumentId, amount);
         }
         vm.stopPrank();
 
@@ -660,47 +660,47 @@ contract ArborVoteTest is Test {
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
-        address firstInvestor = makeAddr("firstInvestor");
-        address secondInvestor = makeAddr("secondInvestor");
+        address firstStaker = makeAddr("firstStaker");
+        address secondStaker = makeAddr("secondStaker");
 
-        vm.startPrank(firstInvestor);
+        vm.startPrank(firstStaker);
         _arborVote.join(debateId);
-        if (firstIsPro) _arborVote.investInPro(debateId, argumentId, firstAmount);
-        else _arborVote.investInCon(debateId, argumentId, firstAmount);
+        if (firstIsPro) _arborVote.stakePro(debateId, argumentId, firstAmount);
+        else _arborVote.stakeCon(debateId, argumentId, firstAmount);
         vm.stopPrank();
 
-        vm.startPrank(secondInvestor);
+        vm.startPrank(secondStaker);
         _arborVote.join(debateId);
-        if (secondIsPro) _arborVote.investInPro(debateId, argumentId, secondAmount);
-        else _arborVote.investInCon(debateId, argumentId, secondAmount);
+        if (secondIsPro) _arborVote.stakePro(debateId, argumentId, secondAmount);
+        else _arborVote.stakeCon(debateId, argumentId, secondAmount);
         vm.stopPrank();
 
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
         uint32 collateral = _arborVote.getArgument(debateId, argumentId).votes;
-        uint32 firstBefore = _arborVote.getUserTokens(debateId, firstInvestor);
-        uint32 secondBefore = _arborVote.getUserTokens(debateId, secondInvestor);
+        uint32 firstBefore = _arborVote.getUserTokens(debateId, firstStaker);
+        uint32 secondBefore = _arborVote.getUserTokens(debateId, secondStaker);
 
-        _arborVote.redeemArgumentShares(debateId, argumentId, firstInvestor);
-        _arborVote.redeemArgumentShares(debateId, argumentId, secondInvestor);
+        _arborVote.redeemArgumentShares(debateId, argumentId, firstStaker);
+        _arborVote.redeemArgumentShares(debateId, argumentId, secondStaker);
 
-        uint256 paidOut = (uint256(_arborVote.getUserTokens(debateId, firstInvestor)) - firstBefore)
-            + (uint256(_arborVote.getUserTokens(debateId, secondInvestor)) - secondBefore);
+        uint256 paidOut = (uint256(_arborVote.getUserTokens(debateId, firstStaker)) - firstBefore)
+            + (uint256(_arborVote.getUserTokens(debateId, secondStaker)) - secondBefore);
         assertLe(paidOut, uint256(collateral));
     }
 
-    function test_investInPro_revertsForTheThesis() public {
+    function test_stakePro_revertsForTheThesis() public {
         uint256 debateId = _createDebate();
         _join(debateId);
         _endEditing(debateId);
 
         // The thesis is Final from creation but has no market of its own.
         vm.expectRevert(ArborVote.ThesisHasNoMarket.selector);
-        _arborVote.investInPro(debateId, _ROOT_ARGUMENT_ID, 10);
+        _arborVote.stakePro(debateId, _ROOT_ARGUMENT_ID, 10);
     }
 
-    function test_investInPro_revertsForANonFinalArgument() public {
+    function test_stakePro_revertsForANonFinalArgument() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
@@ -710,10 +710,10 @@ contract ArborVoteTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
         );
-        _arborVote.investInPro(debateId, argumentId, 10);
+        _arborVote.stakePro(debateId, argumentId, 10);
     }
 
-    function test_investInCon_revertsForANonexistentArgument() public {
+    function test_stakeCon_revertsForANonexistentArgument() public {
         uint256 debateId = _createDebate();
         _join(debateId);
         _endEditing(debateId);
@@ -721,7 +721,7 @@ contract ArborVoteTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
         );
-        _arborVote.investInCon(debateId, 42, 10);
+        _arborVote.stakeCon(debateId, 42, 10);
     }
 
     // --- tallyTree ---
@@ -877,7 +877,7 @@ contract ArborVoteTest is Test {
         assertEq(_arborVote.getUserTokens(debateId, address(this)), 0);
     }
 
-    function test_redeemArgumentShares_paysTheEarlyCorrectInvestorAProfit() public {
+    function test_redeemArgumentShares_paysTheEarlyCorrectStakerAProfit() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
@@ -886,31 +886,31 @@ contract ArborVoteTest is Test {
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
-        address earlyInvestor = makeAddr("earlyInvestor");
-        address lateInvestor = makeAddr("lateInvestor");
+        address earlyStaker = makeAddr("earlyStaker");
+        address lateStaker = makeAddr("lateStaker");
 
-        // The early investor buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
-        vm.startPrank(earlyInvestor);
+        // The early staker buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
+        vm.startPrank(earlyStaker);
         _arborVote.join(debateId);
-        _arborVote.investInPro(debateId, argumentId, 10);
+        _arborVote.stakePro(debateId, argumentId, 10);
         vm.stopPrank();
 
         // The crowd confirms the rating later, at a higher price: 20 shares for 20 tokens (-> 97.1%).
-        vm.startPrank(lateInvestor);
+        vm.startPrank(lateStaker);
         _arborVote.join(debateId);
-        _arborVote.investInPro(debateId, argumentId, 20);
+        _arborVote.stakePro(debateId, argumentId, 20);
         vm.stopPrank();
 
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
-        _arborVote.redeemArgumentShares(debateId, argumentId, earlyInvestor);
-        _arborVote.redeemArgumentShares(debateId, argumentId, lateInvestor);
+        _arborVote.redeemArgumentShares(debateId, argumentId, earlyStaker);
+        _arborVote.redeemArgumentShares(debateId, argumentId, lateStaker);
 
-        // Early: 13 shares x 34/35 = 12 tokens back on 10 invested - correcting the rating early pays.
-        assertEq(_arborVote.getUserTokens(debateId, earlyInvestor), 102);
-        // Late: 20 shares x 34/35 = 19 tokens back on 20 invested - fee and slippage eat the late trade.
-        assertEq(_arborVote.getUserTokens(debateId, lateInvestor), 99);
+        // Early: 13 shares x 34/35 = 12 tokens back on 10 staked - correcting the rating early pays.
+        assertEq(_arborVote.getUserTokens(debateId, earlyStaker), 102);
+        // Late: 20 shares x 34/35 = 19 tokens back on 20 staked - fee and slippage eat the late trade.
+        assertEq(_arborVote.getUserTokens(debateId, lateStaker), 99);
         // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
     }
 
@@ -925,12 +925,12 @@ contract ArborVoteTest is Test {
         _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
-        // A second participant invests 20; the 5% fee (1 token) accrues to the argument.
-        address investor = makeAddr("investor");
-        vm.prank(investor);
+        // A second participant stakes 20; the 5% fee (1 token) accrues to the argument.
+        address staker = makeAddr("staker");
+        vm.prank(staker);
         _arborVote.join(debateId);
-        vm.prank(investor);
-        _arborVote.investInPro(debateId, argumentId, 20);
+        vm.prank(staker);
+        _arborVote.stakePro(debateId, argumentId, 20);
 
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
@@ -1080,7 +1080,7 @@ contract ArborVoteTest is Test {
         assertEq(vm.getRecordedLogs().length, 0);
     }
 
-    function test_investInPro_emitsInvested() public {
+    function test_stakePro_emitsStaked() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
@@ -1091,13 +1091,13 @@ contract ArborVoteTest is Test {
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
         vm.expectEmit();
-        emit IArborVote.Invested({
+        emit IArborVote.Staked({
             debateId: debateId,
             argumentId: argumentId,
-            investor: address(this),
-            data: Argument.Investment({isPro: true, voteTokensInvested: 20, fee: 1, sharesOut: 22})
+            staker: address(this),
+            data: Argument.Stake({isPro: true, voteTokensStaked: 20, fee: 1, sharesOut: 22})
         });
-        _arborVote.investInPro(debateId, argumentId, 20);
+        _arborVote.stakePro(debateId, argumentId, 20);
     }
 
     function test_tallyTree_emitsDebateFinishedWithTheOutcome() public {
@@ -1124,7 +1124,7 @@ contract ArborVoteTest is Test {
         _endEditing(debateId);
 
         // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
-        _arborVote.investInCon(debateId, argumentId, 20);
+        _arborVote.stakeCon(debateId, argumentId, 20);
 
         _endRating(debateId);
         _arborVote.tallyTree(debateId);

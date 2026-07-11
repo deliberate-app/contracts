@@ -27,15 +27,15 @@ The per-argument market in which participants buy an argument's pro or con share
 _Avoid_: rating market
 
 **Approval**:
-An argument market's current rating of the argument — the price of belief in it, rising as participants invest in pro shares and falling as they invest in con shares.
+An argument market's current rating of the argument — the price of belief in it, rising as participants stake on the pro side (the argument is underrated) and falling as they stake on the con side (overrated).
 _Avoid_: score, rating value
 
 **Vote tokens**:
-The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con share investments.
+The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con stakes.
 _Avoid_: debate tokens
 
-**Investment fee**:
-The share of each argument-market investment that accrues to the argument's creator, claimable once the debate is finished — the authorship incentive for arguments that attract rating volume.
+**Market fee**:
+The share of each stake that accrues to the argument's creator, claimable once the debate is finished — the authorship incentive for arguments that attract rating volume.
 
 **Participant**:
 A Proof-of-Humanity-verified account that has joined a debate and received vote tokens.
@@ -54,7 +54,7 @@ The phase in which participants add, alter, move, and finalize arguments beneath
 _Avoid_: debating stage
 
 **Rating phase**:
-The phase in which participants rate arguments by investing vote tokens in their argument markets.
+The phase in which participants rate arguments by staking vote tokens on their argument markets.
 _Avoid_: voting phase, voting stage
 
 **Tallying phase**:
