@@ -170,6 +170,16 @@ contract ArborVoteTest is Test {
         assertEq(debateId, 1);
     }
 
+    function test_debatesCount_countsCreatedDebates() public {
+        assertEq(_arborVote.debatesCount(), 0);
+
+        _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        assertEq(_arborVote.debatesCount(), 1);
+
+        _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        assertEq(_arborVote.debatesCount(), 2);
+    }
+
     function test_createDebate_initializesThePhaseData() public {
         uint256 debateId = _createDebate();
 

@@ -233,6 +233,10 @@ interface IArborVote {
         view
         returns (User.Shares memory shares);
 
+    /// @notice Returns the number of debates created so far; debate IDs run from 0 to `count - 1`.
+    /// @return count The number of created debates.
+    function debatesCount() external view returns (uint256 count);
+
     /// @notice Returns the aggregate data of a debate.
     /// @param debateId The ID of the debate.
     /// @return totalVotes The total votes cast in the debate.

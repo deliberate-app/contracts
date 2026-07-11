@@ -397,6 +397,11 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
+    function debatesCount() external view override returns (uint256 count) {
+        count = _debatesCounter;
+    }
+
+    /// @inheritdoc IArborVote
     function debates(uint256 debateId) external view override returns (uint32 totalVotes, uint16 argumentsCount) {
         Debate.Data storage debate = _debates[debateId];
         return (debate.totalVotes, debate.argumentsCount);
