@@ -150,19 +150,22 @@ interface IArborVote {
     /// @param argumentId The ID of the argument to be finalized.
     function finalizeArgument(uint256 debateId, uint16 argumentId) external;
 
-    /// @notice Adds an argument below a parent argument with a certain initial approval.
+    /// @notice Adds an argument below a parent argument with a certain initial approval, staking a
+    /// creator-chosen deposit that seeds the argument's market and sets its starting weight.
     /// @param debateId The ID of the debate.
     /// @param parentArgumentId The ID of the parent argument.
     /// @param contentURI The URI pointing to the argument content.
     /// @param isSupporting Whether the argument supports or opposes the parent argument.
     /// @param initialApproval The initial approval of the argument.
+    /// @param deposit The vote token deposit to seed the argument's market with; at least the minimum.
     /// @return newArgumentId The ID of the created argument.
     function addArgument(
         uint256 debateId,
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval
+        uint32 initialApproval,
+        uint32 deposit
     ) external returns (uint16 newArgumentId);
 
     /// @notice Moves an argument below a new parent argument, re-seeding its market at a new

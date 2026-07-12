@@ -6,8 +6,11 @@ pragma solidity ^0.8.24;
 /// @author Michael Heuer
 /// @notice A library collecting the protocol parameters governing every debate.
 library Parameters {
-    /// @notice The vote token deposit an argument's creator pays to seed the argument's market reserves.
-    uint32 internal constant _DEBATE_DEPOSIT = 10;
+    /// @notice The smallest vote token deposit an argument's creator may stake to seed the market reserves.
+    /// @dev The creator picks the deposit; this floor keeps both market reserves non-empty across the seedable
+    /// approval range (a degenerate zero reserve would freeze the constant-product market) and sets the minimum
+    /// weight an argument carries into the tally.
+    uint32 internal constant _MIN_DEBATE_DEPOSIT = 10;
 
     /// @notice The market fee in percent, accrued to the argument's creator on every stake.
     uint32 internal constant _FEE_PERCENTAGE = 5;

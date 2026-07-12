@@ -87,6 +87,11 @@ contract ArborVote is IArborVote {
     /// @param actual The actual vote token balance.
     error InsufficientVoteTokens(uint32 required, uint32 actual);
 
+    /// @notice Thrown if the chosen argument deposit is below the permitted minimum.
+    /// @param minimum The minimum permitted deposit.
+    /// @param actual The actual deposit chosen.
+    error DepositBelowMinimum(uint32 minimum, uint32 actual);
+
     /// @notice Thrown if a debate has reached its maximum number of arguments.
     /// @param limit The maximum number of arguments per debate.
     error ArgumentLimitReached(uint16 limit);
@@ -227,10 +232,10 @@ contract ArborVote is IArborVote {
         movedArgument.parentArgumentId = newParentArgumentId;
 
         // Re-seed the market at the new approval. Only a draft can move and drafts cannot be
-        // staked on, so the reserves are still the pristine deposit split - re-splitting is
-        // lossless. The deposit (votes) is unchanged, so the childsVote transfer stays correct.
-        (movedArgument.pro, movedArgument.con) =
-            Parameters._DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
+        // staked on, so the reserves are still the pristine deposit split - re-splitting the
+        // argument's own deposit (its unchanged votes) is lossless, whatever deposit the
+        // creator chose. The votes total is unchanged, so the childsVote transfer stays correct.
+        (movedArgument.pro, movedArgument.con) = movedArgument.votes.split(100 - initialApproval, initialApproval);
 
         // change new parent argument state
         debate.arguments[newParentArgumentId].untalliedChilds++;
@@ -497,7 +502,8 @@ contract ArborVote is IArborVote {
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval
+        uint32 initialApproval,
+        uint32 deposit
     )
         public
         override
@@ -510,8 +516,13 @@ contract ArborVote is IArborVote {
 
         _checkInitialApproval(initialApproval);
 
-        if (user.tokens < Parameters._DEBATE_DEPOSIT) {
-            revert InsufficientVoteTokens({required: Parameters._DEBATE_DEPOSIT, actual: user.tokens});
+        // The creator picks the deposit seeding the market; a floor keeps both reserves non-empty.
+        if (deposit < Parameters._MIN_DEBATE_DEPOSIT) {
+            revert DepositBelowMinimum({minimum: Parameters._MIN_DEBATE_DEPOSIT, actual: deposit});
+        }
+
+        if (user.tokens < deposit) {
+            revert InsufficientVoteTokens({required: deposit, actual: user.tokens});
         }
 
         // initialize market
@@ -521,7 +532,7 @@ contract ArborVote is IArborVote {
             revert ArgumentLimitReached({limit: Parameters.MAX_ARGUMENTS});
         }
 
-        user.tokens -= Parameters._DEBATE_DEPOSIT;
+        user.tokens -= deposit;
 
         // Create new argument
         newArgumentId = _createArgument({
@@ -529,16 +540,17 @@ contract ArborVote is IArborVote {
             parentArgumentId: parentArgumentId,
             contentURI: contentURI,
             isSupporting: isSupporting,
-            initialApproval: initialApproval
+            initialApproval: initialApproval,
+            deposit: deposit
         });
 
         // Update the parent: one more child to tally whose deposit counts toward the children's vote weight.
         Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
         parentArgument.untalliedChilds++;
-        parentArgument.childsVote += Parameters._DEBATE_DEPOSIT;
+        parentArgument.childsVote += deposit;
 
         // The deposit is committed to the new argument's market and counts toward the debate total.
-        debate.totalVotes += Parameters._DEBATE_DEPOSIT;
+        debate.totalVotes += deposit;
 
         // Update the debate's leaves: the parent stops being one (a no-op if it was already interior,
         // and the root is never a leaf), the new argument starts as one.
@@ -594,13 +606,15 @@ contract ArborVote is IArborVote {
     /// @param contentURI The URI pointing to the argument content.
     /// @param isSupporting Whether the argument supports or opposes the parent argument.
     /// @param initialApproval The initial approval of the argument.
+    /// @param deposit The vote token deposit seeding the argument's market reserves.
     /// @return newArgumentId The ID of the created argument.
     function _createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval
+        uint32 initialApproval,
+        uint32 deposit
     ) internal returns (uint16 newArgumentId) {
         Debate.Data storage debate = _debates[debateId];
 
@@ -609,11 +623,11 @@ contract ArborVote is IArborVote {
 
         Argument.Data storage argument = debate.arguments[newArgumentId];
 
-        // Seed the market reserves at the creator's initial approval. Approval is the pro-share
-        // PRICE, so a high approval means a scarce pro reserve: the con side receives
+        // Seed the market reserves from the creator's deposit at their initial approval. Approval is the
+        // pro-share PRICE, so a high approval means a scarce pro reserve: the con side receives
         // the initialApproval fraction of the deposit, the pro side the complement.
-        (argument.pro, argument.con) = Parameters._DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
-        argument.votes = Parameters._DEBATE_DEPOSIT;
+        (argument.pro, argument.con) = deposit.split(100 - initialApproval, initialApproval);
+        argument.votes = deposit;
 
         argument.creator = msg.sender;
         argument.finalizationTime = Time.timestamp() + _phases[debateId].timeUnit;

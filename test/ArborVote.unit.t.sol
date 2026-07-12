@@ -41,12 +41,20 @@ contract ArborVoteTest is Test {
         internal
         returns (uint16 argumentId)
     {
+        argumentId = _addArgument(debateId, isSupporting, initialApproval, Parameters._MIN_DEBATE_DEPOSIT);
+    }
+
+    function _addArgument(uint256 debateId, bool isSupporting, uint32 initialApproval, uint32 deposit)
+        internal
+        returns (uint16 argumentId)
+    {
         argumentId = _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: _ROOT_ARGUMENT_ID,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: isSupporting,
-            initialApproval: initialApproval
+            initialApproval: initialApproval,
+            deposit: deposit
         });
     }
 
@@ -80,7 +88,8 @@ contract ArborVoteTest is Test {
                     parentArgumentId: _ROOT_ARGUMENT_ID,
                     contentURI: _PRO_ARGUMENT_CONTENT,
                     isSupporting: added % 2 == 0,
-                    initialApproval: 50
+                    initialApproval: 50,
+                    deposit: Parameters._MIN_DEBATE_DEPOSIT
                 });
                 added++;
             }
@@ -413,6 +422,46 @@ contract ArborVoteTest is Test {
         assertEq(totalVotes, 20);
     }
 
+    function test_addArgument_stakesTheChosenDeposit() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        // The creator stakes 40 (above the minimum) at 50% approval: the deposit splits evenly
+        // into the reserves, seeds the votes, and counts in full toward the parent and debate totals.
+        uint16 argumentId = _addArgument(debateId, true, 50, 40);
+        Argument.Data memory argument = _arborVote.getArgument(debateId, argumentId);
+        assertEq(argument.pro, 20);
+        assertEq(argument.con, 20);
+        assertEq(argument.votes, 40);
+
+        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 40);
+        (uint32 totalVotes,) = _arborVote.debates(debateId);
+        assertEq(totalVotes, 40);
+        assertEq(_arborVote.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
+    }
+
+    function test_addArgument_revertsForADepositBelowTheMinimum() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint32 deposit = Parameters._MIN_DEBATE_DEPOSIT - 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.DepositBelowMinimum.selector, Parameters._MIN_DEBATE_DEPOSIT, deposit)
+        );
+        _addArgument(debateId, true, 50, deposit);
+    }
+
+    function test_addArgument_revertsWhenTheDepositExceedsTheBalance() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint32 deposit = Parameters.INITIAL_TOKENS + 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.InsufficientVoteTokens.selector, deposit, Parameters.INITIAL_TOKENS)
+        );
+        _addArgument(debateId, true, 50, deposit);
+    }
+
     function test_addArgument_revertsOutsideTheEditingPhase() public {
         uint256 debateId = _createDebate();
         _join(debateId);
@@ -451,14 +500,16 @@ contract ArborVoteTest is Test {
             parentArgumentId: argumentA,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: true,
-            initialApproval: 50
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         uint16 argumentD = _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: argumentA,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: false,
-            initialApproval: 50
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
 
         uint16[] memory expectedIds = new uint16[](3);
@@ -486,7 +537,8 @@ contract ArborVoteTest is Test {
             parentArgumentId: argumentA,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: true,
-            initialApproval: 50
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
 
         _arborVote.moveArgument({
@@ -512,7 +564,8 @@ contract ArborVoteTest is Test {
             parentArgumentId: parentArgumentId,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: true,
-            initialApproval: 50
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         assertEq(_arborVote.getArgument(debateId, parentArgumentId).childsVote, 10);
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 10);
@@ -546,6 +599,28 @@ contract ArborVoteTest is Test {
         assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 2);
         assertEq(_arborVote.getArgument(debateId, childArgumentId).con, 8);
         assertEq(_arborVote.getArgument(debateId, childArgumentId).votes, 10); // the deposit is unchanged
+    }
+
+    function test_moveArgument_reseedsFromTheArgumentDeposit() public {
+        // A non-default deposit must re-seed from the argument's own votes, not a fixed constant.
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 parentArgumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, parentArgumentId);
+
+        // A draft seeded with a 40-token deposit at 50%: reserves 20/20.
+        uint16 childArgumentId = _addArgument(debateId, true, 50, 40);
+
+        // Moving it re-seeds at 80% from the 40-token deposit: con takes 80% (32), pro the rest (8).
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
+        });
+
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 8);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).con, 32);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).votes, 40);
     }
 
     function test_moveArgument_revertsForAnApprovalOutOfBounds() public {
@@ -873,7 +948,8 @@ contract ArborVoteTest is Test {
             parentArgumentId: argumentId,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: false,
-            initialApproval: 95
+            initialApproval: 95,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
         _arborVote.finalizeArgument(debateId, childArgumentId);
