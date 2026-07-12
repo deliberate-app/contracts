@@ -99,20 +99,8 @@ deploy-with-mock deployer chain *args:
 # or timed out. ArborVote's constructor takes the Proof of Humanity address, so it
 # must be supplied to reconstruct the constructor arguments.
 
-# Verify a full deployment (ArborVote + its bundled MockProofOfHumanity) on a Blockscout
-# explorer (keyless); pass the explorer's /api/ URL, e.g. https://base-sepolia.blockscout.com/api/
-verify-all arborvote proof-of-humanity verifier-url *args:
-    forge verify-contract {{ arborvote }} src/ArborVote.sol:ArborVote \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
-        --verifier blockscout --verifier-url {{ verifier-url }} --watch {{ args }}
-    forge verify-contract {{ proof-of-humanity }} test/mocks/MockProofOfHumanity.m.sol:MockProofOfHumanity \
-        --verifier blockscout --verifier-url {{ verifier-url }} --watch {{ args }}
-
-# Verify ArborVote on any Blockscout explorer (keyless); pass the explorer's /api/ URL
-verify-blockscout address proof-of-humanity verifier-url *args:
-    forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
-        --verifier blockscout --verifier-url {{ verifier-url }} --watch {{ args }}
+# Verify ArborVote on both Sourcify and Etherscan
+verify address proof-of-humanity chain: (verify-sourcify address proof-of-humanity chain) (verify-etherscan address proof-of-humanity chain)
 
 # Verify ArborVote on Sourcify (keyless, chain-agnostic)
 verify-sourcify address proof-of-humanity chain *args:
@@ -125,6 +113,12 @@ verify-etherscan address proof-of-humanity chain *args:
     forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
         --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
         --chain {{ chain }} --verifier etherscan --watch {{ args }}
+
+# Verify ArborVote on a custom explorer (pass its verifier URL; add `--verifier blockscout` for Blockscout)
+verify-custom address proof-of-humanity chain verifier-url *args:
+    forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
+        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
+        --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
 # Publish contracts to the Soldeer registry
 publish version *args:
