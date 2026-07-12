@@ -70,11 +70,15 @@ interface IArborVote {
     /// @param argumentId The ID of the argument.
     /// @param newParentArgumentId The ID of the new parent argument.
     /// @param oldParentArgumentId The ID of the old parent argument.
+    /// @param pro The pro reserve after re-seeding the market at the new initial approval.
+    /// @param con The con reserve after re-seeding the market at the new initial approval.
     event ArgumentMoved(
         uint256 indexed debateId,
         uint16 indexed argumentId,
         uint16 indexed newParentArgumentId,
-        uint16 oldParentArgumentId
+        uint16 oldParentArgumentId,
+        uint32 pro,
+        uint32 con
     );
 
     /// @notice Emitted when an argument's content is altered, which restarts its editing window.
@@ -161,11 +165,16 @@ interface IArborVote {
         uint32 initialApproval
     ) external returns (uint16 newArgumentId);
 
-    /// @notice Moves an argument below a new parent argument.
+    /// @notice Moves an argument below a new parent argument, re-seeding its market at a new
+    /// initial approval. Only a still-draft argument can move, so its reserves are still the
+    /// pristine deposit split and re-seeding them is lossless; pass the current approval to
+    /// keep the rating unchanged.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument to be moved.
     /// @param newParentArgumentId The ID of the new parent argument.
-    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId) external;
+    /// @param initialApproval The initial approval to re-seed the argument's market at.
+    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint32 initialApproval)
+        external;
 
     /// @notice Alters the content of an argument.
     /// @param debateId The ID of the debate.

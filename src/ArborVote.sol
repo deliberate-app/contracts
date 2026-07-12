@@ -205,7 +205,7 @@ contract ArborVote is IArborVote {
     /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
     /// attach beneath Final arguments while only Created arguments can move, so a Created argument is always
     /// childless - its subtree is itself alone, and it is not Final.
-    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId)
+    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint32 initialApproval)
         external
         override
         onlyPhase(debateId, Phase.Status.Editing)
@@ -213,6 +213,8 @@ contract ArborVote is IArborVote {
         onlyArgumentState(debateId, argumentId, Argument.State.Created)
         onlyArgumentState(debateId, newParentArgumentId, Argument.State.Final)
     {
+        _checkInitialApproval(initialApproval);
+
         Debate.Data storage debate = _debates[debateId];
         Argument.Data storage movedArgument = debate.arguments[argumentId];
 
@@ -223,6 +225,12 @@ contract ArborVote is IArborVote {
 
         // change argument state
         movedArgument.parentArgumentId = newParentArgumentId;
+
+        // Re-seed the market at the new approval. Only a draft can move and drafts cannot be
+        // staked on, so the reserves are still the pristine deposit split - re-splitting is
+        // lossless. The deposit (votes) is unchanged, so the childsVote transfer stays correct.
+        (movedArgument.pro, movedArgument.con) =
+            Parameters._DEBATE_DEPOSIT.split(100 - initialApproval, initialApproval);
 
         // change new parent argument state
         debate.arguments[newParentArgumentId].untalliedChilds++;
@@ -237,7 +245,9 @@ contract ArborVote is IArborVote {
             debateId: debateId,
             argumentId: argumentId,
             newParentArgumentId: newParentArgumentId,
-            oldParentArgumentId: oldParentArgumentId
+            oldParentArgumentId: oldParentArgumentId,
+            pro: movedArgument.pro,
+            con: movedArgument.con
         });
     }
 
@@ -498,13 +508,7 @@ contract ArborVote is IArborVote {
     {
         User.Data storage user = _users[debateId][msg.sender];
 
-        if (initialApproval < 50) {
-            revert InitialApprovalOutOfBounds({limit: 50, actual: initialApproval});
-        }
-        // 100 is not seedable: it would empty the pro reserve and freeze the market.
-        if (initialApproval > 99) {
-            revert InitialApprovalOutOfBounds({limit: 99, actual: initialApproval});
-        }
+        _checkInitialApproval(initialApproval);
 
         if (user.tokens < Parameters._DEBATE_DEPOSIT) {
             revert InsufficientVoteTokens({required: Parameters._DEBATE_DEPOSIT, actual: user.tokens});
@@ -790,5 +794,17 @@ contract ArborVote is IArborVote {
         })
         + argument.descendantsImpact
             .multiplyByFraction({numerator: Parameters._MIX_VAL, denominator: Parameters._MIX_MAX});
+    }
+
+    /// @notice An internal function reverting if an initial approval is outside the seedable range.
+    /// @param initialApproval The initial approval to validate.
+    function _checkInitialApproval(uint32 initialApproval) internal pure {
+        if (initialApproval < 50) {
+            revert InitialApprovalOutOfBounds({limit: 50, actual: initialApproval});
+        }
+        // 100 is not seedable: it would empty the pro reserve and freeze the market.
+        if (initialApproval > 99) {
+            revert InitialApprovalOutOfBounds({limit: 99, actual: initialApproval});
+        }
     }
 }

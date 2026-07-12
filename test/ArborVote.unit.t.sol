@@ -489,7 +489,9 @@ contract ArborVoteTest is Test {
             initialApproval: 50
         });
 
-        _arborVote.moveArgument(debateId, argumentC, argumentB);
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: argumentC, newParentArgumentId: argumentB, initialApproval: 50
+        });
 
         uint16[] memory expectedIds = new uint16[](2);
         expectedIds[0] = argumentA;
@@ -515,10 +517,51 @@ contract ArborVoteTest is Test {
         assertEq(_arborVote.getArgument(debateId, parentArgumentId).childsVote, 10);
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 10);
 
-        _arborVote.moveArgument(debateId, childArgumentId, _ROOT_ARGUMENT_ID);
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: childArgumentId, newParentArgumentId: _ROOT_ARGUMENT_ID, initialApproval: 50
+        });
 
         assertEq(_arborVote.getArgument(debateId, parentArgumentId).childsVote, 0);
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
+    }
+
+    function test_moveArgument_reseedsTheMarketAtTheNewApproval() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 parentArgumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, parentArgumentId);
+
+        // A draft seeded at 50% approval: reserves split the deposit evenly.
+        uint16 childArgumentId = _addArgument(debateId, true, 50);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 5);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).con, 5);
+
+        // Moving it re-seeds the market at 80%: con takes 80% of the (unchanged) deposit.
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
+        });
+
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 2);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).con, 8);
+        assertEq(_arborVote.getArgument(debateId, childArgumentId).votes, 10); // the deposit is unchanged
+    }
+
+    function test_moveArgument_revertsForAnApprovalOutOfBounds() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 parentArgumentId = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, parentArgumentId);
+
+        uint16 childArgumentId = _addArgument(debateId, true, 50);
+
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, 99, 100));
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 100
+        });
     }
 
     function test_moveArgument_revertsForANonFinalNewParent() public {
@@ -531,7 +574,9 @@ contract ArborVoteTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
         );
-        _arborVote.moveArgument(debateId, argumentA, argumentB);
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: argumentA, newParentArgumentId: argumentB, initialApproval: 50
+        });
     }
 
     function test_moveArgument_revertsWhenMovedUnderItself() public {
@@ -544,7 +589,9 @@ contract ArborVoteTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
         );
-        _arborVote.moveArgument(debateId, argumentId, argumentId);
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: argumentId, newParentArgumentId: argumentId, initialApproval: 50
+        });
     }
 
     function test_moveArgument_revertsForANonexistentNewParent() public {
@@ -556,7 +603,9 @@ contract ArborVoteTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
         );
-        _arborVote.moveArgument(debateId, argumentId, 42);
+        _arborVote.moveArgument({
+            debateId: debateId, argumentId: argumentId, newParentArgumentId: 42, initialApproval: 50
+        });
     }
 
     // --- stakePro / stakeCon ---
@@ -1033,9 +1082,16 @@ contract ArborVoteTest is Test {
             debateId: debateId,
             argumentId: movedArgumentId,
             newParentArgumentId: newParentArgumentId,
-            oldParentArgumentId: _ROOT_ARGUMENT_ID
+            oldParentArgumentId: _ROOT_ARGUMENT_ID,
+            pro: 2,
+            con: 8
         });
-        _arborVote.moveArgument(debateId, movedArgumentId, newParentArgumentId);
+        _arborVote.moveArgument({
+            debateId: debateId,
+            argumentId: movedArgumentId,
+            newParentArgumentId: newParentArgumentId,
+            initialApproval: 80
+        });
     }
 
     function test_alterArgument_emitsArgumentAltered() public {
