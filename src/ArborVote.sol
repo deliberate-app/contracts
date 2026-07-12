@@ -59,6 +59,14 @@ contract ArborVote is IArborVote {
     /// @param actual The actual argument state.
     error StateInvalid(Argument.State expected, Argument.State actual);
 
+    /// @notice Thrown if an argument is required to be final (its editing window elapsed) but is not.
+    /// @param argumentId The ID of the argument.
+    error ArgumentNotFinal(uint16 argumentId);
+
+    /// @notice Thrown if an argument is required to be an editable draft (inside its editing window) but is not.
+    /// @param argumentId The ID of the argument.
+    error ArgumentNotDraft(uint16 argumentId);
+
     /// @notice Thrown if the role of a user is invalid.
     /// @param expected The expected role.
     /// @param actual The actual role.
@@ -117,6 +125,24 @@ contract ArborVote is IArborVote {
     /// @param state The state of the argument required.
     modifier onlyArgumentState(uint256 debateId, uint16 argumentId, Argument.State state) {
         _onlyArgumentState({debateId: debateId, argumentId: argumentId, state: state});
+        _;
+    }
+
+    /// @notice A modifier to restrict functions to only act on a final argument: one whose editing window
+    /// has elapsed (or the permanently-final thesis).
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    modifier onlyFinalArgument(uint256 debateId, uint16 argumentId) {
+        _onlyFinalArgument({debateId: debateId, argumentId: argumentId});
+        _;
+    }
+
+    /// @notice A modifier to restrict functions to only act on a draft argument: one still inside its editing
+    /// window, hence editable and movable but not yet tradeable.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    modifier onlyDraftArgument(uint256 debateId, uint16 argumentId) {
+        _onlyDraftArgument({debateId: debateId, argumentId: argumentId});
         _;
     }
 
@@ -208,15 +234,15 @@ contract ArborVote is IArborVote {
 
     /// @inheritdoc IArborVote
     /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
-    /// attach beneath Final arguments while only Created arguments can move, so a Created argument is always
-    /// childless - its subtree is itself alone, and it is not Final.
+    /// attach beneath final arguments while only drafts (still inside their editing window) can move, so a draft is
+    /// always childless - its subtree is itself alone - and it is not final.
     function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint32 initialApproval)
         external
         override
         onlyPhase(debateId, Phase.Status.Editing)
         onlyCreator(debateId, argumentId)
-        onlyArgumentState(debateId, argumentId, Argument.State.Created)
-        onlyArgumentState(debateId, newParentArgumentId, Argument.State.Final)
+        onlyDraftArgument(debateId, argumentId)
+        onlyFinalArgument(debateId, newParentArgumentId)
     {
         _checkInitialApproval(initialApproval);
 
@@ -262,7 +288,7 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Editing)
         onlyCreator(debateId, argumentId)
-        onlyArgumentState(debateId, argumentId, Argument.State.Created)
+        onlyDraftArgument(debateId, argumentId)
     {
         uint48 newFinalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
 
@@ -284,7 +310,7 @@ contract ArborVote is IArborVote {
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
-        onlyArgumentState(debateId, argumentId, Argument.State.Final)
+        onlyFinalArgument(debateId, argumentId)
     {
         _stake({debateId: debateId, argumentId: argumentId, isPro: true, voteTokenAmount: voteTokenAmount});
     }
@@ -294,7 +320,7 @@ contract ArborVote is IArborVote {
         external
         override
         onlyPhase(debateId, Phase.Status.Rating)
-        onlyArgumentState(debateId, argumentId, Argument.State.Final)
+        onlyFinalArgument(debateId, argumentId)
     {
         _stake({debateId: debateId, argumentId: argumentId, isPro: false, voteTokenAmount: voteTokenAmount});
     }
@@ -457,26 +483,7 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function finalizeArgument(uint256 debateId, uint16 argumentId)
-        public
-        override
-        onlyArgumentState(debateId, argumentId, Argument.State.Created)
-    {
-        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
-
-        uint48 currentTime = Time.timestamp();
-
-        if (argument.finalizationTime > currentTime) {
-            revert TimeOutOfBounds({limit: currentTime, actual: argument.finalizationTime});
-        }
-
-        argument.state = Argument.State.Final;
-
-        emit ArgumentFinalized({debateId: debateId, argumentId: argumentId});
-    }
-
-    /// @inheritdoc IArborVote
-    /// @dev This requires the parent argument to be final.
+    /// @dev This requires the parent argument to be final: its editing window must have elapsed.
     function addArgument(
         uint256 debateId,
         uint16 parentArgumentId,
@@ -489,7 +496,7 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Editing)
         onlyRole(debateId, User.Role.Participant)
-        onlyArgumentState(debateId, parentArgumentId, Argument.State.Final)
+        onlyFinalArgument(debateId, parentArgumentId)
         returns (uint16 newArgumentId)
     {
         User.Data storage user = _users[debateId][msg.sender];
@@ -625,8 +632,8 @@ contract ArborVote is IArborVote {
         Debate.Data storage debate = _debates[debateId];
         Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
 
-        if (parentArgument.state != Argument.State.Final) {
-            revert StateInvalid({expected: Argument.State.Final, actual: parentArgument.state});
+        if (!_isFinal(parentArgument)) {
+            revert ArgumentNotFinal({argumentId: parentArgumentId});
         }
 
         parentArgument.untalliedChilds--;
@@ -738,10 +745,10 @@ contract ArborVote is IArborVote {
             revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
         }
 
-        // Only Final arguments carry impact. An argument never finalized contributes nothing: it can have
-        // neither children nor stakers (both require a Final argument), only its author's never-locked-in signal.
+        // Only final arguments carry impact - those whose editing window elapsed. By the Tallying phase every
+        // argument is final (its window ends before rating does), so this guards a case the phase clock rules out.
         int64 ownImpact = 0;
-        if (argument.state == Argument.State.Final) {
+        if (_isFinal(argument)) {
             // Calculate own impact $r_j$
             ownImpact = _calculateImpact({debateId: debateId, argumentId: argumentId});
 
@@ -797,6 +804,37 @@ contract ArborVote is IArborVote {
         if (currentState != state) {
             revert StateInvalid({expected: state, actual: currentState});
         }
+    }
+
+    /// @notice An internal function reverting if an argument is not final.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    function _onlyFinalArgument(uint256 debateId, uint16 argumentId) internal view {
+        if (!_isFinal(_debates[debateId].arguments[argumentId])) {
+            revert ArgumentNotFinal({argumentId: argumentId});
+        }
+    }
+
+    /// @notice An internal function reverting if an argument is not an editable draft.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    function _onlyDraftArgument(uint256 debateId, uint16 argumentId) internal view {
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+        // A draft exists and is still inside its editing window: not the permanently-final thesis, not a
+        // window-elapsed (hence final) argument, and not a nonexistent one.
+        if (argument.state != Argument.State.Created || Time.timestamp() >= argument.finalizationTime) {
+            revert ArgumentNotDraft({argumentId: argumentId});
+        }
+    }
+
+    /// @notice An internal function returning whether an argument is final: locked in, tradeable, and tallied.
+    /// @param argument The argument to check.
+    /// @return isFinal Whether the argument is final.
+    function _isFinal(Argument.Data storage argument) internal view returns (bool isFinal) {
+        // The thesis is created permanently final; every other argument finalizes automatically once its
+        // editing window has elapsed - no explicit transaction required.
+        isFinal = argument.state == Argument.State.Final
+            || (argument.state == Argument.State.Created && Time.timestamp() >= argument.finalizationTime);
     }
 
     /// @notice An internal function reverting if the caller does not hold a certain role.

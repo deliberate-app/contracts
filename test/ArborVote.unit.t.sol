@@ -492,8 +492,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentA);
-
         uint16 argumentB = _addArgument(debateId, false, 50);
         uint16 argumentC = _arborVote.addArgument({
             debateId: debateId,
@@ -529,8 +527,6 @@ contract ArborVoteTest is Test {
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentA);
-        _arborVote.finalizeArgument(debateId, argumentB);
 
         uint16 argumentC = _arborVote.addArgument({
             debateId: debateId,
@@ -557,8 +553,6 @@ contract ArborVoteTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, parentArgumentId);
-
         uint16 childArgumentId = _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: parentArgumentId,
@@ -584,8 +578,6 @@ contract ArborVoteTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, parentArgumentId);
-
         // A draft seeded at 50% approval: reserves split the deposit evenly.
         uint16 childArgumentId = _addArgument(debateId, true, 50);
         assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 5);
@@ -608,8 +600,6 @@ contract ArborVoteTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, parentArgumentId);
-
         // A draft seeded with a 40-token deposit at 50%: reserves 20/20.
         uint16 childArgumentId = _addArgument(debateId, true, 50, 40);
 
@@ -629,8 +619,6 @@ contract ArborVoteTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, parentArgumentId);
-
         uint16 childArgumentId = _addArgument(debateId, true, 50);
 
         vm.expectRevert(abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, 99, 100));
@@ -644,11 +632,9 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
-        uint16 argumentB = _addArgument(debateId, false, 50); // stays Created
+        uint16 argumentB = _addArgument(debateId, false, 50); // a draft, so not a valid parent
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentB));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentA, newParentArgumentId: argumentB, initialApproval: 50
         });
@@ -660,10 +646,8 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
-        // The moved argument is necessarily Created, never Final - self-parenting is a state error.
-        vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
-        );
+        // The argument being moved is necessarily a draft, never final - it cannot be its own final parent.
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentId));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentId, newParentArgumentId: argumentId, initialApproval: 50
         });
@@ -675,9 +659,7 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, uint16(42)));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentId, newParentArgumentId: 42, initialApproval: 50
         });
@@ -691,7 +673,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         _arborVote.stakePro(debateId, argumentId, 20);
@@ -717,7 +698,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         _arborVote.stakeCon(debateId, argumentId, 20);
@@ -745,7 +725,6 @@ contract ArborVoteTest is Test {
         _join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         Argument.Data memory before = _arborVote.getArgument(debateId, argumentId);
@@ -792,7 +771,6 @@ contract ArborVoteTest is Test {
         _join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         address firstStaker = makeAddr("firstStaker");
@@ -839,12 +817,14 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint16 argumentId = _addArgument(debateId, true, 50); // stays Created: never finalized
-        _endEditing(debateId);
+        // Add an argument late in the editing window so it is still a draft once rating begins: its
+        // finalization time (one time unit out) lands after the editing deadline.
+        (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
+        vm.warp(editingEndTime - 1);
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        _endEditing(debateId); // now in rating, but the argument's window has not closed yet
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Created)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentId));
         _arborVote.stakePro(debateId, argumentId, 10);
     }
 
@@ -853,9 +833,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
         _endEditing(debateId);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.StateInvalid.selector, Argument.State.Final, Argument.State.Uninitialized)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, uint16(42)));
         _arborVote.stakeCon(debateId, 42, 10);
     }
 
@@ -875,10 +853,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint16 argumentId = _addArgument(debateId, true, 80);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
-
+        _addArgument(debateId, true, 80);
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
@@ -890,10 +865,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint16 argumentId = _addArgument(debateId, false, 80);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
-
+        _addArgument(debateId, false, 80);
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
@@ -905,13 +877,8 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _fillDebateToTheArgumentCap(debateId);
 
-        // Finalize every argument so all of them carry impact (the expensive path).
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        uint16 maxArguments = Parameters.MAX_ARGUMENTS;
-        for (uint16 i = 1; i < maxArguments; i++) {
-            _arborVote.finalizeArgument(debateId, i);
-        }
-
+        // By the Tallying phase every argument is final (each editing window elapsed), so all of them carry
+        // impact - the expensive path this benchmark must stay within block gas for.
         _endRating(debateId);
 
         uint256 gasBefore = gasleft();
@@ -922,17 +889,19 @@ contract ArborVoteTest is Test {
         assertLt(gasUsed, 30_000_000);
     }
 
-    function test_tallyTree_ignoresUnfinalizedArguments() public {
+    function test_tallyTree_finalizesArgumentsByTime() public {
+        // No explicit finalize step: an argument left untouched becomes final once its editing window elapses
+        // (by the Tallying phase, always), so it is tallied automatically.
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        _addArgument(debateId, true, 95); // stays Created: never finalized
+        _addArgument(debateId, true, 95); // supporting, seeded high; never touched again
         _endRating(debateId);
 
         _arborVote.tallyTree(debateId);
 
-        assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
-        assertFalse(_arborVote.outcome(debateId));
+        assertGt(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
+        assertTrue(_arborVote.outcome(debateId));
     }
 
     function test_tallyTree_talliesRecursivelyUpTheTree() public {
@@ -941,9 +910,7 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 80);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
-
-        uint16 childArgumentId = _arborVote.addArgument({
+        _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: argumentId,
             contentURI: _PRO_ARGUMENT_CONTENT,
@@ -952,8 +919,6 @@ contract ArborVoteTest is Test {
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, childArgumentId);
-
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
@@ -1019,7 +984,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         address earlyStaker = makeAddr("earlyStaker");
@@ -1059,8 +1023,6 @@ contract ArborVoteTest is Test {
         uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
         uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argument1);
-        _arborVote.finalizeArgument(debateId, argument2);
         _endEditing(debateId);
 
         // One staker takes a con position in both arguments (22 con shares each).
@@ -1093,8 +1055,6 @@ contract ArborVoteTest is Test {
         uint16 argument1 = _addArgument(debateId, true, 50);
         uint16 argument2 = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argument1);
-        _arborVote.finalizeArgument(debateId, argument2);
         _endEditing(debateId);
 
         // The staker only holds shares in argument1.
@@ -1137,7 +1097,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         // A second participant stakes 20; the 5% fee (1 token) accrues to the argument.
@@ -1228,8 +1187,6 @@ contract ArborVoteTest is Test {
 
         uint16 newParentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, newParentArgumentId);
-
         uint16 movedArgumentId = _addArgument(debateId, false, 50);
 
         vm.expectEmit();
@@ -1266,18 +1223,6 @@ contract ArborVoteTest is Test {
         _arborVote.alterArgument(debateId, argumentId, newContentURI);
     }
 
-    function test_finalizeArgument_emitsArgumentFinalized() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-
-        vm.expectEmit();
-        emit IArborVote.ArgumentFinalized({debateId: debateId, argumentId: argumentId});
-        _arborVote.finalizeArgument(debateId, argumentId);
-    }
-
     function test_advancePhase_emitsPhaseAdvancedOnEachTransition() public {
         uint256 debateId = _createDebate();
         (, uint48 editingEndTime, uint48 ratingEndTime,) = _arborVote.phases(debateId);
@@ -1308,7 +1253,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
@@ -1326,9 +1270,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint16 argumentId = _addArgument(debateId, true, 80); // a supporting argument rated well
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
+        _addArgument(debateId, true, 80); // a supporting argument rated well, finalized by time at the tally
         _endRating(debateId);
 
         vm.expectEmit();
@@ -1342,7 +1284,6 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 80); // reserves 2/8
         vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
-        _arborVote.finalizeArgument(debateId, argumentId);
         _endEditing(debateId);
 
         // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26

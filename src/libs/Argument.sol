@@ -6,7 +6,9 @@ pragma solidity ^0.8.24;
 /// @author Michael Heuer
 /// @notice A library defining the types associated with an argument.
 library Argument {
-    /// @notice The state of an argument.
+    /// @notice The stored state of an argument. Finalization is not a stored transition: a `Created` argument
+    /// becomes final automatically once its editing window (`finalizationTime`) has elapsed. `Final` is reserved
+    /// for the thesis, which is permanently final from creation.
     enum State {
         Uninitialized,
         Created,

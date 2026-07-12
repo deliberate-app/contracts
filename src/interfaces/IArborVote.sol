@@ -90,11 +90,6 @@ interface IArborVote {
         uint256 indexed debateId, uint16 indexed argumentId, bytes32 contentURI, uint48 finalizationTime
     );
 
-    /// @notice Emitted when an argument is finalized, locking it in for rating and tallying.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    event ArgumentFinalized(uint256 indexed debateId, uint16 indexed argumentId);
-
     /// @notice Emitted when a debater stakes vote tokens on one side of an argument's market.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
@@ -144,11 +139,6 @@ interface IArborVote {
     /// @notice Join a debate and receive debate tokens.
     /// @param debateId The ID of the debate.
     function join(uint256 debateId) external;
-
-    /// @notice Finalizes an argument of a debate.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument to be finalized.
-    function finalizeArgument(uint256 debateId, uint16 argumentId) external;
 
     /// @notice Adds an argument below a parent argument with a certain initial approval, staking a
     /// creator-chosen deposit that seeds the argument's market and sets its starting weight.
