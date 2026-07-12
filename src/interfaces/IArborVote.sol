@@ -207,6 +207,13 @@ interface IArborVote {
     /// @param account The account to redeem the shares for.
     function redeemArgumentShares(uint256 debateId, uint16 argumentId, address account) external;
 
+    /// @notice Redeems the shares a user holds across several arguments of a debate in one call.
+    /// Arguments the account holds no shares in are skipped, so a stale ID is harmless.
+    /// @param debateId The ID of the debate.
+    /// @param argumentIds The IDs of the arguments to redeem shares in.
+    /// @param account The account to redeem the shares for.
+    function redeemArgumentSharesBatch(uint256 debateId, uint16[] calldata argumentIds, address account) external;
+
     /// @notice Claims the market fees accrued by an argument's market, crediting them to the argument's creator.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.

@@ -319,39 +319,19 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Finished)
     {
-        User.Data storage user = _users[debateId][account];
-        User.Shares storage userShares = _users[debateId][account].shares[argumentId];
-        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+        _redeemArgumentShares({debateId: debateId, argumentId: argumentId, account: account});
+    }
 
-        uint32 proShares = userShares.pro;
-        uint32 conShares = userShares.con;
-        if (proShares == 0 && conShares == 0) {
-            return;
+    /// @inheritdoc IArborVote
+    function redeemArgumentSharesBatch(uint256 debateId, uint16[] calldata argumentIds, address account)
+        external
+        override
+        onlyPhase(debateId, Phase.Status.Finished)
+    {
+        uint256 arrayLength = argumentIds.length;
+        for (uint256 i = 0; i < arrayLength; i++) {
+            _redeemArgumentShares({debateId: debateId, argumentId: argumentIds[i], account: account});
         }
-
-        uint32 marketSize = argument.pro + argument.con;
-
-        // Each pro share pays out the final approval - the con reserve's share of the market
-        // - and each con share the complement. Rounding down keeps the market solvent.
-        uint32 payout = 0;
-        if (proShares > 0) {
-            payout += proShares.multiplyByFraction({numerator: argument.con, denominator: marketSize});
-            userShares.pro = 0;
-        }
-        if (conShares > 0) {
-            payout += conShares.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
-            userShares.con = 0;
-        }
-        user.tokens += payout;
-
-        emit SharesRedeemed({
-            debateId: debateId,
-            argumentId: argumentId,
-            account: account,
-            proShares: proShares,
-            conShares: conShares,
-            payout: payout
-        });
     }
 
     /// @inheritdoc IArborVote
@@ -657,6 +637,46 @@ contract ArborVote is IArborVote {
             // slither-disable-next-line unused-return
             debate.leafArgumentIds.add(parentArgumentId);
         }
+    }
+
+    /// @notice Internal function redeeming a user's shares in an argument for vote tokens; a no-op without shares.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    /// @param account The account to redeem the shares for.
+    function _redeemArgumentShares(uint256 debateId, uint16 argumentId, address account) internal {
+        User.Data storage user = _users[debateId][account];
+        User.Shares storage userShares = _users[debateId][account].shares[argumentId];
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+
+        uint32 proShares = userShares.pro;
+        uint32 conShares = userShares.con;
+        if (proShares == 0 && conShares == 0) {
+            return;
+        }
+
+        uint32 marketSize = argument.pro + argument.con;
+
+        // Each pro share pays out the final approval - the con reserve's share of the market
+        // - and each con share the complement. Rounding down keeps the market solvent.
+        uint32 payout = 0;
+        if (proShares > 0) {
+            payout += proShares.multiplyByFraction({numerator: argument.con, denominator: marketSize});
+            userShares.pro = 0;
+        }
+        if (conShares > 0) {
+            payout += conShares.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
+            userShares.con = 0;
+        }
+        user.tokens += payout;
+
+        emit SharesRedeemed({
+            debateId: debateId,
+            argumentId: argumentId,
+            account: account,
+            proShares: proShares,
+            conShares: conShares,
+            payout: payout
+        });
     }
 
     /// @notice Internal function staking vote tokens on one side of an argument's constant-product market.

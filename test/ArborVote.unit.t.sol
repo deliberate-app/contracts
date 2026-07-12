@@ -1050,6 +1050,85 @@ contract ArborVoteTest is Test {
         // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
     }
 
+    // --- redeemArgumentSharesBatch ---
+
+    function test_redeemArgumentSharesBatch_redeemsAcrossArguments() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
+        uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argument1);
+        _arborVote.finalizeArgument(debateId, argument2);
+        _endEditing(debateId);
+
+        // One staker takes a con position in both arguments (22 con shares each).
+        address staker = makeAddr("staker");
+        vm.startPrank(staker);
+        _arborVote.join(debateId);
+        _arborVote.stakeCon(debateId, argument1, 20);
+        _arborVote.stakeCon(debateId, argument2, 20);
+        vm.stopPrank();
+        assertEq(_arborVote.getUserTokens(debateId, staker), 60); // 100 - 20 - 20
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        uint16[] memory argumentIds = new uint16[](2);
+        argumentIds[0] = argument1;
+        argumentIds[1] = argument2;
+        _arborVote.redeemArgumentSharesBatch(debateId, argumentIds, staker);
+
+        // Both positions redeemed in one call: 20 tokens back per argument.
+        assertEq(_arborVote.getUserShares(debateId, argument1, staker).con, 0);
+        assertEq(_arborVote.getUserShares(debateId, argument2, staker).con, 0);
+        assertEq(_arborVote.getUserTokens(debateId, staker), 100); // 60 + 20 + 20
+    }
+
+    function test_redeemArgumentSharesBatch_skipsArgumentsWithoutShares() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argument1 = _addArgument(debateId, true, 50);
+        uint16 argument2 = _addArgument(debateId, true, 50);
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        _arborVote.finalizeArgument(debateId, argument1);
+        _arborVote.finalizeArgument(debateId, argument2);
+        _endEditing(debateId);
+
+        // The staker only holds shares in argument1.
+        address staker = makeAddr("staker");
+        vm.startPrank(staker);
+        _arborVote.join(debateId);
+        _arborVote.stakeCon(debateId, argument1, 20);
+        vm.stopPrank();
+
+        _endRating(debateId);
+        _arborVote.tallyTree(debateId);
+
+        // The batch includes argument2, which the staker never staked on: it is skipped, not reverted.
+        uint16[] memory argumentIds = new uint16[](2);
+        argumentIds[0] = argument1;
+        argumentIds[1] = argument2;
+        _arborVote.redeemArgumentSharesBatch(debateId, argumentIds, staker);
+
+        assertEq(_arborVote.getUserShares(debateId, argument1, staker).con, 0);
+        assertEq(_arborVote.getUserTokens(debateId, staker), 100); // 100 - 20 + 20; argument2 a no-op
+    }
+
+    function test_redeemArgumentSharesBatch_revertsBeforeTheTallyHasRun() public {
+        uint256 debateId = _createDebate();
+        _endRating(debateId);
+
+        uint16[] memory argumentIds = new uint16[](1);
+        argumentIds[0] = _ROOT_ARGUMENT_ID;
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+        );
+        _arborVote.redeemArgumentSharesBatch(debateId, argumentIds, address(this));
+    }
+
     // --- claimFees ---
 
     function test_claimFees_creditsTheAccruedFeesToTheArgumentCreator() public {
