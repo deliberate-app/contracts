@@ -101,63 +101,57 @@ contract ArborVoteTest is Test {
     function _endEditing(uint256 debateId) internal {
         (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
         vm.warp(editingEndTime + 1);
-        _arborVote.advancePhase(debateId);
     }
 
     function _endRating(uint256 debateId) internal {
         (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
         vm.warp(ratingEndTime + 1);
-        _arborVote.advancePhase(debateId);
     }
 
-    // --- advancePhase ---
+    // --- phase derivation ---
 
-    function test_advancePhase_revertsForAnUninitializedDebate() public {
-        _createDebate();
-
-        uint256 uninitializedDebateId = 123;
-        (Phase.Status currentPhase,,,) = _arborVote.phases(uninitializedDebateId);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Uninitialized));
-
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.DebateUninitialized.selector, uninitializedDebateId));
-        _arborVote.advancePhase(uninitializedDebateId);
-    }
-
-    function test_advancePhase_advancesThePhasesAfterTheTimeHasPassed() public {
+    function test_phases_derivesEditingRatingTallyingFromTheClockWithoutAPoke() public {
         uint256 debateId = _createDebate();
 
         (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime,) = _arborVote.phases(debateId);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Editing));
 
+        // Crossing a time gate advances the phase on read - no transaction moves it.
         vm.warp(editingEndTime + 1);
-        _arborVote.advancePhase(debateId);
         (currentPhase,,,) = _arborVote.phases(debateId);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Rating));
 
         vm.warp(ratingEndTime + 1);
-        _arborVote.advancePhase(debateId);
         (currentPhase,,,) = _arborVote.phases(debateId);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
     }
 
-    function test_advancePhase_isIdempotentAfterRatingHasEnded() public {
+    function test_phases_holdEditingUpToButNotPastTheEditingGate() public {
         uint256 debateId = _createDebate();
-        _endRating(debateId);
+        (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
 
-        _arborVote.advancePhase(debateId);
-
+        // The gate is exclusive: exactly at the end time the debate is still editing.
+        vm.warp(editingEndTime);
         (Phase.Status currentPhase,,,) = _arborVote.phases(debateId);
-        assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Editing));
     }
 
-    function test_advancePhase_doesNotLeaveTheFinishedPhase() public {
+    function test_phases_reachFinishedOnlyThroughTheTallyLatchNotTheClock() public {
         uint256 debateId = _createDebate();
         _endRating(debateId);
-        _arborVote.tallyTree(debateId);
 
-        _arborVote.advancePhase(debateId);
-
+        // The clock alone never reaches Finished, however far it advances.
+        vm.warp(type(uint32).max);
         (Phase.Status currentPhase,,,) = _arborVote.phases(debateId);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Tallying));
+
+        _arborVote.tallyTree(debateId);
+        (currentPhase,,,) = _arborVote.phases(debateId);
+        assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
+
+        // Finished is terminal: no later time leaves it.
+        vm.warp(type(uint40).max);
+        (currentPhase,,,) = _arborVote.phases(debateId);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Finished));
     }
 
@@ -1221,30 +1215,6 @@ contract ArborVoteTest is Test {
             finalizationTime: uint48(vm.getBlockTimestamp()) + _TIME_UNIT
         });
         _arborVote.alterArgument(debateId, argumentId, newContentURI);
-    }
-
-    function test_advancePhase_emitsPhaseAdvancedOnEachTransition() public {
-        uint256 debateId = _createDebate();
-        (, uint48 editingEndTime, uint48 ratingEndTime,) = _arborVote.phases(debateId);
-
-        vm.warp(editingEndTime + 1);
-        vm.expectEmit();
-        emit IArborVote.PhaseAdvanced({debateId: debateId, newPhase: Phase.Status.Rating});
-        _arborVote.advancePhase(debateId);
-
-        vm.warp(ratingEndTime + 1);
-        vm.expectEmit();
-        emit IArborVote.PhaseAdvanced({debateId: debateId, newPhase: Phase.Status.Tallying});
-        _arborVote.advancePhase(debateId);
-    }
-
-    function test_advancePhase_emitsNothingBelowTheTimeGates() public {
-        uint256 debateId = _createDebate();
-
-        vm.recordLogs();
-        _arborVote.advancePhase(debateId);
-
-        assertEq(vm.getRecordedLogs().length, 0);
     }
 
     function test_stakePro_emitsStaked() public {

@@ -189,9 +189,9 @@ contract ArborVote is IArborVote {
         rootArgument.finalizationTime = Time.timestamp();
         rootArgument.state = Argument.State.Final;
 
-        // Store the phase related data
+        // Store the phase-related data. The phase itself is not stored: Editing, Rating, and Tallying are
+        // derived from these time gates on read, and only the terminal Finished phase is later latched by the tally.
         Phase.Data storage phaseData = _phases[debateId];
-        phaseData.currentPhase = Phase.Status.Editing;
         phaseData.timeUnit = timeUnit;
         phaseData.editingEndTime = Time.timestamp() + 7 * timeUnit;
         phaseData.ratingEndTime = Time.timestamp() + 10 * timeUnit;
@@ -212,7 +212,7 @@ contract ArborVote is IArborVote {
     /// @inheritdoc IArborVote
     function join(uint256 debateId) external override onlyRole(debateId, User.Role.Unassigned) {
         // Joining is only possible while participating is: during the editing and rating phases.
-        Phase.Status currentPhase = _phases[debateId].currentPhase;
+        Phase.Status currentPhase = _phaseOf(_phases[debateId]);
         if (currentPhase == Phase.Status.Uninitialized) {
             revert DebateUninitialized({debateId: debateId});
         }
@@ -334,7 +334,8 @@ contract ArborVote is IArborVote {
             _tallyNode(debateId, SafeCast.toUint16(leafArgumentIds[i]));
         }
 
-        _phases[debateId].currentPhase = Phase.Status.Finished;
+        // Latch the terminal phase: the tally is the single transaction that finishes a debate, no separate poke.
+        _phases[debateId].finished = true;
 
         emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsImpact > 0});
     }
@@ -442,44 +443,17 @@ contract ArborVote is IArborVote {
         returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit)
     {
         Phase.Data storage phaseData = _phases[debateId];
-        return (phaseData.currentPhase, phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.timeUnit);
+        return (_phaseOf(phaseData), phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.timeUnit);
     }
 
     /// @inheritdoc IArborVote
     function outcome(uint256 debateId) external view override returns (bool approved) {
-        if (_phases[debateId].currentPhase != Phase.Status.Finished) {
-            revert PhaseInvalid({expected: Phase.Status.Finished, actual: _phases[debateId].currentPhase});
+        Phase.Status currentPhase = _phaseOf(_phases[debateId]);
+        if (currentPhase != Phase.Status.Finished) {
+            revert PhaseInvalid({expected: Phase.Status.Finished, actual: currentPhase});
         }
 
         approved = _debates[debateId].arguments[0].descendantsImpact > 0;
-    }
-
-    /// @inheritdoc IArborVote
-    function advancePhase(uint256 debateId) public override {
-        Phase.Data storage phaseData = _phases[debateId];
-
-        Phase.Status currentPhase = phaseData.currentPhase;
-
-        if (currentPhase == Phase.Status.Uninitialized) {
-            revert DebateUninitialized({debateId: debateId});
-        }
-
-        // The terminal phase is entered by the tally and can never be left.
-        if (currentPhase == Phase.Status.Finished) {
-            return;
-        }
-
-        uint48 currentTime = Time.timestamp();
-
-        if (currentTime > phaseData.ratingEndTime) {
-            phaseData.currentPhase = Phase.Status.Tallying;
-        } else if (currentTime > phaseData.editingEndTime) {
-            phaseData.currentPhase = Phase.Status.Rating;
-        }
-
-        if (phaseData.currentPhase != currentPhase) {
-            emit PhaseAdvanced({debateId: debateId, newPhase: phaseData.currentPhase});
-        }
     }
 
     /// @inheritdoc IArborVote
@@ -780,9 +754,34 @@ contract ArborVote is IArborVote {
     /// @param debateId The ID of the debate.
     /// @param phase The phase of the debate required.
     function _onlyPhase(uint256 debateId, Phase.Status phase) internal view {
-        if (_phases[debateId].currentPhase != phase) {
-            revert PhaseInvalid({expected: phase, actual: _phases[debateId].currentPhase});
+        Phase.Status currentPhase = _phaseOf(_phases[debateId]);
+        if (currentPhase != phase) {
+            revert PhaseInvalid({expected: phase, actual: currentPhase});
         }
+    }
+
+    /// @notice An internal function deriving a debate's phase from the time gates and the terminal tally latch.
+    /// @dev Editing, Rating, and Tallying follow purely from the clock, so the phase never lags behind time and
+    /// needs no poke to advance; only the terminal Finished phase is stored, latched by the tally. An unset
+    /// `editingEndTime` marks a debate that was never created.
+    /// @param phaseData The phase data of the debate.
+    /// @return phase The current phase of the debate.
+    function _phaseOf(Phase.Data storage phaseData) internal view returns (Phase.Status phase) {
+        if (phaseData.editingEndTime == 0) {
+            return Phase.Status.Uninitialized;
+        }
+        if (phaseData.finished) {
+            return Phase.Status.Finished;
+        }
+
+        uint48 currentTime = Time.timestamp();
+        if (currentTime > phaseData.ratingEndTime) {
+            return Phase.Status.Tallying;
+        }
+        if (currentTime > phaseData.editingEndTime) {
+            return Phase.Status.Rating;
+        }
+        return Phase.Status.Editing;
     }
 
     /// @notice An internal function reverting if the caller is not the argument creator.

@@ -32,12 +32,6 @@ interface IArborVote {
     /// @param tokens The vote tokens the account received.
     event Joined(uint256 indexed debateId, address indexed account, uint32 tokens);
 
-    /// @notice Emitted when a debate advances into a later phase along its time gates.
-    /// The terminal transition into `Finished` is emitted as `DebateFinished` by the tally instead.
-    /// @param debateId The ID of the debate.
-    /// @param newPhase The phase the debate advanced into.
-    event PhaseAdvanced(uint256 indexed debateId, Phase.Status newPhase);
-
     /// @notice Emitted when the tally completes, moving the debate into the terminal `Finished` phase.
     /// @param debateId The ID of the debate.
     /// @param approved Whether the debate approved the thesis.
@@ -131,10 +125,6 @@ interface IArborVote {
     /// @param timeUnit The time unit of the debate determining the editing and rating durations.
     /// @return debateId The ID of the created debate.
     function createDebate(bytes32 contentURI, uint48 timeUnit) external returns (uint256 debateId);
-
-    /// @notice Advances the phase of the debate.
-    /// @param debateId The ID of the debate.
-    function advancePhase(uint256 debateId) external;
 
     /// @notice Join a debate and receive debate tokens.
     /// @param debateId The ID of the debate.
