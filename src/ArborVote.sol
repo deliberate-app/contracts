@@ -712,23 +712,21 @@ contract ArborVote is IArborVote {
 
         // Only final arguments carry impact - those whose editing window elapsed. By the Tallying phase every
         // argument is final (its window ends before rating does), so this guards a case the phase clock rules out.
-        int64 ownImpact = 0;
+
         if (_isFinal(argument)) {
-            // Calculate own impact $r_j$
-            ownImpact = _calculateImpact({debateId: debateId, argumentId: argumentId});
+            // Calculate own impact
+            int64 ownImpact = _calculateImpact({
+                debateId: debateId, argumentId: argumentId
+            }).multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
 
-            // Apply pre-factor $\sigma_j$
-            if (!argument.isSupporting) {
-                ownImpact = -ownImpact;
-            }
+            emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: ownImpact});
 
-            // Apply weight $w_j$. The parent holds the summed votes of all its children (the siblings).
-            ownImpact =
-                ownImpact.multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
+            // Update the parent argument impact
+            argument.isSupporting
+                ? parentArgument.descendantsImpact += ownImpact
+                : parentArgument.descendantsImpact -= ownImpact;
         }
 
-        // Update the parent argument impact
-        parentArgument.descendantsImpact += ownImpact;
         parentArgument.untalliedChilds--;
 
         // If all children of the parent are tallied, tally the parent - unless the parent is the root: the root
@@ -737,8 +735,6 @@ contract ArborVote is IArborVote {
         if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             _tallyNode({debateId: debateId, argumentId: parentArgumentId});
         }
-
-        emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: ownImpact});
     }
 
     /// @notice An internal function reverting if the debate is not in a certain phase.
