@@ -6,23 +6,16 @@ pragma solidity ^0.8.24;
 /// @author Michael Heuer
 /// @notice A library defining the types associated with an argument.
 library Argument {
-    /// @notice The stored state of an argument. Finalization is not a stored transition: a `Created` argument
-    /// becomes final automatically once its editing window (`finalizationTime`) has elapsed. `Final` is reserved
-    /// for the thesis, which is permanently final from creation.
-    enum State {
-        Uninitialized,
-        Created,
-        Final
-    }
-
     /// @notice The data associated with an argument.
+    /// @dev An argument's lifecycle is not stored: it exists once it has a `creator`, and it is final (locked
+    /// in, tradeable, tallied) once its editing window (`finalizationTime`) has elapsed. The thesis sets its
+    /// finalization time to creation, so it is final from the start.
     /// @param contentURI The URI pointing to the content of the argument.
-    /// @param creator The creator of the argument.
+    /// @param creator The creator of the argument; the zero address marks a nonexistent argument.
     /// @param isSupporting Whether the argument supports or opposes its parent.
-    /// @param state The state of the argument.
     /// @param parentArgumentId The ID of the parent argument.
     /// @param untalliedChilds The number of untallied child arguments.
-    /// @param finalizationTime The time at which the argument can be finalized.
+    /// @param finalizationTime The time from which the argument is final.
     /// @param pro The pro share reserve of the argument market (scarce pro = high approval).
     /// @param con The con share reserve of the argument market.
     /// @param votes The vote tokens collateralizing the argument market (deposit and net stakes).
@@ -33,10 +26,9 @@ library Argument {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
         bool isSupporting; //       | + 1
-        State state; //             | + 1
         uint16 parentArgumentId; // | + 2
         uint16 untalliedChilds; //  | + 2
-        uint48 finalizationTime; // ┘ + 6 = 32
+        uint48 finalizationTime; // ┘ + 6 = 31
         uint32 pro; //              ┐   4
         uint32 con; //              | + 4
         uint32 votes; //            | + 4

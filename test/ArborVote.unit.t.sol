@@ -208,7 +208,7 @@ contract ArborVoteTest is Test {
         assertEq(rootArgument.fees, 0);
 
         assertEq(rootArgument.creator, address(this));
-        assertEq(uint256(rootArgument.state), uint256(Argument.State.Final));
+        // The thesis is final from creation: its finalization time is the creation time itself.
         assertEq(rootArgument.finalizationTime, uint48(vm.getBlockTimestamp()));
 
         assertEq(rootArgument.isSupporting, false);
@@ -307,7 +307,7 @@ contract ArborVoteTest is Test {
         assertEq(proArgument.fees, 0);
 
         assertEq(proArgument.creator, address(this));
-        assertEq(uint256(proArgument.state), uint256(Argument.State.Created));
+        // A fresh argument is a draft: its finalization time is one time unit out.
         assertEq(proArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _TIME_UNIT);
 
         assertEq(proArgument.isSupporting, true);
@@ -334,7 +334,7 @@ contract ArborVoteTest is Test {
         assertEq(conArgument.fees, 0);
 
         assertEq(conArgument.creator, address(this));
-        assertEq(uint256(conArgument.state), uint256(Argument.State.Created));
+        // A fresh argument is a draft: its finalization time is one time unit out.
         assertEq(conArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _TIME_UNIT);
 
         assertEq(conArgument.isSupporting, false);

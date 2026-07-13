@@ -54,11 +54,6 @@ contract ArborVote is IArborVote {
     /// @param actual The actual debate phase.
     error PhaseExceeded(Phase.Status limit, Phase.Status actual);
 
-    /// @notice Thrown if the state of an argument is invalid.
-    /// @param expected The expected argument state.
-    /// @param actual The actual argument state.
-    error StateInvalid(Argument.State expected, Argument.State actual);
-
     /// @notice Thrown if an argument is required to be final (its editing window elapsed) but is not.
     /// @param argumentId The ID of the argument.
     error ArgumentNotFinal(uint16 argumentId);
@@ -119,15 +114,6 @@ contract ArborVote is IArborVote {
         _;
     }
 
-    /// @notice A modifier to restrict functions to only be called if the argument is in a certain state.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    /// @param state The state of the argument required.
-    modifier onlyArgumentState(uint256 debateId, uint16 argumentId, Argument.State state) {
-        _onlyArgumentState({debateId: debateId, argumentId: argumentId, state: state});
-        _;
-    }
-
     /// @notice A modifier to restrict functions to only act on a final argument: one whose editing window
     /// has elapsed (or the permanently-final thesis).
     /// @param debateId The ID of the debate.
@@ -169,12 +155,7 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function createDebate(bytes32 contentURI, uint48 timeUnit)
-        external
-        override
-        onlyArgumentState(_debatesCounter, 0, Argument.State.Uninitialized)
-        returns (uint256 debateId)
-    {
+    function createDebate(bytes32 contentURI, uint48 timeUnit) external override returns (uint256 debateId) {
         debateId = _debatesCounter;
         _debatesCounter++;
 
@@ -182,12 +163,11 @@ contract ArborVote is IArborVote {
         Debate.Data storage newDebate = _debates[debateId];
         Argument.Data storage rootArgument = newDebate.arguments[0];
 
-        // Create the root argument of the tree
+        // Create the root argument of the tree - the thesis. Setting its finalization time to creation makes it
+        // final from the start (finality is derived from the clock, not stored), so it can immediately parent.
         rootArgument.contentURI = contentURI;
-
         rootArgument.creator = msg.sender;
         rootArgument.finalizationTime = Time.timestamp();
-        rootArgument.state = Argument.State.Final;
 
         // Store the phase-related data. The phase itself is not stored: Editing, Rating, and Tallying are
         // derived from these time gates on read, and only the terminal Finished phase is later latched by the tally.
@@ -590,11 +570,12 @@ contract ArborVote is IArborVote {
         (argument.pro, argument.con) = deposit.split(100 - initialApproval, initialApproval);
         argument.votes = deposit;
 
+        // A fresh argument is a draft until its editing window elapses one time unit out; existence and
+        // finality are derived from the creator and this finalization time, so no state is stored.
         argument.creator = msg.sender;
         argument.finalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
         argument.parentArgumentId = parentArgumentId;
         argument.isSupporting = isSupporting;
-        argument.state = Argument.State.Created;
 
         argument.contentURI = contentURI;
     }
@@ -794,17 +775,6 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @notice An internal function reverting if the argument is not in a certain state.
-    /// @param debateId The ID of the debate.
-    /// @param argumentId The ID of the argument.
-    /// @param state The state of the argument required.
-    function _onlyArgumentState(uint256 debateId, uint16 argumentId, Argument.State state) internal view {
-        Argument.State currentState = _debates[debateId].arguments[argumentId].state;
-        if (currentState != state) {
-            revert StateInvalid({expected: state, actual: currentState});
-        }
-    }
-
     /// @notice An internal function reverting if an argument is not final.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
@@ -819,21 +789,21 @@ contract ArborVote is IArborVote {
     /// @param argumentId The ID of the argument.
     function _onlyDraftArgument(uint256 debateId, uint16 argumentId) internal view {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
-        // A draft exists and is still inside its editing window: not the permanently-final thesis, not a
-        // window-elapsed (hence final) argument, and not a nonexistent one.
-        if (argument.state != Argument.State.Created || Time.timestamp() >= argument.finalizationTime) {
+        // A draft exists and is still inside its editing window: not the permanently-final thesis (whose window
+        // ends at creation), not a window-elapsed (hence final) argument, and not a nonexistent one (no creator).
+        if (argument.creator == address(0) || Time.timestamp() >= argument.finalizationTime) {
             revert ArgumentNotDraft({argumentId: argumentId});
         }
     }
 
     /// @notice An internal function returning whether an argument is final: locked in, tradeable, and tallied.
+    /// @dev Finality is derived, not stored: an argument is final once it exists and its editing window has
+    /// elapsed. The thesis sets its finalization time to creation, so it is final from the start with no special
+    /// case; a nonexistent argument (no creator) is never final, so its finalization time of zero is harmless.
     /// @param argument The argument to check.
     /// @return isFinal Whether the argument is final.
     function _isFinal(Argument.Data storage argument) internal view returns (bool isFinal) {
-        // The thesis is created permanently final; every other argument finalizes automatically once its
-        // editing window has elapsed - no explicit transaction required.
-        isFinal = argument.state == Argument.State.Final
-            || (argument.state == Argument.State.Created && Time.timestamp() >= argument.finalizationTime);
+        isFinal = argument.creator != address(0) && Time.timestamp() >= argument.finalizationTime;
     }
 
     /// @notice An internal function reverting if the caller does not hold a certain role.
