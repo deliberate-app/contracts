@@ -33,8 +33,8 @@ library Argument {
         uint32 con; //              | + 4
         uint32 votes; //            | + 4
         uint32 fees; //             | + 4
-        uint32 childsVote; //       ┘ + 4 = 20
-        int64 descendantsImpact; //      ]   8
+        uint32 childsVote; //       | + 4
+        int64 descendantsImpact; // ┘ + 8 = 28
     }
 
     /// @notice The container holding the amounts computed for a stake on an argument market.
@@ -43,9 +43,9 @@ library Argument {
     /// @param fee The fee charged for the stake, accruing to the argument's creator.
     /// @param sharesOut The amount of shares the staker receives.
     struct Stake {
-        bool isPro; //                ┐   1
+        bool isPro; //              ┐   1
         uint32 voteTokensStaked; // | + 4
-        uint32 fee; //                | + 4
-        uint32 sharesOut; //          ┘ + 4 = 13
+        uint32 fee; //              | + 4
+        uint32 sharesOut; //        ┘ + 4 = 13
     }
 }

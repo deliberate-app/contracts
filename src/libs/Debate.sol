@@ -17,9 +17,9 @@ library Debate {
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
-        uint32 totalVotes; //                       ┐   4
-        uint16 argumentsCount; //                   ┘ + 2 = 6
-        EnumerableSet.UintSet leafArgumentIds;
+        uint32 totalVotes; //                     ┐   4
+        uint16 argumentsCount; //                 | + 2
+        EnumerableSet.UintSet leafArgumentIds; // ┘ + 2 = 8
     }
 
     /// @notice Increments the argument counter of a debate.
