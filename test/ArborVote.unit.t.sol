@@ -196,6 +196,11 @@ contract ArborVoteTest is Test {
         assertEq(ratingEndTime, currentTime + 10 * _TIME_UNIT);
     }
 
+    function test_createDebate_revertsForAZeroTimeUnit() public {
+        vm.expectRevert(ArborVote.TimeUnitZero.selector);
+        _arborVote.createDebate(_THESIS_CONTENT, 0);
+    }
+
     function test_createDebate_initializesTheRootArgument() public {
         uint256 debateId = _createDebate();
 

@@ -80,6 +80,10 @@ contract ArborVote is IArborVote {
     /// @param actual The actual time as a unix timestamp.
     error TimeOutOfBounds(uint48 limit, uint48 actual);
 
+    /// @notice Thrown if a debate is created with a zero time unit, which would collapse its editing
+    /// and rating windows to nothing.
+    error TimeUnitZero();
+
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
     /// @param actual The actual initial approval value.
@@ -156,6 +160,12 @@ contract ArborVote is IArborVote {
 
     /// @inheritdoc IArborVote
     function createDebate(bytes32 contentURI, uint48 timeUnit) external override returns (uint256 debateId) {
+        // A zero time unit would put editingEndTime == ratingEndTime == creation, leaving no editing or
+        // rating window and dropping the debate straight into tallying-time.
+        if (timeUnit == 0) {
+            revert TimeUnitZero();
+        }
+
         debateId = _debatesCounter;
         _debatesCounter++;
 
