@@ -287,6 +287,16 @@ contract ArborVoteTest is Test {
         _arborVote.join(debateId);
     }
 
+    function test_join_revertsForAnAlreadyJoinedAccount() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.RoleInvalid.selector, User.Role.Unassigned, User.Role.Participant)
+        );
+        _arborVote.join(debateId);
+    }
+
     // --- addArgument ---
 
     function test_addArgument_incrementsTheArgumentId() public {
@@ -664,6 +674,47 @@ contract ArborVoteTest is Test {
         });
     }
 
+    // --- alterArgument ---
+
+    function test_alterArgument_revertsForANonCreator() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+
+        address intruder = makeAddr("intruder");
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.AddressInvalid.selector, address(this), intruder));
+        vm.prank(intruder);
+        _arborVote.alterArgument(debateId, argumentId, "A hijacked idea.");
+    }
+
+    function test_alterArgument_revertsOnceTheArgumentIsFinal() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+
+        // The draft locks in exactly when its editing window elapses.
+        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT);
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotDraft.selector, argumentId));
+        _arborVote.alterArgument(debateId, argumentId, "Too late.");
+    }
+
+    function test_alterArgument_revertsWhenTheNewWindowWouldOutliveEditing() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        // Added this late, the draft finalizes past the editing end - which adding allows, but
+        // re-arming the window on an edit does not.
+        (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
+        vm.warp(editingEndTime - _TIME_UNIT / 2);
+        uint16 argumentId = _addArgument(debateId, true, 50);
+
+        uint48 rearmedTime = uint48(vm.getBlockTimestamp()) + _TIME_UNIT;
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.TimeOutOfBounds.selector, editingEndTime, rearmedTime));
+        _arborVote.alterArgument(debateId, argumentId, "Re-armed.");
+    }
+
     // --- stakePro / stakeCon ---
 
     function test_stakePro_buysProSharesAndRaisesTheApproval() public {
@@ -800,6 +851,18 @@ contract ArborVoteTest is Test {
         uint256 paidOut = (uint256(_arborVote.getUserTokens(debateId, firstStaker)) - firstBefore)
             + (uint256(_arborVote.getUserTokens(debateId, secondStaker)) - secondBefore);
         assertLe(paidOut, uint256(collateral));
+    }
+
+    function test_stakePro_revertsForInsufficientVoteTokens() public {
+        uint256 debateId = _createDebate();
+        _join(debateId);
+
+        uint16 argumentId = _addArgument(debateId, true, 50);
+        _endEditing(debateId);
+
+        uint32 balance = _arborVote.getUserTokens(debateId, address(this));
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.InsufficientVoteTokens.selector, balance + 1, balance));
+        _arborVote.stakePro(debateId, argumentId, balance + 1);
     }
 
     function test_stakePro_revertsForTheThesis() public {
