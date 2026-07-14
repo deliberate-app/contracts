@@ -22,6 +22,10 @@ _Avoid_: node, fact node
 **Tally**:
 The on-chain, leaves-to-root aggregation of argument impact that produces the debate's outcome.
 
+**Outcome**:
+The tally's verdict on the thesis — confirmed or objected. A credible deliberation signal, not a manipulation-proof oracle: automation that consumes it must bring its own guardrails.
+_Avoid_: result, decision
+
 **Argument market**:
 The per-argument market in which participants buy an argument's pro or con shares with vote tokens.
 _Avoid_: rating market
@@ -38,12 +42,24 @@ _Avoid_: debate tokens
 The share of each stake that accrues to the argument's creator, claimable once the debate is finished — the authorship incentive for arguments that attract rating volume.
 
 **Participant**:
-A Proof-of-Humanity-verified account that has joined a debate and received vote tokens.
+A personhood-verified account that has joined a debate and received vote tokens.
 _Avoid_: voter, debater (both are just participants acting in a phase)
 
+**Identity registry**:
+The pluggable on-chain registry the join gate queries to check that an account belongs to a verified person.
+_Avoid_: Proof of Humanity (one legacy provider, not the concept)
+
 **Bounty**:
-The stake the creator attaches to a debate, paid out to above-average participants after tallying.
+The stake the creator attaches to a debate, claimable after tallying by participants who ended with more vote tokens than the initial grant — those who net won points by arguing or rating.
 _Avoid_: debate bounty, reward pool
+
+**Excess**:
+The vote tokens a participant ends with beyond the initial grant; the score a bounty claim is proportional to.
+_Avoid_: profit, surplus
+
+**Claim window**:
+The period after a debate finishes during which bounty claims are open; once it closes, the creator may sweep the remainder.
+_Avoid_: payout period
 
 ## Phases
 
