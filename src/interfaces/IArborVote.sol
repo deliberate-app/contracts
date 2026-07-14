@@ -14,14 +14,14 @@ interface IArborVote {
     /// @param debateId The ID of the debate.
     /// @param creator The creator of the debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.
-    /// @param timeUnit The time unit of the debate determining the editing and rating durations.
+    /// @param lockingDuration How long a new or edited argument stays a draft before it locks in.
     /// @param editingEndTime The end time of the editing phase.
     /// @param ratingEndTime The end time of the rating phase.
     event DebateCreated(
         uint256 indexed debateId,
         address indexed creator,
         bytes32 contentURI,
-        uint48 timeUnit,
+        uint48 lockingDuration,
         uint48 editingEndTime,
         uint48 ratingEndTime
     );
@@ -122,13 +122,13 @@ interface IArborVote {
 
     /// @notice Creates a new debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.
-    /// @param timeUnit The draft window: the time from an argument's creation (or last edit) until it locks in.
-    /// @param editingDuration The length of the editing phase; longer than the time unit, so arguments can lock
-    /// in and be replied to.
-    /// @param ratingDuration The length of the rating phase; at least one time unit, so every argument is final
-    /// by the time the tally runs.
+    /// @param lockingDuration The time from an argument's creation (or last edit) until it locks in.
+    /// @param editingDuration The length of the editing phase; longer than the locking duration, so arguments
+    /// can lock in and be replied to.
+    /// @param ratingDuration The length of the rating phase; at least one locking window, so every argument is
+    /// final by the time the tally runs.
     /// @return debateId The ID of the created debate.
-    function createDebate(bytes32 contentURI, uint48 timeUnit, uint48 editingDuration, uint48 ratingDuration)
+    function createDebate(bytes32 contentURI, uint48 lockingDuration, uint48 editingDuration, uint48 ratingDuration)
         external
         returns (uint256 debateId);
 
@@ -260,11 +260,11 @@ interface IArborVote {
     /// @return currentPhase The current phase of the debate.
     /// @return editingEndTime The end time of the editing phase.
     /// @return ratingEndTime The end time of the rating phase.
-    /// @return timeUnit The time unit of the debate.
+    /// @return lockingDuration The debate's locking duration.
     function phases(uint256 debateId)
         external
         view
-        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit);
+        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 lockingDuration);
 
     /// @notice Returns the outcome of the debate.
     /// @param debateId The ID of the debate.

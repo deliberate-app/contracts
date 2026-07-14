@@ -13,7 +13,7 @@ import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 contract DebateGenExampleTest is Test {
     using DebateGen for Vm;
 
-    uint48 internal constant _TIME_UNIT = 1 minutes;
+    uint48 internal constant _LOCKING_DURATION = 1 minutes;
 
     address internal immutable _ALICE = makeAddr("alice");
     address internal immutable _BOB = makeAddr("bob");
@@ -26,7 +26,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_everyArgumentsContentIsItsOwnId() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _TIME_UNIT);
+        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
 
         uint16 pro = vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
         uint16 con = vm.addCon(debate, _BOB, DebateGen.ROOT, 60);
@@ -36,7 +36,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_talliesASupportingArgumentToApproval() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _TIME_UNIT);
+        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
         vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
 
         vm.warpToTallying(debate);
@@ -48,7 +48,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_stakingConLowersTheApproval() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _TIME_UNIT);
+        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
         uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50); // reserves 5/5 at the min deposit
 
         vm.warpToRating(debate);
@@ -59,12 +59,12 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_buildsADeeperTreeAcrossFinalizationWindows() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _TIME_UNIT);
+        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
 
         uint16 a1 = vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
-        vm.warpUnits(debate, 1); // a1 finalizes, so it can now be a parent
+        vm.warpWindows(debate, 1); // a1 finalizes, so it can now be a parent
         uint16 a2 = vm.addCon(debate, _BOB, a1, 70);
-        vm.warpUnits(debate, 1); // a2 finalizes
+        vm.warpWindows(debate, 1); // a2 finalizes
         uint16 a3 = vm.addPro(debate, _CAROL, a2, 65);
 
         assertEq(vm.argumentOf(debate, a2).parentArgumentId, a1);

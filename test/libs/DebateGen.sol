@@ -24,15 +24,18 @@ library DebateGen {
 
     // --- create ---
 
-    function createDebate(Vm vm, ArborVote arborVote, address creator, uint48 timeUnit)
+    function createDebate(Vm vm, ArborVote arborVote, address creator, uint48 lockingDuration)
         internal
         returns (Debate memory debate)
     {
         vm.prank(creator);
         // The thesis is argument 0, so its content is bytes32(0) under the "content is the id" convention.
-        // One knob for tests: the classic 7/3 split derives both phases from the time unit.
+        // One knob for tests: the classic 7/3 split derives both phases from the locking duration.
         uint256 id = arborVote.createDebate({
-            contentURI: bytes32(0), timeUnit: timeUnit, editingDuration: 7 * timeUnit, ratingDuration: 3 * timeUnit
+            contentURI: bytes32(0),
+            lockingDuration: lockingDuration,
+            editingDuration: 7 * lockingDuration,
+            ratingDuration: 3 * lockingDuration
         });
         debate = Debate({arborVote: arborVote, id: id});
     }
@@ -118,9 +121,9 @@ library DebateGen {
 
     // --- time ---
 
-    function warpUnits(Vm vm, Debate memory debate, uint48 timeUnits) internal {
-        (,,, uint48 unit) = debate.arborVote.phases(debate.id);
-        vm.warp(vm.getBlockTimestamp() + uint256(timeUnits) * unit);
+    function warpWindows(Vm vm, Debate memory debate, uint48 lockingWindows) internal {
+        (,,, uint48 lockingDuration) = debate.arborVote.phases(debate.id);
+        vm.warp(vm.getBlockTimestamp() + uint256(lockingWindows) * lockingDuration);
     }
 
     function warpToRating(Vm vm, Debate memory debate) internal {

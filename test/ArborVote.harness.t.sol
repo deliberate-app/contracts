@@ -24,7 +24,7 @@ contract ArborVoteHarness is ArborVote {
 }
 
 contract ArborVoteHarnessTest is Test {
-    uint48 internal constant _TIME_UNIT = 1 * 60; // 1 minute
+    uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
 
     ArborVoteHarness internal _arborVote;
 
@@ -35,9 +35,9 @@ contract ArborVoteHarnessTest is Test {
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
         debateId = _arborVote.createDebate({
             contentURI: "We should do XYZ",
-            timeUnit: _TIME_UNIT,
-            editingDuration: 7 * _TIME_UNIT,
-            ratingDuration: 3 * _TIME_UNIT
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION
         });
         _arborVote.join(debateId);
         argumentId = _arborVote.addArgument({
@@ -57,7 +57,7 @@ contract ArborVoteHarnessTest is Test {
         (uint256 debateId, uint16 parentId) = _debateWithADraft();
 
         // Give the argument a child of its own, once it has locked in and can be replied to.
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
         _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: parentId,

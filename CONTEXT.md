@@ -38,6 +38,10 @@ _Avoid_: score, rating value
 The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con stakes.
 _Avoid_: debate tokens
 
+**Locking window**:
+The time a new or edited argument stays a draft before it locks in — chosen per debate by the creator, and the floor for each phase's length. Kept short so replies beneath new arguments are never held up for long.
+_Avoid_: draft window, time unit (the legacy parameter name — nothing is a multiple of it anymore)
+
 **Market fee**:
 The share of each stake that accrues to the argument's creator, claimable once the debate is finished — the authorship incentive for arguments that attract rating volume.
 

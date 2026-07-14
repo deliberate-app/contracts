@@ -24,7 +24,7 @@ contract DeployArborVoteTest is Test {
         // The given registry is wired into the join gate: an account it denies cannot join.
         uint256 debateId = ArborVote(arborVote)
             .createDebate({
-            contentURI: "We should do XYZ", timeUnit: 60, editingDuration: 7 * 60, ratingDuration: 3 * 60
+            contentURI: "We should do XYZ", lockingDuration: 60, editingDuration: 7 * 60, ratingDuration: 3 * 60
         });
         address denied = makeAddr("denied");
         registry.deny(denied);

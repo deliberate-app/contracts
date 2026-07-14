@@ -80,12 +80,12 @@ contract ArborVote is IArborVote {
     /// @param actual The actual time as a unix timestamp.
     error TimeOutOfBounds(uint48 limit, uint48 actual);
 
-    /// @notice Thrown if a debate is created with a zero time unit, which would finalize every argument
-    /// at creation, leaving nothing editable or movable.
-    error TimeUnitZero();
+    /// @notice Thrown if a debate is created with a zero locking duration, which would finalize every
+    /// argument at creation, leaving nothing editable or movable.
+    error LockingDurationZero();
 
-    /// @notice Thrown if a debate is created with a phase too short relative to its time unit.
-    /// @param minimum The time unit the phase must fit (the editing phase must exceed it).
+    /// @notice Thrown if a debate is created with a phase too short relative to its locking duration.
+    /// @param minimum The locking duration the phase must fit (the editing phase must exceed it).
     /// @param actual The duration passed.
     error DurationTooShort(uint48 minimum, uint48 actual);
 
@@ -164,24 +164,24 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function createDebate(bytes32 contentURI, uint48 timeUnit, uint48 editingDuration, uint48 ratingDuration)
+    function createDebate(bytes32 contentURI, uint48 lockingDuration, uint48 editingDuration, uint48 ratingDuration)
         external
         override
         returns (uint256 debateId)
     {
-        // A zero time unit would finalize every argument at creation, leaving nothing editable or movable.
-        if (timeUnit == 0) {
-            revert TimeUnitZero();
+        // A zero locking duration would finalize every argument at creation, leaving nothing editable or movable.
+        if (lockingDuration == 0) {
+            revert LockingDurationZero();
         }
-        // The editing phase must exceed the time unit (strictly - the + 1 keeps the comparison strict),
+        // The editing phase must exceed the locking duration (strictly - the + 1 keeps the comparison strict),
         // so arguments can lock in and be replied to: nesting needs final parents.
-        if (editingDuration < timeUnit + 1) {
-            revert DurationTooShort({minimum: timeUnit, actual: editingDuration});
+        if (editingDuration < lockingDuration + 1) {
+            revert DurationTooShort({minimum: lockingDuration, actual: editingDuration});
         }
-        // The rating phase must fit at least one draft window, so an argument added in the editing phase's
+        // The rating phase must fit at least one locking window, so an argument added in the editing phase's
         // last moment is final by the time the tally runs.
-        if (ratingDuration < timeUnit) {
-            revert DurationTooShort({minimum: timeUnit, actual: ratingDuration});
+        if (ratingDuration < lockingDuration) {
+            revert DurationTooShort({minimum: lockingDuration, actual: ratingDuration});
         }
 
         debateId = _debatesCounter;
@@ -200,7 +200,7 @@ contract ArborVote is IArborVote {
         // Store the phase-related data. The phase itself is not stored: Editing, Rating, and Tallying are
         // derived from these time gates on read, and only the terminal Finished phase is later latched by the tally.
         Phase.Data storage phaseData = _phases[debateId];
-        phaseData.timeUnit = timeUnit;
+        phaseData.lockingDuration = lockingDuration;
         phaseData.editingEndTime = Time.timestamp() + editingDuration;
         phaseData.ratingEndTime = phaseData.editingEndTime + ratingDuration;
 
@@ -211,7 +211,7 @@ contract ArborVote is IArborVote {
             debateId: debateId,
             creator: msg.sender,
             contentURI: contentURI,
-            timeUnit: timeUnit,
+            lockingDuration: lockingDuration,
             editingEndTime: phaseData.editingEndTime,
             ratingEndTime: phaseData.ratingEndTime
         });
@@ -298,7 +298,8 @@ contract ArborVote is IArborVote {
         onlyCreator(debateId, argumentId)
         onlyDraftArgument(debateId, argumentId)
     {
-        uint48 newFinalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
+        uint48 newFinalizationTime =
+            Time.timestamp() + _phases[debateId].lockingDuration;
 
         if (newFinalizationTime > _phases[debateId].editingEndTime) {
             revert TimeOutOfBounds({limit: _phases[debateId].editingEndTime, actual: newFinalizationTime});
@@ -449,10 +450,10 @@ contract ArborVote is IArborVote {
         external
         view
         override
-        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit)
+        returns (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 lockingDuration)
     {
         Phase.Data storage phaseData = _phases[debateId];
-        return (_phaseOf(phaseData), phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.timeUnit);
+        return (_phaseOf(phaseData), phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.lockingDuration);
     }
 
     /// @inheritdoc IArborVote
@@ -599,10 +600,10 @@ contract ArborVote is IArborVote {
         (argument.pro, argument.con) = deposit.split(100 - initialApproval, initialApproval);
         argument.votes = deposit;
 
-        // A fresh argument is a draft until its editing window elapses one time unit out; existence and
-        // finality are derived from the creator and this finalization time, so no state is stored.
+        // A fresh argument is a draft until its locking window elapses; existence and finality are
+        // derived from the creator and this finalization time, so no state is stored.
         argument.creator = msg.sender;
-        argument.finalizationTime = Time.timestamp() + _phases[debateId].timeUnit;
+        argument.finalizationTime = Time.timestamp() + _phases[debateId].lockingDuration;
         argument.parentArgumentId = parentArgumentId;
         argument.isSupporting = isSupporting;
 

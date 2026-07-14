@@ -26,11 +26,11 @@ library Phase {
     /// @param finished Whether the tally has run, latching the debate into the terminal `Finished` phase.
     /// @param editingEndTime The time at which the editing phase ends.
     /// @param ratingEndTime The time at which the rating phase ends.
-    /// @param timeUnit The time unit determining the editing and rating durations.
+    /// @param lockingDuration How long a new or edited argument stays a draft before it locks in.
     struct Data {
-        bool finished; //         ┐   1
-        uint48 editingEndTime; // | + 6
-        uint48 ratingEndTime; //  | + 6
-        uint48 timeUnit; //       ┘ + 6 = 19
+        bool finished; //          ┐   1
+        uint48 editingEndTime; //  | + 6
+        uint48 ratingEndTime; //   | + 6
+        uint48 lockingDuration; // ┘ + 6 = 19
     }
 }

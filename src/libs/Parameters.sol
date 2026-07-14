@@ -20,8 +20,8 @@ library Parameters {
 
     /// @notice The maximum number of arguments per debate, the thesis included.
     /// @dev Bounds the atomic tally: the whole tree must be tallyable within one block's gas (asserted by the gas
-    /// benchmark test). Depth needs no bound of its own - each tree level takes one time unit of finalization
-    /// latency inside the seven-time-unit editing window - so the cap effectively governs breadth.
+    /// benchmark test). Depth needs no bound of its own - each tree level takes one locking window of
+    /// finalization latency inside the editing phase - so the cap effectively governs breadth.
     uint16 public constant MAX_ARGUMENTS = 1024;
 
     /// @notice The weight of the descendants' impact in the tally blend (one half, in `_MIX_MAX` fixed-point).

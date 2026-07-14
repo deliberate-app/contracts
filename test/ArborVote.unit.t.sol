@@ -17,7 +17,7 @@ contract ArborVoteTest is Test {
 
     MockIdentityRegistry internal _mockIdentityRegistry;
 
-    uint48 internal constant _TIME_UNIT = 1 * 60; // 1 minute
+    uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
     bytes32 internal constant _PRO_ARGUMENT_CONTENT = "This is a good idea.";
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
@@ -30,12 +30,12 @@ contract ArborVoteTest is Test {
     // --- helpers ---
 
     function _createDebate() internal returns (uint256 debateId) {
-        // The classic 7/3 split: editing spans seven draft windows, rating three.
+        // The classic 7/3 split: editing spans seven locking windows, rating three.
         debateId = _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
-            timeUnit: _TIME_UNIT,
-            editingDuration: 7 * _TIME_UNIT,
-            ratingDuration: 3 * _TIME_UNIT
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION
         });
     }
 
@@ -164,11 +164,12 @@ contract ArborVoteTest is Test {
     // --- createDebate ---
 
     function test_createDebate_isUninitializedBeforeADebateIsCreated() public view {
-        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) = _arborVote.phases(0);
+        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 lockingDuration) =
+            _arborVote.phases(0);
         assertEq(uint256(currentPhase), uint256(Phase.Status.Uninitialized));
         assertEq(editingEndTime, 0);
         assertEq(ratingEndTime, 0);
-        assertEq(timeUnit, 0);
+        assertEq(lockingDuration, 0);
     }
 
     function test_createDebate_incrementsTheDebateId() public {
@@ -193,53 +194,60 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
 
         uint256 currentTime = vm.getBlockTimestamp();
-        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) =
+        (Phase.Status currentPhase, uint48 editingEndTime, uint48 ratingEndTime, uint48 lockingDuration) =
             _arborVote.phases(debateId);
 
         assertEq(uint256(currentPhase), uint256(Phase.Status.Editing));
-        assertEq(timeUnit, _TIME_UNIT);
-        assertEq(editingEndTime, currentTime + 7 * _TIME_UNIT);
-        assertEq(ratingEndTime, currentTime + 10 * _TIME_UNIT);
+        assertEq(lockingDuration, _LOCKING_DURATION);
+        assertEq(editingEndTime, currentTime + 7 * _LOCKING_DURATION);
+        assertEq(ratingEndTime, currentTime + 10 * _LOCKING_DURATION);
     }
 
-    function test_createDebate_revertsForAZeroTimeUnit() public {
-        vm.expectRevert(ArborVote.TimeUnitZero.selector);
+    function test_createDebate_revertsForAZeroLockingDuration() public {
+        vm.expectRevert(ArborVote.LockingDurationZero.selector);
         _arborVote.createDebate({
-            contentURI: _THESIS_CONTENT, timeUnit: 0, editingDuration: 7 * _TIME_UNIT, ratingDuration: 3 * _TIME_UNIT
+            contentURI: _THESIS_CONTENT,
+            lockingDuration: 0,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION
         });
     }
 
     function test_createDebate_setsTheChosenDurations() public {
-        // The three times are independent: a short draft window inside long, uneven phases.
+        // The three times are independent: a short locking window inside long, uneven phases.
         uint256 debateId = _arborVote.createDebate({
-            contentURI: _THESIS_CONTENT, timeUnit: 30 minutes, editingDuration: 3 days, ratingDuration: 1 days
+            contentURI: _THESIS_CONTENT, lockingDuration: 30 minutes, editingDuration: 3 days, ratingDuration: 1 days
         });
 
         uint256 currentTime = vm.getBlockTimestamp();
-        (, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) = _arborVote.phases(debateId);
-        assertEq(timeUnit, 30 minutes);
+        (, uint48 editingEndTime, uint48 ratingEndTime, uint48 lockingDuration) = _arborVote.phases(debateId);
+        assertEq(lockingDuration, 30 minutes);
         assertEq(editingEndTime, currentTime + 3 days);
         assertEq(ratingEndTime, currentTime + 3 days + 1 days);
     }
 
-    function test_createDebate_revertsForAnEditingPhaseNotExceedingTheTimeUnit() public {
-        // The bound is strict: an editing phase equal to the time unit fits no reply window.
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT));
+    function test_createDebate_revertsForAnEditingPhaseNotExceedingTheLocking() public {
+        // The bound is strict: an editing phase equal to the locking duration fits no reply window.
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION)
+        );
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
-            timeUnit: _TIME_UNIT,
-            editingDuration: _TIME_UNIT,
-            ratingDuration: 3 * _TIME_UNIT
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION
         });
     }
 
-    function test_createDebate_revertsForARatingPhaseShorterThanTheTimeUnit() public {
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT - 1));
+    function test_createDebate_revertsForARatingPhaseShorterThanTheLocking() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION - 1)
+        );
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
-            timeUnit: _TIME_UNIT,
-            editingDuration: 7 * _TIME_UNIT,
-            ratingDuration: _TIME_UNIT - 1
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: _LOCKING_DURATION - 1
         });
     }
 
@@ -364,8 +372,8 @@ contract ArborVoteTest is Test {
         assertEq(proArgument.fees, 0);
 
         assertEq(proArgument.creator, address(this));
-        // A fresh argument is a draft: its finalization time is one time unit out.
-        assertEq(proArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _TIME_UNIT);
+        // A fresh argument is a draft: its finalization time is one locking window out.
+        assertEq(proArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION);
 
         assertEq(proArgument.isSupporting, true);
         assertEq(proArgument.parentArgumentId, 0);
@@ -391,8 +399,8 @@ contract ArborVoteTest is Test {
         assertEq(conArgument.fees, 0);
 
         assertEq(conArgument.creator, address(this));
-        // A fresh argument is a draft: its finalization time is one time unit out.
-        assertEq(conArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _TIME_UNIT);
+        // A fresh argument is a draft: its finalization time is one locking window out.
+        assertEq(conArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION);
 
         assertEq(conArgument.isSupporting, false);
         assertEq(conArgument.parentArgumentId, 0);
@@ -542,7 +550,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 argumentB = _addArgument(debateId, false, 50);
         uint16 argumentC = _arborVote.addArgument({
             debateId: debateId,
@@ -577,7 +585,7 @@ contract ArborVoteTest is Test {
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
 
         uint16 argumentC = _arborVote.addArgument({
             debateId: debateId,
@@ -603,7 +611,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 childArgumentId = _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: parentArgumentId,
@@ -628,7 +636,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         // A draft seeded at 50% approval: reserves split the deposit evenly.
         uint16 childArgumentId = _addArgument(debateId, true, 50);
         assertEq(_arborVote.getArgument(debateId, childArgumentId).pro, 5);
@@ -650,7 +658,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         // A draft seeded with a 40-token deposit at 50%: reserves 20/20.
         uint16 childArgumentId = _addArgument(debateId, true, 50, 40);
 
@@ -669,7 +677,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 childArgumentId = _addArgument(debateId, true, 50);
 
         vm.expectRevert(abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, 99, 100));
@@ -737,7 +745,7 @@ contract ArborVoteTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
 
         // The draft locks in exactly when its editing window elapses.
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
         vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotDraft.selector, argumentId));
         _arborVote.alterArgument(debateId, argumentId, "Too late.");
     }
@@ -749,10 +757,10 @@ contract ArborVoteTest is Test {
         // Added this late, the draft finalizes past the editing end - which adding allows, but
         // re-arming the window on an edit does not.
         (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
-        vm.warp(editingEndTime - _TIME_UNIT / 2);
+        vm.warp(editingEndTime - _LOCKING_DURATION / 2);
         uint16 argumentId = _addArgument(debateId, true, 50);
 
-        uint48 rearmedTime = uint48(vm.getBlockTimestamp()) + _TIME_UNIT;
+        uint48 rearmedTime = uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION;
         vm.expectRevert(abi.encodeWithSelector(ArborVote.TimeOutOfBounds.selector, editingEndTime, rearmedTime));
         _arborVote.alterArgument(debateId, argumentId, "Re-armed.");
     }
@@ -764,7 +772,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         _arborVote.stakePro(debateId, argumentId, 20);
@@ -789,7 +797,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         _arborVote.stakeCon(debateId, argumentId, 20);
@@ -816,7 +824,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         Argument.Data memory before = _arborVote.getArgument(debateId, argumentId);
@@ -862,7 +870,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         address firstStaker = makeAddr("firstStaker");
@@ -922,7 +930,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         // Add an argument late in the editing window so it is still a draft once rating begins: its
-        // finalization time (one time unit out) lands after the editing deadline.
+        // finalization time (one locking window out) lands after the editing deadline.
         (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
         vm.warp(editingEndTime - 1);
         uint16 argumentId = _addArgument(debateId, true, 50);
@@ -1013,7 +1021,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 80);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _arborVote.addArgument({
             debateId: debateId,
             parentArgumentId: argumentId,
@@ -1022,7 +1030,7 @@ contract ArborVoteTest is Test {
             initialApproval: 95,
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
@@ -1087,7 +1095,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         address earlyStaker = makeAddr("earlyStaker");
@@ -1126,7 +1134,7 @@ contract ArborVoteTest is Test {
 
         uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
         uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // One staker takes a con position in both arguments (22 con shares each).
@@ -1158,7 +1166,7 @@ contract ArborVoteTest is Test {
 
         uint16 argument1 = _addArgument(debateId, true, 50);
         uint16 argument2 = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // The staker only holds shares in argument1.
@@ -1200,7 +1208,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // A second participant stakes 20; the 5% fee (1 token) accrues to the argument.
@@ -1250,9 +1258,9 @@ contract ArborVoteTest is Test {
             debateId: 0,
             creator: address(this),
             contentURI: _THESIS_CONTENT,
-            timeUnit: _TIME_UNIT,
-            editingEndTime: creationTime + 7 * _TIME_UNIT,
-            ratingEndTime: creationTime + 10 * _TIME_UNIT
+            lockingDuration: _LOCKING_DURATION,
+            editingEndTime: creationTime + 7 * _LOCKING_DURATION,
+            ratingEndTime: creationTime + 10 * _LOCKING_DURATION
         });
         _createDebate();
     }
@@ -1280,7 +1288,7 @@ contract ArborVoteTest is Test {
             contentURI: _PRO_ARGUMENT_CONTENT,
             pro: 2,
             con: 8,
-            finalizationTime: uint48(vm.getBlockTimestamp()) + _TIME_UNIT
+            finalizationTime: uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION
         });
         _addArgument(debateId, true, 80);
     }
@@ -1290,7 +1298,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 newParentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 movedArgumentId = _addArgument(debateId, false, 50);
 
         vm.expectEmit();
@@ -1322,7 +1330,7 @@ contract ArborVoteTest is Test {
             debateId: debateId,
             argumentId: argumentId,
             contentURI: newContentURI,
-            finalizationTime: uint48(vm.getBlockTimestamp()) + _TIME_UNIT
+            finalizationTime: uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION
         });
         _arborVote.alterArgument(debateId, argumentId, newContentURI);
     }
@@ -1332,7 +1340,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
@@ -1363,7 +1371,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 80); // reserves 2/8
-        vm.warp(vm.getBlockTimestamp() + _TIME_UNIT + 1);
+        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
