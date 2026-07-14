@@ -67,13 +67,16 @@ total initial supply:
 claim = pool × (tokens − 100) / (100 × N)        N = number of joined participants
 ```
 
-Claims are O(1) and open the moment the claimer has settled their own positions — no waiting for
-anyone else's redemption.
+Claims are O(1) in everyone else's state — no waiting for anyone's redemption — and the claim call
+**settles-and-claims**: it batch-redeems the share positions handed to it and claims creator fees
+on the caller's own arguments first, so claiming before settling (an irreversible under-claim —
+claims are one-shot) is structurally impossible (ADR-0009).
 
-**Claim window and remainder.** Claims open at Finished and close after a claim window (default
-suggestion: 7 time units, mirroring the editing window). Afterwards the creator sweeps the
-remainder. There is **no protocol fee** in v1; a fee (possibly folded into the market-fee mechanism)
-is a recorded TODO.
+**Claim window and remainder.** Claims open at Finished and close after a constant **7-day claim
+window** (`CLAIM_WINDOW`; a floored creator-chosen window is a recorded TODO — an unfloored one
+would let the creator sweep before anyone can claim). Afterwards the creator sweeps the remainder.
+There is **no protocol fee** in v1; a fee (possibly folded into the market-fee mechanism) is a
+recorded TODO.
 
 **Worked example.** 20 participants (`100·N = 2000`), pool 1000 DAI. Alice ends at 180 (excess 80)
 → claims 40 DAI. Bob ends at 130 → 15 DAI. Everyone else broke even or lost. Claimed: 55 DAI;

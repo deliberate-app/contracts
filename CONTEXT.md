@@ -65,6 +65,10 @@ _Avoid_: profit, surplus
 The period after a debate finishes during which bounty claims are open; once it closes, the creator may sweep the remainder.
 _Avoid_: payout period
 
+**Sweep**:
+The creator reclaiming a bounty's unclaimed remainder once the claim window has closed — by design most of the pool on consensual debates.
+_Avoid_: refund (top-ups are donations, nothing is owed back)
+
 ## Phases
 
 A debate passes through three domain phases, in order.
