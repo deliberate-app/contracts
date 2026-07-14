@@ -70,54 +70,54 @@ check:
     @just test
 
 # Simulate deployment (dry-run)
-simulate proof-of-humanity chain *args:
+simulate identity-registry chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
     forge script script/DeployArborVote.s.sol:DeployArborVote \
-        --sig "run(address)" {{ proof-of-humanity }} \
+        --sig "run(address)" {{ identity-registry }} \
         --rpc-url {{ chain }} {{ args }}
 
 # Deploy ArborVote
-deploy deployer proof-of-humanity chain *args:
+deploy deployer identity-registry chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
     forge script script/DeployArborVote.s.sol:DeployArborVote \
-        --sig "run(address)" {{ proof-of-humanity }} \
+        --sig "run(address)" {{ identity-registry }} \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
-# Deploy ArborVote together with a MockProofOfHumanity (test networks without a real registry)
+# Deploy ArborVote together with a MockIdentityRegistry (test networks without a real registry)
 deploy-with-mock deployer chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
     forge script script/DeployArborVote.s.sol:DeployArborVote \
-        --sig "runWithMockPoH()" \
+        --sig "runWithMockRegistry()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
 # --- Verification ---
 # The deploy recipes verify inline when passed `--verify ...`; these re-verify a
 # standing deployment (constructor args and all) when that inline pass was skipped
-# or timed out. ArborVote's constructor takes the Proof of Humanity address, so it
+# or timed out. ArborVote's constructor takes the identity registry address, so it
 # must be supplied to reconstruct the constructor arguments.
 
 # Verify ArborVote on both Sourcify and Etherscan
-verify address proof-of-humanity chain: (verify-sourcify address proof-of-humanity chain) (verify-etherscan address proof-of-humanity chain)
+verify address identity-registry chain: (verify-sourcify address identity-registry chain) (verify-etherscan address identity-registry chain)
 
 # Verify ArborVote on Sourcify (keyless, chain-agnostic)
-verify-sourcify address proof-of-humanity chain *args:
+verify-sourcify address identity-registry chain *args:
     env -u ETHERSCAN_API_KEY forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
+        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier sourcify --watch {{ args }}
 
 # Verify ArborVote on an Etherscan-family explorer (needs ETHERSCAN_API_KEY)
-verify-etherscan address proof-of-humanity chain *args:
+verify-etherscan address identity-registry chain *args:
     forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
+        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier etherscan --watch {{ args }}
 
 # Verify ArborVote on a custom explorer (pass its verifier URL; add `--verifier blockscout` for Blockscout)
-verify-custom address proof-of-humanity chain verifier-url *args:
+verify-custom address identity-registry chain verifier-url *args:
     forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ proof-of-humanity }}) \
+        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
 # Publish contracts to the Soldeer registry

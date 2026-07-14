@@ -8,7 +8,7 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 import {ArborVote} from "../src/ArborVote.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
-import {MockProofOfHumanity} from "./mocks/MockProofOfHumanity.m.sol";
+import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DebateGenExampleTest is Test {
     using DebateGen for Vm;
@@ -22,7 +22,7 @@ contract DebateGenExampleTest is Test {
     ArborVote internal _arborVote;
 
     function setUp() public {
-        _arborVote = new ArborVote(new MockProofOfHumanity());
+        _arborVote = new ArborVote(new MockIdentityRegistry());
     }
 
     function test_everyArgumentsContentIsItsOwnId() public {

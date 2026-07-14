@@ -10,12 +10,12 @@ import {Argument} from "../src/libs/Argument.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
-import {MockProofOfHumanity} from "./mocks/MockProofOfHumanity.m.sol";
+import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract ArborVoteTest is Test {
     ArborVote internal _arborVote;
 
-    MockProofOfHumanity internal _mockProofOfHumanity;
+    MockIdentityRegistry internal _mockIdentityRegistry;
 
     uint48 internal constant _TIME_UNIT = 1 * 60; // 1 minute
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
@@ -23,8 +23,8 @@ contract ArborVoteTest is Test {
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
 
     function setUp() public {
-        _mockProofOfHumanity = new MockProofOfHumanity();
-        _arborVote = new ArborVote(_mockProofOfHumanity);
+        _mockIdentityRegistry = new MockIdentityRegistry();
+        _arborVote = new ArborVote(_mockIdentityRegistry);
     }
 
     // --- helpers ---
@@ -248,7 +248,7 @@ contract ArborVoteTest is Test {
     function test_join_revertsIfTheUserHasNoValidIdentityProof() public {
         uint256 debateId = _createDebate();
 
-        _mockProofOfHumanity.deny(address(this));
+        _mockIdentityRegistry.deny(address(this));
 
         vm.expectRevert(ArborVote.IdentityProofInvalid.selector);
         _arborVote.join(debateId);

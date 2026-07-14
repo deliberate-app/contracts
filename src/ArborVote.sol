@@ -7,7 +7,7 @@ import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/Enumera
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 
 import {IArborVote} from "./interfaces/IArborVote.sol";
-import {IProofOfHumanity} from "./interfaces/IProofOfHumanity.sol";
+import {IIdentityRegistry} from "./interfaces/IIdentityRegistry.sol";
 import {Argument} from "./libs/Argument.sol";
 import {Debate} from "./libs/Debate.sol";
 import {Parameters} from "./libs/Parameters.sol";
@@ -25,8 +25,8 @@ contract ArborVote is IArborVote {
     using Utils for int64;
     using Debate for Debate.Data;
 
-    /// @notice The proof of humanity registry contract (PoH mainnet: 0x1dAD862095d40d43c2109370121cf087632874dB).
-    IProofOfHumanity internal immutable _POH;
+    /// @notice The identity registry gating debate joining (e.g. a personhood registry or an attestation adapter).
+    IIdentityRegistry internal immutable _IDENTITY_REGISTRY;
 
     /// @notice The counter tracking the number of created debates.
     uint256 internal _debatesCounter;
@@ -152,10 +152,10 @@ contract ArborVote is IArborVote {
         _;
     }
 
-    /// @notice Deploys the contract with the Proof of Humanity registry gating debate joining.
-    /// @param poh The proof of humanity registry contract.
-    constructor(IProofOfHumanity poh) {
-        _POH = poh;
+    /// @notice Deploys the contract with the identity registry gating debate joining.
+    /// @param identityRegistry The identity registry contract.
+    constructor(IIdentityRegistry identityRegistry) {
+        _IDENTITY_REGISTRY = identityRegistry;
     }
 
     /// @inheritdoc IArborVote
@@ -210,9 +210,9 @@ contract ArborVote is IArborVote {
             revert PhaseExceeded({limit: Phase.Status.Rating, actual: currentPhase});
         }
 
-        if (!_POH.isRegistered(msg.sender)) {
+        if (!_IDENTITY_REGISTRY.isRegistered(msg.sender)) {
             revert IdentityProofInvalid();
-        } // not failsafe - takes 3.5 days to switch address
+        }
 
         User.Data storage user = _users[debateId][msg.sender];
 

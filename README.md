@@ -74,22 +74,24 @@ slither .
 
 #### Deployment
 
-`ArborVote` takes the address of a [Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB)
-registry as its only constructor argument. Against a real registry:
+`ArborVote` takes the address of an identity registry (`IIdentityRegistry`) as its only constructor
+argument — a personhood registry such as [Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB),
+or an adapter like `EASIdentityRegistry` (attestation-based, e.g. Coinbase Verifications on Base).
+Against a real registry:
 
 ```sh
 forge script script/DeployArborVote.s.sol:DeployArborVote \
-  --sig "run(address)" <PROOF_OF_HUMANITY> \
+  --sig "run(address)" <IDENTITY_REGISTRY> \
   --rpc-url <network>
 ```
 
-On test networks without a registry, `runWithMockPoH()` deploys a `MockProofOfHumanity`
+On test networks without a registry, `runWithMockRegistry()` deploys a `MockIdentityRegistry`
 (everyone counts as registered) alongside. For Base Sepolia, verified on Blockscout (keyless),
 with a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`):
 
 ```sh
 forge script script/DeployArborVote.s.sol:DeployArborVote \
-  --sig "runWithMockPoH()" \
+  --sig "runWithMockRegistry()" \
   --rpc-url https://sepolia.base.org \
   --account <KEYSTORE_ACCOUNT> \
   --broadcast \
