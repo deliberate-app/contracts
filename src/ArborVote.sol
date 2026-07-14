@@ -382,8 +382,9 @@ contract ArborVote is IArborVote {
     function getLeafArgumentIds(uint256 debateId) external view override returns (uint16[] memory leafArgumentIds) {
         uint256[] memory ids = _debates[debateId].leafArgumentIds.values();
 
-        leafArgumentIds = new uint16[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
+        uint256 arrayLength = ids.length;
+        leafArgumentIds = new uint16[](arrayLength);
+        for (uint256 i = 0; i < arrayLength; i++) {
             leafArgumentIds[i] = SafeCast.toUint16(ids[i]);
         }
     }
@@ -479,7 +480,7 @@ contract ArborVote is IArborVote {
         // initialize market
         Debate.Data storage debate = _debates[debateId];
 
-        if (debate.getArgumentsCount() >= Parameters.MAX_ARGUMENTS) {
+        if (debate.getArgumentsCount() > Parameters.MAX_ARGUMENTS - 1) {
             revert ArgumentLimitReached({limit: Parameters.MAX_ARGUMENTS});
         }
 
@@ -797,7 +798,7 @@ contract ArborVote is IArborVote {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
         // A draft exists and is still inside its editing window: not the permanently-final thesis (whose window
         // ends at creation), not a window-elapsed (hence final) argument, and not a nonexistent one (no creator).
-        if (argument.creator == address(0) || Time.timestamp() >= argument.finalizationTime) {
+        if (argument.creator == address(0) || !_isDraft(argument)) {
             revert ArgumentNotDraft({argumentId: argumentId});
         }
     }
@@ -809,7 +810,15 @@ contract ArborVote is IArborVote {
     /// @param argument The argument to check.
     /// @return isFinal Whether the argument is final.
     function _isFinal(Argument.Data storage argument) internal view returns (bool isFinal) {
-        isFinal = argument.creator != address(0) && Time.timestamp() >= argument.finalizationTime;
+        isFinal = argument.creator != address(0) && !_isDraft(argument);
+    }
+
+    /// @notice An internal function returning whether an argument is still inside its editing window - the clock
+    /// half of draft-ness, and the exact complement of window-elapsed finality; existence is the callers' check.
+    /// @param argument The argument to check.
+    /// @return isDraft Whether the argument's editing window is still running.
+    function _isDraft(Argument.Data storage argument) internal view returns (bool isDraft) {
+        isDraft = Time.timestamp() < argument.finalizationTime;
     }
 
     /// @notice An internal function reverting if the caller does not hold a certain role.
