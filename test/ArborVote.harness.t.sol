@@ -33,7 +33,12 @@ contract ArborVoteHarnessTest is Test {
     }
 
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
-        debateId = _arborVote.createDebate("We should do XYZ", _TIME_UNIT);
+        debateId = _arborVote.createDebate({
+            contentURI: "We should do XYZ",
+            timeUnit: _TIME_UNIT,
+            editingDuration: 7 * _TIME_UNIT,
+            ratingDuration: 3 * _TIME_UNIT
+        });
         _arborVote.join(debateId);
         argumentId = _arborVote.addArgument({
             debateId: debateId,

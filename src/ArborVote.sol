@@ -80,9 +80,14 @@ contract ArborVote is IArborVote {
     /// @param actual The actual time as a unix timestamp.
     error TimeOutOfBounds(uint48 limit, uint48 actual);
 
-    /// @notice Thrown if a debate is created with a zero time unit, which would collapse its editing
-    /// and rating windows to nothing.
+    /// @notice Thrown if a debate is created with a zero time unit, which would finalize every argument
+    /// at creation, leaving nothing editable or movable.
     error TimeUnitZero();
+
+    /// @notice Thrown if a debate is created with a phase too short to fit one draft window (time unit).
+    /// @param minimum The shortest allowed duration - the debate's time unit.
+    /// @param actual The duration passed.
+    error DurationTooShort(uint48 minimum, uint48 actual);
 
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
@@ -159,11 +164,23 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function createDebate(bytes32 contentURI, uint48 timeUnit) external override returns (uint256 debateId) {
-        // A zero time unit would put editingEndTime == ratingEndTime == creation, leaving no editing or
-        // rating window and dropping the debate straight into tallying-time.
+    function createDebate(bytes32 contentURI, uint48 timeUnit, uint48 editingDuration, uint48 ratingDuration)
+        external
+        override
+        returns (uint256 debateId)
+    {
+        // A zero time unit would finalize every argument at creation, leaving nothing editable or movable.
         if (timeUnit == 0) {
             revert TimeUnitZero();
+        }
+        // Each phase must fit at least one draft window: the editing phase so arguments can lock in and be
+        // replied to (nesting needs final parents), the rating phase so an argument added in the editing
+        // phase's last moment is final by the time the tally runs.
+        if (editingDuration < timeUnit) {
+            revert DurationTooShort({minimum: timeUnit, actual: editingDuration});
+        }
+        if (ratingDuration < timeUnit) {
+            revert DurationTooShort({minimum: timeUnit, actual: ratingDuration});
         }
 
         debateId = _debatesCounter;
@@ -183,8 +200,8 @@ contract ArborVote is IArborVote {
         // derived from these time gates on read, and only the terminal Finished phase is later latched by the tally.
         Phase.Data storage phaseData = _phases[debateId];
         phaseData.timeUnit = timeUnit;
-        phaseData.editingEndTime = Time.timestamp() + 7 * timeUnit;
-        phaseData.ratingEndTime = Time.timestamp() + 10 * timeUnit;
+        phaseData.editingEndTime = Time.timestamp() + editingDuration;
+        phaseData.ratingEndTime = phaseData.editingEndTime + ratingDuration;
 
         // increment counters
         newDebate.incrementArgumentCounter();

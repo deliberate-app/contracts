@@ -122,9 +122,15 @@ interface IArborVote {
 
     /// @notice Creates a new debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.
-    /// @param timeUnit The time unit of the debate determining the editing and rating durations.
+    /// @param timeUnit The draft window: the time from an argument's creation (or last edit) until it locks in.
+    /// @param editingDuration The length of the editing phase; at least one time unit, so arguments can lock in
+    /// and be replied to.
+    /// @param ratingDuration The length of the rating phase; at least one time unit, so every argument is final
+    /// by the time the tally runs.
     /// @return debateId The ID of the created debate.
-    function createDebate(bytes32 contentURI, uint48 timeUnit) external returns (uint256 debateId);
+    function createDebate(bytes32 contentURI, uint48 timeUnit, uint48 editingDuration, uint48 ratingDuration)
+        external
+        returns (uint256 debateId);
 
     /// @notice Join a debate and receive debate tokens.
     /// @param debateId The ID of the debate.

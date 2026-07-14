@@ -30,7 +30,10 @@ library DebateGen {
     {
         vm.prank(creator);
         // The thesis is argument 0, so its content is bytes32(0) under the "content is the id" convention.
-        uint256 id = arborVote.createDebate({contentURI: bytes32(0), timeUnit: timeUnit});
+        // One knob for tests: the classic 7/3 split derives both phases from the time unit.
+        uint256 id = arborVote.createDebate({
+            contentURI: bytes32(0), timeUnit: timeUnit, editingDuration: 7 * timeUnit, ratingDuration: 3 * timeUnit
+        });
         debate = Debate({arborVote: arborVote, id: id});
     }
 

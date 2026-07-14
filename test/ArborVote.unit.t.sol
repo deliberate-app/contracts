@@ -30,7 +30,13 @@ contract ArborVoteTest is Test {
     // --- helpers ---
 
     function _createDebate() internal returns (uint256 debateId) {
-        debateId = _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        // The classic 7/3 split: editing spans seven draft windows, rating three.
+        debateId = _arborVote.createDebate({
+            contentURI: _THESIS_CONTENT,
+            timeUnit: _TIME_UNIT,
+            editingDuration: 7 * _TIME_UNIT,
+            ratingDuration: 3 * _TIME_UNIT
+        });
     }
 
     function _join(uint256 debateId) internal {
@@ -166,20 +172,20 @@ contract ArborVoteTest is Test {
     }
 
     function test_createDebate_incrementsTheDebateId() public {
-        uint256 debateId = _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        uint256 debateId = _createDebate();
         assertEq(debateId, 0);
 
-        debateId = _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        debateId = _createDebate();
         assertEq(debateId, 1);
     }
 
     function test_debatesCount_countsCreatedDebates() public {
         assertEq(_arborVote.debatesCount(), 0);
 
-        _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        _createDebate();
         assertEq(_arborVote.debatesCount(), 1);
 
-        _arborVote.createDebate(_THESIS_CONTENT, _TIME_UNIT);
+        _createDebate();
         assertEq(_arborVote.debatesCount(), 2);
     }
 
@@ -198,7 +204,42 @@ contract ArborVoteTest is Test {
 
     function test_createDebate_revertsForAZeroTimeUnit() public {
         vm.expectRevert(ArborVote.TimeUnitZero.selector);
-        _arborVote.createDebate(_THESIS_CONTENT, 0);
+        _arborVote.createDebate({
+            contentURI: _THESIS_CONTENT, timeUnit: 0, editingDuration: 7 * _TIME_UNIT, ratingDuration: 3 * _TIME_UNIT
+        });
+    }
+
+    function test_createDebate_setsTheChosenDurations() public {
+        // The three times are independent: a short draft window inside long, uneven phases.
+        uint256 debateId = _arborVote.createDebate({
+            contentURI: _THESIS_CONTENT, timeUnit: 30 minutes, editingDuration: 3 days, ratingDuration: 1 days
+        });
+
+        uint256 currentTime = vm.getBlockTimestamp();
+        (, uint48 editingEndTime, uint48 ratingEndTime, uint48 timeUnit) = _arborVote.phases(debateId);
+        assertEq(timeUnit, 30 minutes);
+        assertEq(editingEndTime, currentTime + 3 days);
+        assertEq(ratingEndTime, currentTime + 3 days + 1 days);
+    }
+
+    function test_createDebate_revertsForAnEditingPhaseShorterThanTheTimeUnit() public {
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT - 1));
+        _arborVote.createDebate({
+            contentURI: _THESIS_CONTENT,
+            timeUnit: _TIME_UNIT,
+            editingDuration: _TIME_UNIT - 1,
+            ratingDuration: 3 * _TIME_UNIT
+        });
+    }
+
+    function test_createDebate_revertsForARatingPhaseShorterThanTheTimeUnit() public {
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT - 1));
+        _arborVote.createDebate({
+            contentURI: _THESIS_CONTENT,
+            timeUnit: _TIME_UNIT,
+            editingDuration: 7 * _TIME_UNIT,
+            ratingDuration: _TIME_UNIT - 1
+        });
     }
 
     function test_createDebate_initializesTheRootArgument() public {
