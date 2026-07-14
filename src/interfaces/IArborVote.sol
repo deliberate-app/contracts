@@ -123,8 +123,8 @@ interface IArborVote {
     /// @notice Creates a new debate.
     /// @param contentURI The URI pointing to the content of the debate thesis.
     /// @param timeUnit The draft window: the time from an argument's creation (or last edit) until it locks in.
-    /// @param editingDuration The length of the editing phase; at least one time unit, so arguments can lock in
-    /// and be replied to.
+    /// @param editingDuration The length of the editing phase; longer than the time unit, so arguments can lock
+    /// in and be replied to.
     /// @param ratingDuration The length of the rating phase; at least one time unit, so every argument is final
     /// by the time the tally runs.
     /// @return debateId The ID of the created debate.

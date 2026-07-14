@@ -222,12 +222,13 @@ contract ArborVoteTest is Test {
         assertEq(ratingEndTime, currentTime + 3 days + 1 days);
     }
 
-    function test_createDebate_revertsForAnEditingPhaseShorterThanTheTimeUnit() public {
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT - 1));
+    function test_createDebate_revertsForAnEditingPhaseNotExceedingTheTimeUnit() public {
+        // The bound is strict: an editing phase equal to the time unit fits no reply window.
+        vm.expectRevert(abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _TIME_UNIT, _TIME_UNIT));
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
             timeUnit: _TIME_UNIT,
-            editingDuration: _TIME_UNIT - 1,
+            editingDuration: _TIME_UNIT,
             ratingDuration: 3 * _TIME_UNIT
         });
     }

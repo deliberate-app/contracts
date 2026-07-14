@@ -84,8 +84,8 @@ contract ArborVote is IArborVote {
     /// at creation, leaving nothing editable or movable.
     error TimeUnitZero();
 
-    /// @notice Thrown if a debate is created with a phase too short to fit one draft window (time unit).
-    /// @param minimum The shortest allowed duration - the debate's time unit.
+    /// @notice Thrown if a debate is created with a phase too short relative to its time unit.
+    /// @param minimum The time unit the phase must fit (the editing phase must exceed it).
     /// @param actual The duration passed.
     error DurationTooShort(uint48 minimum, uint48 actual);
 
@@ -173,12 +173,13 @@ contract ArborVote is IArborVote {
         if (timeUnit == 0) {
             revert TimeUnitZero();
         }
-        // Each phase must fit at least one draft window: the editing phase so arguments can lock in and be
-        // replied to (nesting needs final parents), the rating phase so an argument added in the editing
-        // phase's last moment is final by the time the tally runs.
-        if (editingDuration < timeUnit) {
+        // The editing phase must exceed the time unit (strictly - the + 1 keeps the comparison strict),
+        // so arguments can lock in and be replied to: nesting needs final parents.
+        if (editingDuration < timeUnit + 1) {
             revert DurationTooShort({minimum: timeUnit, actual: editingDuration});
         }
+        // The rating phase must fit at least one draft window, so an argument added in the editing phase's
+        // last moment is final by the time the tally runs.
         if (ratingDuration < timeUnit) {
             revert DurationTooShort({minimum: timeUnit, actual: ratingDuration});
         }
