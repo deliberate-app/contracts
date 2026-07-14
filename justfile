@@ -31,7 +31,7 @@ test *args:
 
 # Show coverage
 coverage *args:
-    forge coverage {{ args }}
+    forge coverage --no-match-coverage "(test)" {{ args }}
 
 # Lint (forge lint + solhint)
 lint:
