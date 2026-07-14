@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
@@ -9,6 +11,7 @@ import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 import {IArborVote} from "./interfaces/IArborVote.sol";
 import {IIdentityRegistry} from "./interfaces/IIdentityRegistry.sol";
 import {Argument} from "./libs/Argument.sol";
+import {Bounty} from "./libs/Bounty.sol";
 import {Debate} from "./libs/Debate.sol";
 import {Parameters} from "./libs/Parameters.sol";
 import {Phase} from "./libs/Phase.sol";
@@ -21,6 +24,7 @@ import {Utils} from "./libs/Utils.sol";
 /// has no owner, and is not upgradeable.
 contract ArborVote is IArborVote {
     using EnumerableSet for EnumerableSet.UintSet;
+    using SafeERC20 for IERC20;
     using Utils for uint32;
     using Utils for int64;
     using Debate for Debate.Data;
@@ -39,6 +43,9 @@ contract ArborVote is IArborVote {
 
     /// @notice The phase data by debate ID.
     mapping(uint256 debateId => Phase.Data phase) internal _phases;
+
+    /// @notice The bounties by debate ID.
+    mapping(uint256 debateId => Bounty.Data bounty) internal _bounties;
 
     /// @notice Thrown if a debate is uninitialized.
     /// @param debateId The ID of the debate.
@@ -115,6 +122,33 @@ contract ArborVote is IArborVote {
     /// @param untalliedChilds The number of untallied childs.
     error ChildsUntallied(uint16 untalliedChilds);
 
+    /// @notice Thrown if a debate is created with a bounty amount but no bounty token.
+    error BountyTokenZero();
+
+    /// @notice Thrown if a bounty action targets a debate that has no bounty token.
+    error BountyMissing();
+
+    /// @notice Thrown if a bounty is funded with a zero amount.
+    error BountyAmountZero();
+
+    /// @notice Thrown if a bounty claim arrives after the claim window has closed.
+    /// @param closedAt The time the claim window closed.
+    error ClaimWindowClosed(uint48 closedAt);
+
+    /// @notice Thrown if the sweep is attempted while the claim window is still open.
+    /// @param closesAt The time the claim window closes.
+    error ClaimWindowOpen(uint48 closesAt);
+
+    /// @notice Thrown if a participant tries to claim a bounty share twice - claims are one-shot.
+    error BountyAlreadyClaimed();
+
+    /// @notice Thrown if a participant without excess over the initial grant tries to claim.
+    /// @param tokens The participant's vote token balance.
+    error BountyNotWon(uint32 tokens);
+
+    /// @notice Thrown if the bounty remainder has already been swept.
+    error BountyAlreadySwept();
+
     /// @notice A modifier to restrict functions to only be called if the debate is in a certain phase.
     /// @param debateId The ID of the debate.
     /// @param phase The phase of the debate required.
@@ -164,11 +198,14 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function createDebate(bytes32 contentURI, uint48 lockingDuration, uint48 editingDuration, uint48 ratingDuration)
-        external
-        override
-        returns (uint256 debateId)
-    {
+    function createDebate(
+        bytes32 contentURI,
+        uint48 lockingDuration,
+        uint48 editingDuration,
+        uint48 ratingDuration,
+        IERC20 bountyToken,
+        uint256 bountyAmount
+    ) external override returns (uint256 debateId) {
         // A zero locking duration would finalize every argument at creation, leaving nothing editable or movable.
         if (lockingDuration == 0) {
             revert LockingDurationZero();
@@ -215,6 +252,17 @@ contract ArborVote is IArborVote {
             editingEndTime: phaseData.editingEndTime,
             ratingEndTime: phaseData.ratingEndTime
         });
+
+        // Attach the optional bounty: the token is fixed for the debate's lifetime, the amount may be
+        // zero to leave the funding to top-ups.
+        if (address(bountyToken) != address(0)) {
+            _bounties[debateId].token = bountyToken;
+            if (bountyAmount > 0) {
+                _fundBounty(debateId, bountyAmount);
+            }
+        } else if (bountyAmount > 0) {
+            revert BountyTokenZero();
+        }
     }
 
     /// @inheritdoc IArborVote
@@ -237,7 +285,27 @@ contract ArborVote is IArborVote {
         user.role = User.Role.Participant;
         user.tokens = Parameters.INITIAL_TOKENS;
 
+        // The participant count is the `N` in the bounty payout denominator (and a quorum input for
+        // outcome consumers); joining closes with the rating phase, so it is fixed once claims open.
+        _debates[debateId].incrementParticipantCounter();
+
         emit Joined({debateId: debateId, account: msg.sender, tokens: Parameters.INITIAL_TOKENS});
+    }
+
+    /// @inheritdoc IArborVote
+    function fundBounty(uint256 debateId, uint256 amount) external override {
+        if (address(_bounties[debateId].token) == address(0)) {
+            revert BountyMissing();
+        }
+        if (amount == 0) {
+            revert BountyAmountZero();
+        }
+        // Top-ups close once the debate is finished: the pool must be constant while claims divide it.
+        if (_phases[debateId].finished) {
+            revert PhaseExceeded({limit: Phase.Status.Tallying, actual: Phase.Status.Finished});
+        }
+
+        _fundBounty(debateId, amount);
     }
 
     /// @inheritdoc IArborVote
@@ -343,8 +411,10 @@ contract ArborVote is IArborVote {
             _tallyNode(debateId, SafeCast.toUint16(leafArgumentIds[i]));
         }
 
-        // Latch the terminal phase: the tally is the single transaction that finishes a debate, no separate poke.
+        // Latch the terminal phase: the tally is the single transaction that finishes a debate, no separate
+        // poke. The finish time anchors the bounty claim window.
         _phases[debateId].finished = true;
+        _phases[debateId].finishTime = Time.timestamp();
 
         emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsImpact > 0});
     }
@@ -376,15 +446,83 @@ contract ArborVote is IArborVote {
         override
         onlyPhase(debateId, Phase.Status.Finished)
     {
-        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+        _claimFees({debateId: debateId, argumentId: argumentId});
+    }
 
-        uint32 fees = argument.fees;
-        if (fees > 0) {
-            argument.fees = 0;
-            _users[debateId][argument.creator].tokens += fees;
-
-            emit FeesClaimed({debateId: debateId, argumentId: argumentId, creator: argument.creator, fees: fees});
+    /// @inheritdoc IArborVote
+    function claimBounty(uint256 debateId, uint16[] calldata argumentIds)
+        external
+        override
+        onlyPhase(debateId, Phase.Status.Finished)
+    {
+        Bounty.Data storage bountyData = _bounties[debateId];
+        if (address(bountyData.token) == address(0)) {
+            revert BountyMissing();
         }
+        uint48 closesAt = _phases[debateId].finishTime + Parameters.CLAIM_WINDOW;
+        if (Time.timestamp() > closesAt) {
+            revert ClaimWindowClosed({closedAt: closesAt});
+        }
+
+        User.Data storage user = _users[debateId][msg.sender];
+        if (user.bountyClaimed) {
+            revert BountyAlreadyClaimed();
+        }
+
+        // Settle-and-claim: redeem the given share positions and claim their accrued creator fees first,
+        // so the excess below is the caller's full result - claiming early (claims are one-shot) cannot
+        // silently forfeit unredeemed positions.
+        uint256 arrayLength = argumentIds.length;
+        for (uint256 i = 0; i < arrayLength; i++) {
+            _redeemArgumentShares({debateId: debateId, argumentId: argumentIds[i], account: msg.sender});
+            _claimFees({debateId: debateId, argumentId: argumentIds[i]});
+        }
+
+        uint32 tokens = user.tokens;
+        if (tokens <= Parameters.INITIAL_TOKENS) {
+            revert BountyNotWon({tokens: tokens});
+        }
+        uint32 excess = tokens - Parameters.INITIAL_TOKENS;
+
+        // The fixed denominator (initial supply): a collusion ring only ever reaches its headcount share.
+        uint256 amount =
+            (bountyData.pool * excess) / (uint256(Parameters.INITIAL_TOKENS) * _debates[debateId].participantsCount);
+
+        user.bountyClaimed = true;
+        bountyData.claimed += amount;
+        if (amount > 0) {
+            bountyData.token.safeTransfer(msg.sender, amount);
+        }
+
+        emit BountyClaimed({debateId: debateId, account: msg.sender, excess: excess, amount: amount});
+    }
+
+    /// @inheritdoc IArborVote
+    function sweepBounty(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Finished) {
+        Bounty.Data storage bountyData = _bounties[debateId];
+        if (address(bountyData.token) == address(0)) {
+            revert BountyMissing();
+        }
+
+        address creator = _debates[debateId].arguments[0].creator;
+        if (msg.sender != creator) {
+            revert AddressInvalid({expected: creator, actual: msg.sender});
+        }
+        uint48 closesAt = _phases[debateId].finishTime + Parameters.CLAIM_WINDOW;
+        if (Time.timestamp() <= closesAt) {
+            revert ClaimWindowOpen({closesAt: closesAt});
+        }
+        if (bountyData.swept) {
+            revert BountyAlreadySwept();
+        }
+
+        uint256 remainder = bountyData.pool - bountyData.claimed;
+        bountyData.swept = true;
+        if (remainder > 0) {
+            bountyData.token.safeTransfer(creator, remainder);
+        }
+
+        emit BountySwept({debateId: debateId, creator: creator, amount: remainder});
     }
 
     /// @inheritdoc IArborVote
@@ -434,15 +572,38 @@ contract ArborVote is IArborVote {
     }
 
     /// @inheritdoc IArborVote
-    function debates(uint256 debateId) external view override returns (uint32 totalVotes, uint16 argumentsCount) {
+    function debates(uint256 debateId)
+        external
+        view
+        override
+        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount)
+    {
         Debate.Data storage debate = _debates[debateId];
-        return (debate.totalVotes, debate.argumentsCount);
+        return (debate.totalVotes, debate.argumentsCount, debate.participantsCount);
     }
 
     /// @inheritdoc IArborVote
-    function users(uint256 debateId, address account) external view override returns (User.Role role, uint32 tokens) {
+    function bounty(uint256 debateId)
+        external
+        view
+        override
+        returns (IERC20 token, uint256 pool, uint256 claimed, bool swept, uint48 claimEndTime)
+    {
+        Bounty.Data storage bountyData = _bounties[debateId];
+        uint48 finishTime = _phases[debateId].finishTime;
+        claimEndTime = finishTime == 0 ? 0 : finishTime + Parameters.CLAIM_WINDOW;
+        return (bountyData.token, bountyData.pool, bountyData.claimed, bountyData.swept, claimEndTime);
+    }
+
+    /// @inheritdoc IArborVote
+    function users(uint256 debateId, address account)
+        external
+        view
+        override
+        returns (User.Role role, uint32 tokens, bool bountyClaimed)
+    {
         User.Data storage user = _users[debateId][account];
-        return (user.role, user.tokens);
+        return (user.role, user.tokens, user.bountyClaimed);
     }
 
     /// @inheritdoc IArborVote
@@ -628,6 +789,41 @@ contract ArborVote is IArborVote {
         if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             // slither-disable-next-line unused-return
             debate.leafArgumentIds.add(parentArgumentId);
+        }
+    }
+
+    /// @notice Internal function pulling a bounty funding from the caller into the pool. The pool grows by
+    /// what actually arrived (balance delta), so fee-on-transfer tokens fund what the contract can pay out.
+    /// @param debateId The ID of the debate.
+    /// @param amount The amount of the bounty token to pull from the caller.
+    function _fundBounty(uint256 debateId, uint256 amount) internal {
+        Bounty.Data storage bountyData = _bounties[debateId];
+        IERC20 token = bountyData.token;
+
+        uint256 balanceBefore = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = token.balanceOf(address(this)) - balanceBefore;
+
+        bountyData.pool += received;
+
+        emit BountyFunded({
+            debateId: debateId, funder: msg.sender, token: token, amount: received, pool: bountyData.pool
+        });
+    }
+
+    /// @notice Internal function crediting an argument's accrued market fees to its creator; a no-op
+    /// without fees.
+    /// @param debateId The ID of the debate.
+    /// @param argumentId The ID of the argument.
+    function _claimFees(uint256 debateId, uint16 argumentId) internal {
+        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+
+        uint32 fees = argument.fees;
+        if (fees > 0) {
+            argument.fees = 0;
+            _users[debateId][argument.creator].tokens += fees;
+
+            emit FeesClaimed({debateId: debateId, argumentId: argumentId, creator: argument.creator, fees: fees});
         }
     }
 

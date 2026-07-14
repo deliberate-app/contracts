@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {ArborVote} from "../src/ArborVote.sol";
@@ -37,7 +38,9 @@ contract ArborVoteHarnessTest is Test {
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION
+            ratingDuration: 3 * _LOCKING_DURATION,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
         _arborVote.join(debateId);
         argumentId = _arborVote.addArgument({

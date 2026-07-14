@@ -24,9 +24,11 @@ library User {
     /// @param shares The shares the user holds per argument.
     /// @param role The role of the user.
     /// @param tokens The vote token balance of the user.
+    /// @param bountyClaimed Whether the user has claimed their bounty share (claims are one-shot).
     struct Data {
         mapping(uint16 argumentId => Shares) shares; // ]  32
         Role role; //                                   ┐   1
-        uint32 tokens; //                               ┘ + 4 = 5
+        uint32 tokens; //                               | + 4
+        bool bountyClaimed; //                          ┘ + 1 = 6
     }
 }

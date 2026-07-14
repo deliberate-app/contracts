@@ -27,10 +27,12 @@ library Phase {
     /// @param editingEndTime The time at which the editing phase ends.
     /// @param ratingEndTime The time at which the rating phase ends.
     /// @param lockingDuration How long a new or edited argument stays a draft before it locks in.
+    /// @param finishTime The time the tally ran; anchors the bounty claim window. Zero until finished.
     struct Data {
         bool finished; //          ┐   1
         uint48 editingEndTime; //  | + 6
         uint48 ratingEndTime; //   | + 6
-        uint48 lockingDuration; // ┘ + 6 = 19
+        uint48 lockingDuration; // | + 6
+        uint48 finishTime; //      ┘ + 6 = 25
     }
 }

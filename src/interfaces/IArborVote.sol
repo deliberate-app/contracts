@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
+
 import {Argument} from "../libs/Argument.sol";
 import {Phase} from "../libs/Phase.sol";
 import {User} from "../libs/User.sol";
@@ -120,17 +122,67 @@ interface IArborVote {
     /// @param fees The amount of vote token fees claimed.
     event FeesClaimed(uint256 indexed debateId, uint16 indexed argumentId, address indexed creator, uint32 fees);
 
-    /// @notice Creates a new debate.
+    /// @notice Emitted when a debate's bounty pool is funded - at creation or by a later top-up.
+    /// @param debateId The ID of the debate.
+    /// @param funder The account the funds came from.
+    /// @param token The ERC-20 the bounty is denominated in.
+    /// @param amount The amount received (after any transfer fee the token takes).
+    /// @param pool The bounty pool after this funding.
+    event BountyFunded(
+        uint256 indexed debateId, address indexed funder, IERC20 indexed token, uint256 amount, uint256 pool
+    );
+
+    /// @notice Emitted when a participant claims their bounty share.
+    /// @param debateId The ID of the debate.
+    /// @param account The claiming participant.
+    /// @param excess The vote tokens the participant ended with beyond the initial grant.
+    /// @param amount The bounty amount paid out.
+    event BountyClaimed(uint256 indexed debateId, address indexed account, uint32 excess, uint256 amount);
+
+    /// @notice Emitted when the creator sweeps the unclaimed bounty remainder after the claim window.
+    /// @param debateId The ID of the debate.
+    /// @param creator The debate's creator the remainder is paid to.
+    /// @param amount The remainder swept.
+    event BountySwept(uint256 indexed debateId, address indexed creator, uint256 amount);
+
+    /// @notice Creates a new debate, optionally attaching an ERC-20 bounty for its net winners.
     /// @param contentURI The URI pointing to the content of the debate thesis.
     /// @param lockingDuration The time from an argument's creation (or last edit) until it locks in.
     /// @param editingDuration The length of the editing phase; longer than the locking duration, so arguments
     /// can lock in and be replied to.
     /// @param ratingDuration The length of the rating phase; at least one locking window, so every argument is
     /// final by the time the tally runs.
+    /// @param bountyToken The ERC-20 the bounty is denominated in; the zero address attaches no bounty and the
+    /// token cannot be changed later. Any ERC-20 works - the token is deliberately uncurated.
+    /// @param bountyAmount The bounty amount to pull from the caller (requires a prior approval); may be zero
+    /// to name a token and leave the funding to top-ups.
     /// @return debateId The ID of the created debate.
-    function createDebate(bytes32 contentURI, uint48 lockingDuration, uint48 editingDuration, uint48 ratingDuration)
-        external
-        returns (uint256 debateId);
+    function createDebate(
+        bytes32 contentURI,
+        uint48 lockingDuration,
+        uint48 editingDuration,
+        uint48 ratingDuration,
+        IERC20 bountyToken,
+        uint256 bountyAmount
+    ) external returns (uint256 debateId);
+
+    /// @notice Tops up a debate's bounty pool; open to anyone until the debate finishes. Top-ups are
+    /// donations - they raise every claim and are not refundable.
+    /// @param debateId The ID of the debate.
+    /// @param amount The amount of the bounty token to pull from the caller (requires a prior approval).
+    function fundBounty(uint256 debateId, uint256 amount) external;
+
+    /// @notice Settles the caller's positions and claims their bounty share - one-shot, within the claim
+    /// window. Redeems the given arguments' shares and claims their accrued creator fees first, then pays
+    /// `pool * (tokens - 100) / (100 * N)` for the caller's excess over the initial grant.
+    /// @param debateId The ID of the debate.
+    /// @param argumentIds The arguments to settle before the claim - the caller's staked and authored ones;
+    /// empty if already settled.
+    function claimBounty(uint256 debateId, uint16[] calldata argumentIds) external;
+
+    /// @notice Sweeps the unclaimed bounty remainder to the debate's creator once the claim window is over.
+    /// @param debateId The ID of the debate.
+    function sweepBounty(uint256 debateId) external;
 
     /// @notice Join a debate and receive debate tokens.
     /// @param debateId The ID of the debate.
@@ -246,14 +298,34 @@ interface IArborVote {
     /// @param debateId The ID of the debate.
     /// @return totalVotes The total votes cast in the debate.
     /// @return argumentsCount The number of arguments in the debate.
-    function debates(uint256 debateId) external view returns (uint32 totalVotes, uint16 argumentsCount);
+    /// @return participantsCount The number of accounts that joined the debate.
+    function debates(uint256 debateId)
+        external
+        view
+        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount);
 
-    /// @notice Returns the role and tokens of a user in a debate.
+    /// @notice Returns the bounty state of a debate.
+    /// @param debateId The ID of the debate.
+    /// @return token The ERC-20 the bounty is denominated in; the zero address means no bounty.
+    /// @return pool The total amount funded.
+    /// @return claimed The total amount paid out to claimants so far.
+    /// @return swept Whether the creator has swept the remainder.
+    /// @return claimEndTime The time the claim window closes; zero while the debate is unfinished.
+    function bounty(uint256 debateId)
+        external
+        view
+        returns (IERC20 token, uint256 pool, uint256 claimed, bool swept, uint48 claimEndTime);
+
+    /// @notice Returns the role, tokens, and bounty claim state of a user in a debate.
     /// @param debateId The ID of the debate.
     /// @param account The account of the user.
     /// @return role The role of the user.
     /// @return tokens The vote token balance of the user.
-    function users(uint256 debateId, address account) external view returns (User.Role role, uint32 tokens);
+    /// @return bountyClaimed Whether the user has claimed their bounty share (claims are one-shot).
+    function users(uint256 debateId, address account)
+        external
+        view
+        returns (User.Role role, uint32 tokens, bool bountyClaimed);
 
     /// @notice Returns the phase data of a debate.
     /// @param debateId The ID of the debate.

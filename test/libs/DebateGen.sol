@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {ArborVote} from "../../src/ArborVote.sol";
@@ -35,7 +36,9 @@ library DebateGen {
             contentURI: bytes32(0),
             lockingDuration: lockingDuration,
             editingDuration: 7 * lockingDuration,
-            ratingDuration: 3 * lockingDuration
+            ratingDuration: 3 * lockingDuration,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
         debate = Debate({arborVote: arborVote, id: id});
     }
@@ -62,7 +65,7 @@ library DebateGen {
     ) internal returns (uint16 argumentId) {
         join(vm, debate, author);
         // The next id is the current argument count (ids are dense from 0); use it as the content.
-        (, uint16 nextId) = debate.arborVote.debates(debate.id);
+        (, uint16 nextId,) = debate.arborVote.debates(debate.id);
         vm.prank(author);
         argumentId = debate.arborVote
             .addArgument({
@@ -179,7 +182,7 @@ library DebateGen {
     }
 
     function tokensOf(Vm, Debate memory debate, address account) internal view returns (uint32 tokens) {
-        (, tokens) = debate.arborVote.users(debate.id, account);
+        (, tokens,) = debate.arborVote.users(debate.id, account);
     }
 
     // --- internal ---

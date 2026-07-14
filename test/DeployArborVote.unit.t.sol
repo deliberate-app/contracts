@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {DeployArborVote} from "../script/DeployArborVote.s.sol";
@@ -24,7 +25,12 @@ contract DeployArborVoteTest is Test {
         // The given registry is wired into the join gate: an account it denies cannot join.
         uint256 debateId = ArborVote(arborVote)
             .createDebate({
-            contentURI: "We should do XYZ", lockingDuration: 60, editingDuration: 7 * 60, ratingDuration: 3 * 60
+            contentURI: "We should do XYZ",
+            lockingDuration: 60,
+            editingDuration: 7 * 60,
+            ratingDuration: 3 * 60,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
         address denied = makeAddr("denied");
         registry.deny(denied);

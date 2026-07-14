@@ -14,18 +14,26 @@ library Debate {
     /// @param arguments The arguments of the debate by their ID.
     /// @param totalVotes The total votes cast in the debate.
     /// @param argumentsCount The number of arguments in the debate.
+    /// @param participantsCount The number of accounts that joined the debate - the `N` in the bounty payout.
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
         uint32 totalVotes; //                     ┐   4
         uint16 argumentsCount; //                 | + 2
-        EnumerableSet.UintSet leafArgumentIds; // ┘ + 2 = 8
+        uint32 participantsCount; //              | + 4
+        EnumerableSet.UintSet leafArgumentIds; // ┘ = 10
     }
 
     /// @notice Increments the argument counter of a debate.
     /// @param debate The debate to increment the argument counter of.
     function incrementArgumentCounter(Data storage debate) internal {
         debate.argumentsCount += 1;
+    }
+
+    /// @notice Increments the participant counter of a debate.
+    /// @param debate The debate to increment the participant counter of.
+    function incrementParticipantCounter(Data storage debate) internal {
+        debate.participantsCount += 1;
     }
 
     /// @notice Returns the number of arguments of a debate.

@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {ArborVote} from "../src/ArborVote.sol";
@@ -35,7 +36,9 @@ contract ArborVoteTest is Test {
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION
+            ratingDuration: 3 * _LOCKING_DURATION,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
     }
 
@@ -209,14 +212,21 @@ contract ArborVoteTest is Test {
             contentURI: _THESIS_CONTENT,
             lockingDuration: 0,
             editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION
+            ratingDuration: 3 * _LOCKING_DURATION,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
     }
 
     function test_createDebate_setsTheChosenDurations() public {
         // The three times are independent: a short locking window inside long, uneven phases.
         uint256 debateId = _arborVote.createDebate({
-            contentURI: _THESIS_CONTENT, lockingDuration: 30 minutes, editingDuration: 3 days, ratingDuration: 1 days
+            contentURI: _THESIS_CONTENT,
+            lockingDuration: 30 minutes,
+            editingDuration: 3 days,
+            ratingDuration: 1 days,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
 
         uint256 currentTime = vm.getBlockTimestamp();
@@ -235,7 +245,9 @@ contract ArborVoteTest is Test {
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION
+            ratingDuration: 3 * _LOCKING_DURATION,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
     }
 
@@ -247,7 +259,9 @@ contract ArborVoteTest is Test {
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: _LOCKING_DURATION - 1
+            ratingDuration: _LOCKING_DURATION - 1,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
         });
     }
 
@@ -477,7 +491,7 @@ contract ArborVoteTest is Test {
 
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
 
-        (uint32 totalVotes,) = _arborVote.debates(debateId);
+        (uint32 totalVotes,,) = _arborVote.debates(debateId);
         assertEq(totalVotes, 20);
     }
 
@@ -494,7 +508,7 @@ contract ArborVoteTest is Test {
         assertEq(argument.votes, 40);
 
         assertEq(_arborVote.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 40);
-        (uint32 totalVotes,) = _arborVote.debates(debateId);
+        (uint32 totalVotes,,) = _arborVote.debates(debateId);
         assertEq(totalVotes, 40);
         assertEq(_arborVote.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
     }

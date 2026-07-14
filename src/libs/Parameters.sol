@@ -18,6 +18,12 @@ library Parameters {
     /// @notice The initial vote token balance granted to a user upon joining a debate.
     uint32 public constant INITIAL_TOKENS = 100;
 
+    /// @notice The window after a debate finishes during which bounty claims are open; afterwards the
+    /// creator may sweep the remainder.
+    /// @dev A constant, not a creator knob: an unfloored creator-chosen window would allow sweeping
+    /// before anyone can claim (see ADR-0009).
+    uint48 public constant CLAIM_WINDOW = 7 days;
+
     /// @notice The maximum number of arguments per debate, the thesis included.
     /// @dev Bounds the atomic tally: the whole tree must be tallyable within one block's gas (asserted by the gas
     /// benchmark test). Depth needs no bound of its own - each tree level takes one locking window of
