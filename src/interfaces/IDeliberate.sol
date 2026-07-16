@@ -8,10 +8,10 @@ import {Argument} from "../libs/Argument.sol";
 import {Phase} from "../libs/Phase.sol";
 import {User} from "../libs/User.sol";
 
-/// @title IArborVote
+/// @title IDeliberate
 /// @author Michael Heuer
-/// @notice The interface of the ArborVote voting module for deliberative decision-making using argument trees.
-interface IArborVote {
+/// @notice The interface of the Deliberate voting module for deliberative decision-making using argument trees.
+interface IDeliberate {
     /// @notice Emitted when a debate is created. The thesis is the debate's root argument (ID 0).
     /// @param debateId The ID of the debate.
     /// @param creator The creator of the debate.

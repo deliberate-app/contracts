@@ -8,7 +8,7 @@ import {SafeCast} from "@openzeppelin-contracts-5.6.1/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
 import {Time} from "@openzeppelin-contracts-5.6.1/utils/types/Time.sol";
 
-import {IArborVote} from "./interfaces/IArborVote.sol";
+import {IDeliberate} from "./interfaces/IDeliberate.sol";
 import {IIdentityRegistry} from "./interfaces/IIdentityRegistry.sol";
 import {Argument} from "./libs/Argument.sol";
 import {Bounty} from "./libs/Bounty.sol";
@@ -18,11 +18,11 @@ import {Phase} from "./libs/Phase.sol";
 import {User} from "./libs/User.sol";
 import {Utils} from "./libs/Utils.sol";
 
-/// @title ArborVote
+/// @title Deliberate
 /// @author Michael Heuer
 /// @notice A voting module for deliberative decision-making using argument trees. The contract is deployed once,
 /// has no owner, and is not upgradeable.
-contract ArborVote is IArborVote {
+contract Deliberate is IDeliberate {
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
     using Utils for uint32;
@@ -197,7 +197,7 @@ contract ArborVote is IArborVote {
         _IDENTITY_REGISTRY = identityRegistry;
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function createDebate(
         bytes32 contentURI,
         uint48 lockingDuration,
@@ -265,7 +265,7 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function join(uint256 debateId) external override onlyRole(debateId, User.Role.Unassigned) {
         // Joining is only possible while participating is: during the editing and rating phases.
         Phase.Status currentPhase = _phaseOf(_phases[debateId]);
@@ -292,7 +292,7 @@ contract ArborVote is IArborVote {
         emit Joined({debateId: debateId, account: msg.sender, tokens: Parameters.INITIAL_TOKENS});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function fundBounty(uint256 debateId, uint256 amount) external override {
         if (address(_bounties[debateId].token) == address(0)) {
             revert BountyMissing();
@@ -308,7 +308,7 @@ contract ArborVote is IArborVote {
         _fundBounty(debateId, amount);
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
     /// attach beneath final arguments while only drafts (still inside their editing window) can move, so a draft is
     /// always childless - its subtree is itself alone - and it is not final.
@@ -358,7 +358,7 @@ contract ArborVote is IArborVote {
         });
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function alterArgument(uint256 debateId, uint16 argumentId, bytes32 contentURI)
         external
         override
@@ -382,7 +382,7 @@ contract ArborVote is IArborVote {
         });
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function stakePro(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
@@ -392,7 +392,7 @@ contract ArborVote is IArborVote {
         _stake({debateId: debateId, argumentId: argumentId, isPro: true, voteTokenAmount: voteTokenAmount});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function stakeCon(uint256 debateId, uint16 argumentId, uint32 voteTokenAmount)
         external
         override
@@ -402,7 +402,7 @@ contract ArborVote is IArborVote {
         _stake({debateId: debateId, argumentId: argumentId, isPro: false, voteTokenAmount: voteTokenAmount});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function tallyTree(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Tallying) {
         uint256[] memory leafArgumentIds = _debates[debateId].leafArgumentIds.values();
 
@@ -419,7 +419,7 @@ contract ArborVote is IArborVote {
         emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsImpact > 0});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function redeemArgumentShares(uint256 debateId, uint16 argumentId, address account)
         external
         override
@@ -428,7 +428,7 @@ contract ArborVote is IArborVote {
         _redeemArgumentShares({debateId: debateId, argumentId: argumentId, account: account});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function redeemArgumentSharesBatch(uint256 debateId, uint16[] calldata argumentIds, address account)
         external
         override
@@ -440,7 +440,7 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function claimFees(uint256 debateId, uint16 argumentId)
         external
         override
@@ -449,7 +449,7 @@ contract ArborVote is IArborVote {
         _claimFees({debateId: debateId, argumentId: argumentId});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function claimBounty(uint256 debateId, uint16[] calldata argumentIds)
         external
         override
@@ -497,7 +497,7 @@ contract ArborVote is IArborVote {
         emit BountyClaimed({debateId: debateId, account: msg.sender, excess: excess, amount: amount});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function sweepBounty(uint256 debateId) external override onlyPhase(debateId, Phase.Status.Finished) {
         Bounty.Data storage bountyData = _bounties[debateId];
         if (address(bountyData.token) == address(0)) {
@@ -525,7 +525,7 @@ contract ArborVote is IArborVote {
         emit BountySwept({debateId: debateId, creator: creator, amount: remainder});
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function getArgument(uint256 debateId, uint16 argumentId)
         external
         view
@@ -535,7 +535,7 @@ contract ArborVote is IArborVote {
         return _debates[debateId].arguments[argumentId];
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function getLeafArgumentIds(uint256 debateId) external view override returns (uint16[] memory leafArgumentIds) {
         uint256[] memory ids = _debates[debateId].leafArgumentIds.values();
 
@@ -546,17 +546,17 @@ contract ArborVote is IArborVote {
         }
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function getUserRole(uint256 debateId, address account) external view override returns (User.Role role) {
         return _users[debateId][account].role;
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function getUserTokens(uint256 debateId, address account) external view override returns (uint32 tokens) {
         return _users[debateId][account].tokens;
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function getUserShares(uint256 debateId, uint16 argumentId, address account)
         external
         view
@@ -566,12 +566,12 @@ contract ArborVote is IArborVote {
         return _users[debateId][account].shares[argumentId];
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function debatesCount() external view override returns (uint256 count) {
         count = _debatesCounter;
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function debates(uint256 debateId)
         external
         view
@@ -582,7 +582,7 @@ contract ArborVote is IArborVote {
         return (debate.totalVotes, debate.argumentsCount, debate.participantsCount);
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function bounty(uint256 debateId)
         external
         view
@@ -595,7 +595,7 @@ contract ArborVote is IArborVote {
         return (bountyData.token, bountyData.pool, bountyData.claimed, bountyData.swept, claimEndTime);
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function users(uint256 debateId, address account)
         external
         view
@@ -606,7 +606,7 @@ contract ArborVote is IArborVote {
         return (user.role, user.tokens, user.bountyClaimed);
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function phases(uint256 debateId)
         external
         view
@@ -617,7 +617,7 @@ contract ArborVote is IArborVote {
         return (_phaseOf(phaseData), phaseData.editingEndTime, phaseData.ratingEndTime, phaseData.lockingDuration);
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function outcome(uint256 debateId) external view override returns (bool approved) {
         Phase.Status currentPhase = _phaseOf(_phases[debateId]);
         if (currentPhase != Phase.Status.Finished) {
@@ -627,7 +627,7 @@ contract ArborVote is IArborVote {
         approved = _debates[debateId].arguments[0].descendantsImpact > 0;
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     /// @dev This requires the parent argument to be final: its editing window must have elapsed.
     function addArgument(
         uint256 debateId,
@@ -707,7 +707,7 @@ contract ArborVote is IArborVote {
         });
     }
 
-    /// @inheritdoc IArborVote
+    /// @inheritdoc IDeliberate
     function quoteStake(uint256 debateId, uint16 argumentId, bool isPro, uint32 voteTokenAmount)
         public
         view

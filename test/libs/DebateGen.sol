@@ -5,18 +5,18 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
-import {ArborVote} from "../../src/ArborVote.sol";
+import {Deliberate} from "../../src/Deliberate.sol";
 import {Argument} from "../../src/libs/Argument.sol";
 import {Parameters} from "../../src/libs/Parameters.sol";
 import {Phase} from "../../src/libs/Phase.sol";
 import {User} from "../../src/libs/User.sol";
 
-// A test-only DSL for generating example debates against an `ArborVote` deployment.
+// A test-only DSL for generating example debates against an `Deliberate` deployment.
 // solhint-disable private-vars-leading-underscore
 library DebateGen {
     // A lightweight handle to a debate under construction: the deployment plus the debate id.
     struct Debate {
-        ArborVote arborVote;
+        Deliberate arborVote;
         uint256 id;
     }
 
@@ -25,7 +25,7 @@ library DebateGen {
 
     // --- create ---
 
-    function createDebate(Vm vm, ArborVote arborVote, address creator, uint48 lockingDuration)
+    function createDebate(Vm vm, Deliberate arborVote, address creator, uint48 lockingDuration)
         internal
         returns (Debate memory debate)
     {

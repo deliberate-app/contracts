@@ -1,4 +1,4 @@
-# ArborVote
+# Deliberate
 
 An on-chain voting module for deliberative decision-making: participants build a tree of pro and con arguments beneath a thesis, back arguments with vote tokens, and the tallied tree determines the outcome.
 

@@ -5,25 +5,25 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
-import {DeployArborVote} from "../script/DeployArborVote.s.sol";
-import {ArborVote} from "../src/ArborVote.sol";
+import {DeployDeliberate} from "../script/DeployDeliberate.s.sol";
+import {Deliberate} from "../src/Deliberate.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
-contract DeployArborVoteTest is Test {
-    DeployArborVote internal _script;
+contract DeployDeliberateTest is Test {
+    DeployDeliberate internal _script;
 
     function setUp() public {
-        _script = new DeployArborVote();
+        _script = new DeployDeliberate();
     }
 
-    function test_run_deploysArborVoteAgainstTheGivenRegistry() public {
+    function test_run_deploysDeliberateAgainstTheGivenRegistry() public {
         MockIdentityRegistry registry = new MockIdentityRegistry();
 
         address arborVote = _script.run(address(registry));
         assertGt(arborVote.code.length, 0);
 
         // The given registry is wired into the join gate: an account it denies cannot join.
-        uint256 debateId = ArborVote(arborVote)
+        uint256 debateId = Deliberate(arborVote)
             .createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: 60,
@@ -34,9 +34,9 @@ contract DeployArborVoteTest is Test {
         });
         address denied = makeAddr("denied");
         registry.deny(denied);
-        vm.expectRevert(ArborVote.IdentityProofInvalid.selector);
+        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
         vm.prank(denied);
-        ArborVote(arborVote).join(debateId);
+        Deliberate(arborVote).join(debateId);
     }
 
     function test_runWithMockRegistry_deploysThePair() public {

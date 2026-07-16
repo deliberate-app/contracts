@@ -1,9 +1,9 @@
-# ArborVote Contracts
+# Deliberate Contracts
 
 A voting module for deliberative decision-making using argument trees.
 
-ArborVote lets participants build a tree of pro/con arguments below a debate thesis, stake vote tokens on
-argument markets to rate them, and finally tally the tree to determine the outcome. The `ArborVote` contract
+Deliberate lets participants build a tree of pro/con arguments below a debate thesis, stake vote tokens on
+argument markets to rate them, and finally tally the tree to determine the outcome. The `Deliberate` contract
 is deployed once, has no owner, and is not upgradeable (ADR-0006); moderation happens through the rating
 markets themselves (ADR-0005).
 
@@ -74,13 +74,13 @@ slither .
 
 #### Deployment
 
-`ArborVote` takes the address of an identity registry (`IIdentityRegistry`) as its only constructor
+`Deliberate` takes the address of an identity registry (`IIdentityRegistry`) as its only constructor
 argument — a personhood registry such as [Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB),
 or an adapter like `EASIdentityRegistry` (attestation-based, e.g. Coinbase Verifications on Base).
 Against a real registry:
 
 ```sh
-forge script script/DeployArborVote.s.sol:DeployArborVote \
+forge script script/DeployDeliberate.s.sol:DeployDeliberate \
   --sig "run(address)" <IDENTITY_REGISTRY> \
   --rpc-url <network>
 ```
@@ -90,7 +90,7 @@ On test networks without a registry, `runWithMockRegistry()` deploys a `MockIden
 with a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`):
 
 ```sh
-forge script script/DeployArborVote.s.sol:DeployArborVote \
+forge script script/DeployDeliberate.s.sol:DeployDeliberate \
   --sig "runWithMockRegistry()" \
   --rpc-url https://sepolia.base.org \
   --account <KEYSTORE_ACCOUNT> \
@@ -105,7 +105,7 @@ indexer's `config.base-sepolia.yaml` and the frontend's `VITE_ARBORVOTE_ADDRESS`
 ## Layout
 
 ```
-src/        The ArborVote contracts, interfaces, types, and utilities.
+src/        The Deliberate contracts, interfaces, types, and utilities.
 test/       Foundry tests and mocks.
 script/     Deployment scripts.
 ```

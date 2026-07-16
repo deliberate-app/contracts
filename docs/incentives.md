@@ -135,7 +135,7 @@ posture per vector:
 
 ## 6. Consuming the outcome safely
 
-ArborVote stays a pure deliberation primitive: quorum, delay, and veto live **consumer-side**. A
+Deliberate stays a pure deliberation primitive: quorum, delay, and veto live **consumer-side**. A
 DAO executor (or any automation) gating value on `outcome(debateId)` should:
 
 1. **Bind to the thesis**, not the id — check the debate's `contentURI` digest against the text the
@@ -202,7 +202,7 @@ seriously.
 - **(e) A value cap at the consumer.** Even with all of the above: execute only
   `V ≤ α × (measured corruption cost)`, with α ≪ 1.
 
-**The minimal wrapper, sketched.** ArborVote itself stays the deliberation primitive (ADR-0005 —
+**The minimal wrapper, sketched.** Deliberate itself stays the deliberation primitive (ADR-0005 —
 no in-protocol disputes — stays intact); oracle-grade would be a *separate consumer contract*:
 outcome → challenge window → anyone bonds `B` to veto → escalation hands the question to an
 anchored resolver (external arbitrator or token court), the bond forfeited against the resolution.
@@ -261,5 +261,5 @@ humans stays out of scope by design (§5, §7).
 - **Deposit-as-position** — letting the author's deposit buy shares at their seeded rating would
   make authoring recoverable-if-right and seeding honest, but it drains the exact subsidy that makes
   rating profitable in consensus debates. Documented as an alternative, not planned.
-- **In-module vs. wrapper contract** — whether the bounty layer lives in `ArborVote` or in a
+- **In-module vs. wrapper contract** — whether the bounty layer lives in `Deliberate` or in a
   separate vault referencing debates; implementation placement, orthogonal to the rules above.

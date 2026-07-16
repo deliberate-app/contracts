@@ -5,15 +5,15 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
-import {ArborVote} from "../src/ArborVote.sol";
+import {Deliberate} from "../src/Deliberate.sol";
 import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 // Exposes the internal tally/tree plumbing so its defensive guards can be exercised: through the
 // public surface their invariants hold by construction, leaving the guards otherwise unreachable.
-contract ArborVoteHarness is ArborVote {
-    constructor(IIdentityRegistry identityRegistry) ArborVote(identityRegistry) {}
+contract DeliberateHarness is Deliberate {
+    constructor(IIdentityRegistry identityRegistry) Deliberate(identityRegistry) {}
 
     function exposedTallyNode(uint256 debateId, uint16 argumentId) external {
         _tallyNode(debateId, argumentId);
@@ -24,13 +24,13 @@ contract ArborVoteHarness is ArborVote {
     }
 }
 
-contract ArborVoteHarnessTest is Test {
+contract DeliberateHarnessTest is Test {
     uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
 
-    ArborVoteHarness internal _arborVote;
+    DeliberateHarness internal _arborVote;
 
     function setUp() public {
-        _arborVote = new ArborVoteHarness(new MockIdentityRegistry());
+        _arborVote = new DeliberateHarness(new MockIdentityRegistry());
     }
 
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
@@ -73,7 +73,7 @@ contract ArborVoteHarnessTest is Test {
         // Jump straight to tallying the interior node, skipping its child.
         (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
         vm.warp(ratingEndTime + 1);
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ChildsUntallied.selector, uint16(1)));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ChildsUntallied.selector, uint16(1)));
         _arborVote.exposedTallyNode(debateId, parentId);
     }
 
@@ -83,7 +83,7 @@ contract ArborVoteHarnessTest is Test {
     function test_updateParentAfterChildRemoval_revertsForANonFinalParent() public {
         (uint256 debateId, uint16 argumentId) = _debateWithADraft();
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentId));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentId));
         _arborVote.exposedUpdateParentAfterChildRemoval(debateId, argumentId);
     }
 }

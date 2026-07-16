@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
-import {ArborVote} from "../src/ArborVote.sol";
+import {Deliberate} from "../src/Deliberate.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
@@ -19,10 +19,10 @@ contract DebateGenExampleTest is Test {
     address internal immutable _BOB = makeAddr("bob");
     address internal immutable _CAROL = makeAddr("carol");
 
-    ArborVote internal _arborVote;
+    Deliberate internal _arborVote;
 
     function setUp() public {
-        _arborVote = new ArborVote(new MockIdentityRegistry());
+        _arborVote = new Deliberate(new MockIdentityRegistry());
     }
 
     function test_everyArgumentsContentIsItsOwnId() public {

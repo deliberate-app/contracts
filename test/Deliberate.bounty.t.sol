@@ -5,15 +5,15 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
-import {ArborVote} from "../src/ArborVote.sol";
-import {IArborVote} from "../src/interfaces/IArborVote.sol";
+import {Deliberate} from "../src/Deliberate.sol";
+import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {MockERC20, MockERC20FeeOnTransfer} from "./mocks/MockERC20.m.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
-contract ArborVoteBountyTest is Test {
-    ArborVote internal _arborVote;
+contract DeliberateBountyTest is Test {
+    Deliberate internal _arborVote;
     MockERC20 internal _token;
 
     uint48 internal constant _LOCKING_DURATION = 1 * 60;
@@ -23,7 +23,7 @@ contract ArborVoteBountyTest is Test {
     address internal _lateStaker = makeAddr("lateStaker");
 
     function setUp() public {
-        _arborVote = new ArborVote(new MockIdentityRegistry());
+        _arborVote = new Deliberate(new MockIdentityRegistry());
         _token = new MockERC20();
         _token.mint(address(this), 1_000_000 ether);
         _token.approve(address(_arborVote), type(uint256).max);
@@ -102,7 +102,7 @@ contract ArborVoteBountyTest is Test {
 
     function test_createDebate_attachesTheBountyAtCreation() public {
         vm.expectEmit(true, true, true, true);
-        emit IArborVote.BountyFunded({debateId: 0, funder: address(this), token: _token, amount: _POOL, pool: _POOL});
+        emit IDeliberate.BountyFunded({debateId: 0, funder: address(this), token: _token, amount: _POOL, pool: _POOL});
         uint256 debateId = _createBountyDebate(_POOL);
 
         (IERC20 token, uint256 pool, uint256 claimed, bool swept, uint48 claimEndTime) = _arborVote.bounty(debateId);
@@ -123,7 +123,7 @@ contract ArborVoteBountyTest is Test {
     }
 
     function test_createDebate_revertsForAnAmountWithoutAToken() public {
-        vm.expectRevert(ArborVote.BountyTokenZero.selector);
+        vm.expectRevert(Deliberate.BountyTokenZero.selector);
         _arborVote.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
@@ -144,7 +144,7 @@ contract ArborVoteBountyTest is Test {
         vm.startPrank(donor);
         _token.approve(address(_arborVote), 50 ether);
         vm.expectEmit(true, true, true, true);
-        emit IArborVote.BountyFunded({
+        emit IDeliberate.BountyFunded({
             debateId: debateId, funder: donor, token: _token, amount: 50 ether, pool: _POOL + 50 ether
         });
         _arborVote.fundBounty(debateId, 50 ether);
@@ -156,20 +156,20 @@ contract ArborVoteBountyTest is Test {
 
     function test_fundBounty_revertsWithoutABounty() public {
         uint256 debateId = _createBountylessDebate();
-        vm.expectRevert(ArborVote.BountyMissing.selector);
+        vm.expectRevert(Deliberate.BountyMissing.selector);
         _arborVote.fundBounty(debateId, 1 ether);
     }
 
     function test_fundBounty_revertsForAZeroAmount() public {
         uint256 debateId = _createBountyDebate(_POOL);
-        vm.expectRevert(ArborVote.BountyAmountZero.selector);
+        vm.expectRevert(Deliberate.BountyAmountZero.selector);
         _arborVote.fundBounty(debateId, 0);
     }
 
     function test_fundBounty_revertsOnceFinished() public {
         (uint256 debateId,) = _finishedBountyDebate();
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseExceeded.selector, Phase.Status.Tallying, Phase.Status.Finished)
+            abi.encodeWithSelector(Deliberate.PhaseExceeded.selector, Phase.Status.Tallying, Phase.Status.Finished)
         );
         _arborVote.fundBounty(debateId, 1 ether);
     }
@@ -219,7 +219,7 @@ contract ArborVoteBountyTest is Test {
         toSettle[0] = argumentId;
 
         vm.expectEmit(true, true, true, true);
-        emit IArborVote.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 2 ether});
+        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 2 ether});
         vm.prank(_earlyStaker);
         _arborVote.claimBounty(debateId, toSettle);
 
@@ -248,7 +248,7 @@ contract ArborVoteBountyTest is Test {
 
         vm.startPrank(_earlyStaker);
         _arborVote.claimBounty(debateId, toSettle);
-        vm.expectRevert(ArborVote.BountyAlreadyClaimed.selector);
+        vm.expectRevert(Deliberate.BountyAlreadyClaimed.selector);
         _arborVote.claimBounty(debateId, new uint16[](0));
         vm.stopPrank();
     }
@@ -259,7 +259,7 @@ contract ArborVoteBountyTest is Test {
         toSettle[0] = argumentId;
 
         // The late staker redeemed 19 on 20 staked: 99 tokens is no win.
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.BountyNotWon.selector, 99));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 99));
         vm.prank(_lateStaker);
         _arborVote.claimBounty(debateId, toSettle);
     }
@@ -270,14 +270,14 @@ contract ArborVoteBountyTest is Test {
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
-        vm.expectRevert(ArborVote.BountyMissing.selector);
+        vm.expectRevert(Deliberate.BountyMissing.selector);
         _arborVote.claimBounty(debateId, new uint16[](0));
     }
 
     function test_claimBounty_revertsBeforeFinished() public {
         uint256 debateId = _createBountyDebate(_POOL);
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
         );
         _arborVote.claimBounty(debateId, new uint16[](0));
     }
@@ -289,7 +289,7 @@ contract ArborVoteBountyTest is Test {
 
         uint16[] memory toSettle = new uint16[](1);
         toSettle[0] = argumentId;
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ClaimWindowClosed.selector, closesAt));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ClaimWindowClosed.selector, closesAt));
         vm.prank(_earlyStaker);
         _arborVote.claimBounty(debateId, toSettle);
     }
@@ -322,7 +322,7 @@ contract ArborVoteBountyTest is Test {
         uint16[] memory toSettle = new uint16[](1);
         toSettle[0] = argumentId;
         vm.expectEmit(true, true, true, true);
-        emit IArborVote.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 0});
+        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 0});
         vm.prank(_earlyStaker);
         _arborVote.claimBounty(debateId, toSettle);
 
@@ -342,7 +342,7 @@ contract ArborVoteBountyTest is Test {
         uint256 balanceBefore = _token.balanceOf(address(this));
 
         vm.expectEmit(true, true, true, true);
-        emit IArborVote.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2 ether});
+        emit IDeliberate.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2 ether});
         _arborVote.sweepBounty(debateId);
 
         assertEq(_token.balanceOf(address(this)) - balanceBefore, _POOL - 2 ether);
@@ -363,7 +363,7 @@ contract ArborVoteBountyTest is Test {
         (uint256 debateId,) = _finishedBountyDebate();
         vm.warp(_claimWindowEnd(debateId) + 1);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.AddressInvalid.selector, address(this), _earlyStaker));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.AddressInvalid.selector, address(this), _earlyStaker));
         vm.prank(_earlyStaker);
         _arborVote.sweepBounty(debateId);
     }
@@ -372,7 +372,7 @@ contract ArborVoteBountyTest is Test {
         (uint256 debateId,) = _finishedBountyDebate();
         uint48 closesAt = _claimWindowEnd(debateId);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ClaimWindowOpen.selector, closesAt));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ClaimWindowOpen.selector, closesAt));
         _arborVote.sweepBounty(debateId);
     }
 
@@ -381,7 +381,7 @@ contract ArborVoteBountyTest is Test {
         vm.warp(_claimWindowEnd(debateId) + 1);
 
         _arborVote.sweepBounty(debateId);
-        vm.expectRevert(ArborVote.BountyAlreadySwept.selector);
+        vm.expectRevert(Deliberate.BountyAlreadySwept.selector);
         _arborVote.sweepBounty(debateId);
     }
 
@@ -391,7 +391,7 @@ contract ArborVoteBountyTest is Test {
         _endRating(debateId);
         _arborVote.tallyTree(debateId);
 
-        vm.expectRevert(ArborVote.BountyMissing.selector);
+        vm.expectRevert(Deliberate.BountyMissing.selector);
         _arborVote.sweepBounty(debateId);
     }
 

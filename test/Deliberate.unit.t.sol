@@ -5,16 +5,16 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
-import {ArborVote} from "../src/ArborVote.sol";
-import {IArborVote} from "../src/interfaces/IArborVote.sol";
+import {Deliberate} from "../src/Deliberate.sol";
+import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
 import {Argument} from "../src/libs/Argument.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
-contract ArborVoteTest is Test {
-    ArborVote internal _arborVote;
+contract DeliberateTest is Test {
+    Deliberate internal _arborVote;
 
     MockIdentityRegistry internal _mockIdentityRegistry;
 
@@ -25,7 +25,7 @@ contract ArborVoteTest is Test {
 
     function setUp() public {
         _mockIdentityRegistry = new MockIdentityRegistry();
-        _arborVote = new ArborVote(_mockIdentityRegistry);
+        _arborVote = new Deliberate(_mockIdentityRegistry);
     }
 
     // --- helpers ---
@@ -207,7 +207,7 @@ contract ArborVoteTest is Test {
     }
 
     function test_createDebate_revertsForAZeroLockingDuration() public {
-        vm.expectRevert(ArborVote.LockingDurationZero.selector);
+        vm.expectRevert(Deliberate.LockingDurationZero.selector);
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
             lockingDuration: 0,
@@ -239,7 +239,7 @@ contract ArborVoteTest is Test {
     function test_createDebate_revertsForAnEditingPhaseNotExceedingTheLocking() public {
         // The bound is strict: an editing phase equal to the locking duration fits no reply window.
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION)
+            abi.encodeWithSelector(Deliberate.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION)
         );
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
@@ -253,7 +253,7 @@ contract ArborVoteTest is Test {
 
     function test_createDebate_revertsForARatingPhaseShorterThanTheLocking() public {
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION - 1)
+            abi.encodeWithSelector(Deliberate.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION - 1)
         );
         _arborVote.createDebate({
             contentURI: _THESIS_CONTENT,
@@ -314,7 +314,7 @@ contract ArborVoteTest is Test {
 
         _mockIdentityRegistry.deny(address(this));
 
-        vm.expectRevert(ArborVote.IdentityProofInvalid.selector);
+        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
         _arborVote.join(debateId);
     }
 
@@ -330,7 +330,7 @@ contract ArborVoteTest is Test {
     function test_join_revertsForAnUninitializedDebate() public {
         uint256 uninitializedDebateId = 123;
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.DebateUninitialized.selector, uninitializedDebateId));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.DebateUninitialized.selector, uninitializedDebateId));
         _arborVote.join(uninitializedDebateId);
     }
 
@@ -339,14 +339,14 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Tallying)
+            abi.encodeWithSelector(Deliberate.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Tallying)
         );
         _arborVote.join(debateId);
 
         _arborVote.tallyTree(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Finished)
+            abi.encodeWithSelector(Deliberate.PhaseExceeded.selector, Phase.Status.Rating, Phase.Status.Finished)
         );
         _arborVote.join(debateId);
     }
@@ -356,7 +356,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.RoleInvalid.selector, User.Role.Unassigned, User.Role.Participant)
+            abi.encodeWithSelector(Deliberate.RoleInvalid.selector, User.Role.Unassigned, User.Role.Participant)
         );
         _arborVote.join(debateId);
     }
@@ -431,7 +431,7 @@ contract ArborVoteTest is Test {
 
         uint32 initialApproval = 49;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, uint32(50), initialApproval)
+            abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(50), initialApproval)
         );
         _addArgument(debateId, true, initialApproval);
     }
@@ -443,7 +443,7 @@ contract ArborVoteTest is Test {
         // 100 would empty the pro reserve and freeze the market.
         uint32 initialApproval = 100;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, uint32(99), initialApproval)
+            abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(99), initialApproval)
         );
         _addArgument(debateId, true, initialApproval);
     }
@@ -519,7 +519,7 @@ contract ArborVoteTest is Test {
 
         uint32 deposit = Parameters._MIN_DEBATE_DEPOSIT - 1;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.DepositBelowMinimum.selector, Parameters._MIN_DEBATE_DEPOSIT, deposit)
+            abi.encodeWithSelector(Deliberate.DepositBelowMinimum.selector, Parameters._MIN_DEBATE_DEPOSIT, deposit)
         );
         _addArgument(debateId, true, 50, deposit);
     }
@@ -530,7 +530,7 @@ contract ArborVoteTest is Test {
 
         uint32 deposit = Parameters.INITIAL_TOKENS + 1;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.InsufficientVoteTokens.selector, deposit, Parameters.INITIAL_TOKENS)
+            abi.encodeWithSelector(Deliberate.InsufficientVoteTokens.selector, deposit, Parameters.INITIAL_TOKENS)
         );
         _addArgument(debateId, true, 50, deposit);
     }
@@ -542,7 +542,7 @@ contract ArborVoteTest is Test {
         _endEditing(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Editing, Phase.Status.Rating)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Editing, Phase.Status.Rating)
         );
         _addArgument(debateId, true, 50);
     }
@@ -552,7 +552,7 @@ contract ArborVoteTest is Test {
         _fillDebateToTheArgumentCap(debateId);
         _join(debateId);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentLimitReached.selector, Parameters.MAX_ARGUMENTS));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentLimitReached.selector, Parameters.MAX_ARGUMENTS));
         _addArgument(debateId, true, 50);
     }
 
@@ -694,7 +694,7 @@ contract ArborVoteTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 childArgumentId = _addArgument(debateId, true, 50);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.InitialApprovalOutOfBounds.selector, 99, 100));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, 99, 100));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 100
         });
@@ -707,7 +707,7 @@ contract ArborVoteTest is Test {
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50); // a draft, so not a valid parent
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentB));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentB));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentA, newParentArgumentId: argumentB, initialApproval: 50
         });
@@ -720,7 +720,7 @@ contract ArborVoteTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
 
         // The argument being moved is necessarily a draft, never final - it cannot be its own final parent.
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentId));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentId));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentId, newParentArgumentId: argumentId, initialApproval: 50
         });
@@ -732,7 +732,7 @@ contract ArborVoteTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, uint16(42)));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, uint16(42)));
         _arborVote.moveArgument({
             debateId: debateId, argumentId: argumentId, newParentArgumentId: 42, initialApproval: 50
         });
@@ -747,7 +747,7 @@ contract ArborVoteTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
 
         address intruder = makeAddr("intruder");
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.AddressInvalid.selector, address(this), intruder));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.AddressInvalid.selector, address(this), intruder));
         vm.prank(intruder);
         _arborVote.alterArgument(debateId, argumentId, "A hijacked idea.");
     }
@@ -760,7 +760,7 @@ contract ArborVoteTest is Test {
 
         // The draft locks in exactly when its editing window elapses.
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotDraft.selector, argumentId));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotDraft.selector, argumentId));
         _arborVote.alterArgument(debateId, argumentId, "Too late.");
     }
 
@@ -775,7 +775,7 @@ contract ArborVoteTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
 
         uint48 rearmedTime = uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION;
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.TimeOutOfBounds.selector, editingEndTime, rearmedTime));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.TimeOutOfBounds.selector, editingEndTime, rearmedTime));
         _arborVote.alterArgument(debateId, argumentId, "Re-armed.");
     }
 
@@ -925,7 +925,7 @@ contract ArborVoteTest is Test {
         _endEditing(debateId);
 
         uint32 balance = _arborVote.getUserTokens(debateId, address(this));
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.InsufficientVoteTokens.selector, balance + 1, balance));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.InsufficientVoteTokens.selector, balance + 1, balance));
         _arborVote.stakePro(debateId, argumentId, balance + 1);
     }
 
@@ -935,7 +935,7 @@ contract ArborVoteTest is Test {
         _endEditing(debateId);
 
         // The thesis is Final from creation but has no market of its own.
-        vm.expectRevert(ArborVote.ThesisHasNoMarket.selector);
+        vm.expectRevert(Deliberate.ThesisHasNoMarket.selector);
         _arborVote.stakePro(debateId, _ROOT_ARGUMENT_ID, 10);
     }
 
@@ -950,7 +950,7 @@ contract ArborVoteTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
         _endEditing(debateId); // now in rating, but the argument's window has not closed yet
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, argumentId));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentId));
         _arborVote.stakePro(debateId, argumentId, 10);
     }
 
@@ -959,7 +959,7 @@ contract ArborVoteTest is Test {
         _join(debateId);
         _endEditing(debateId);
 
-        vm.expectRevert(abi.encodeWithSelector(ArborVote.ArgumentNotFinal.selector, uint16(42)));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, uint16(42)));
         _arborVote.stakeCon(debateId, 42, 10);
     }
 
@@ -1061,14 +1061,14 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
         );
         _arborVote.outcome(debateId);
 
         _endRating(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
         );
         _arborVote.outcome(debateId);
     }
@@ -1089,7 +1089,7 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
         );
         _arborVote.redeemArgumentShares(debateId, _ROOT_ARGUMENT_ID, address(this));
     }
@@ -1210,7 +1210,7 @@ contract ArborVoteTest is Test {
         uint16[] memory argumentIds = new uint16[](1);
         argumentIds[0] = _ROOT_ARGUMENT_ID;
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
         );
         _arborVote.redeemArgumentSharesBatch(debateId, argumentIds, address(this));
     }
@@ -1255,7 +1255,7 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ArborVote.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
+            abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Tallying)
         );
         _arborVote.claimFees(debateId, argumentId);
     }
@@ -1268,7 +1268,7 @@ contract ArborVoteTest is Test {
         uint48 creationTime = uint48(vm.getBlockTimestamp());
 
         vm.expectEmit();
-        emit IArborVote.DebateCreated({
+        emit IDeliberate.DebateCreated({
             debateId: 0,
             creator: address(this),
             contentURI: _THESIS_CONTENT,
@@ -1283,7 +1283,7 @@ contract ArborVoteTest is Test {
         uint256 debateId = _createDebate();
 
         vm.expectEmit();
-        emit IArborVote.Joined({debateId: debateId, account: address(this), tokens: Parameters.INITIAL_TOKENS});
+        emit IDeliberate.Joined({debateId: debateId, account: address(this), tokens: Parameters.INITIAL_TOKENS});
         _join(debateId);
     }
 
@@ -1293,7 +1293,7 @@ contract ArborVoteTest is Test {
 
         // An 80% initial approval seeds a scarce pro reserve: 2 pro / 8 con.
         vm.expectEmit();
-        emit IArborVote.ArgumentAdded({
+        emit IDeliberate.ArgumentAdded({
             debateId: debateId,
             argumentId: 1,
             parentArgumentId: _ROOT_ARGUMENT_ID,
@@ -1316,7 +1316,7 @@ contract ArborVoteTest is Test {
         uint16 movedArgumentId = _addArgument(debateId, false, 50);
 
         vm.expectEmit();
-        emit IArborVote.ArgumentMoved({
+        emit IDeliberate.ArgumentMoved({
             debateId: debateId,
             argumentId: movedArgumentId,
             newParentArgumentId: newParentArgumentId,
@@ -1340,7 +1340,7 @@ contract ArborVoteTest is Test {
         bytes32 newContentURI = "An even better idea.";
 
         vm.expectEmit();
-        emit IArborVote.ArgumentAltered({
+        emit IDeliberate.ArgumentAltered({
             debateId: debateId,
             argumentId: argumentId,
             contentURI: newContentURI,
@@ -1359,7 +1359,7 @@ contract ArborVoteTest is Test {
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
         vm.expectEmit();
-        emit IArborVote.Staked({
+        emit IDeliberate.Staked({
             debateId: debateId,
             argumentId: argumentId,
             staker: address(this),
@@ -1376,7 +1376,7 @@ contract ArborVoteTest is Test {
         _endRating(debateId);
 
         vm.expectEmit();
-        emit IArborVote.DebateFinished({debateId: debateId, approved: true});
+        emit IDeliberate.DebateFinished({debateId: debateId, approved: true});
         _arborVote.tallyTree(debateId);
     }
 
@@ -1396,7 +1396,7 @@ contract ArborVoteTest is Test {
 
         // 26 con shares x 21/22 of the market, rounded down: 24 tokens.
         vm.expectEmit();
-        emit IArborVote.SharesRedeemed({
+        emit IDeliberate.SharesRedeemed({
             debateId: debateId, argumentId: argumentId, account: address(this), proShares: 0, conShares: 26, payout: 24
         });
         _arborVote.redeemArgumentShares(debateId, argumentId, address(this));

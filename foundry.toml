@@ -3,7 +3,7 @@
 solc = "0.8.35"
 auto_detect_solc = false
 evm_version = "osaka"
-gas_reports = ["ArborVote"]
+gas_reports = ["Deliberate"]
 optimizer = true
 via_ir = true
 optimizer_runs = 10_000
