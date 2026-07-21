@@ -29,7 +29,7 @@ library Utils {
 
     /// @notice Calculates `ceil(value * numerator / denominator)`.
     /// @dev The rounded-up counterpart of `multiplyByFraction`, used where rounding must favor the pool
-    /// (an argument market reserve can never be rounded down to zero).
+    /// (a rating market reserve can never be rounded down to zero).
     /// @param value The value.
     /// @param numerator The numerator.
     /// @param denominator The denominator.

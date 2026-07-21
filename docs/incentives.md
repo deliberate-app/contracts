@@ -14,7 +14,7 @@ redemptions, market fees), so the internal game is **zero-sum**: the sum of fina
 `100·N` minus leakage (rounding dust, never-redeemed shares, never-claimed fees, and the reserves of
 markets nobody traded). Influence cannot be bought, only earned inside the debate.
 
-Two roles trade with each other through the argument markets:
+Two roles trade with each other through the argument-specific rating markets:
 
 - **Authors** pay a deposit (≥ 10) to add an argument. The deposit seeds the market's reserves at
   the author's chosen initial approval (bounded 50–99%) and the author receives **no shares** — the

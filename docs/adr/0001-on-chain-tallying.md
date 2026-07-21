@@ -10,4 +10,4 @@ The whitepaper leaves open where the tallying phase runs, and a Rust off-chain t
 ## Consequences
 
 - Tree size and depth are gas-bounded; very large debates may exceed block limits.
-- The storage layout (per-argument market balances, leaf-ID arrays, `untalliedChilds` counters) is designed around synchronous on-chain aggregation. Revisiting off-chain tallying later (e.g. for L2 scale) is a major refactor of the entire contract, not a swap-out.
+- The storage layout (per-argument rating-market balances, leaf-ID arrays, `untalliedChilds` counters) is designed around synchronous on-chain aggregation. Revisiting off-chain tallying later (e.g. for L2 scale) is a major refactor of the entire contract, not a swap-out.

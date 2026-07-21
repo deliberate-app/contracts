@@ -3,11 +3,11 @@ status: accepted
 date: 2026-07-11
 ---
 
-# Argument markets are constant-product AMMs; approval is the pro-share price
+# Argument-specific rating markets are constant-product AMMs; approval is the pro-share price
 
 The placeholder swap formulas (`TODO Revisit formulas`) mixed two incompatible models: reserves were
 read directly as approval (`pro/(pro+con)`) while the swap mechanics drained the pool like an
-inverse-reserve AMM. We finalize the market as a constant-product AMM with scarcity pricing:
+inverse-reserve AMM. We finalize each argument's rating market as a constant-product AMM with scarcity pricing:
 investing pro takes pro shares out of the reserve, making them scarcer and more expensive —
 **approval is the price of belief, read as `con/(pro+con)`**. Investing con is the mirror image.
 Whoever spots an under- or overrated argument early and invests profits at redemption once the

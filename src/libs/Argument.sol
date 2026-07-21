@@ -16,9 +16,9 @@ library Argument {
     /// @param parentArgumentId The ID of the parent argument.
     /// @param untalliedChilds The number of untallied child arguments.
     /// @param finalizationTime The time from which the argument is final.
-    /// @param pro The pro share reserve of the argument market (scarce pro = high approval).
-    /// @param con The con share reserve of the argument market.
-    /// @param votes The vote tokens collateralizing the argument market (deposit and net stakes).
+    /// @param pro The pro share reserve of the rating market (scarce pro = high approval).
+    /// @param con The con share reserve of the rating market.
+    /// @param votes The vote tokens collateralizing the rating market (deposit and net stakes).
     /// @param fees The fees accrued by the argument for its creator.
     /// @param childsVote The votes staked on the child arguments.
     /// @param descendantsImpact The tallied impact of all descendants: each child folds its own approval and its
@@ -38,7 +38,7 @@ library Argument {
         int64 descendantsImpact; // ┘ + 8 = 28
     }
 
-    /// @notice The container holding the amounts computed for a stake on an argument market.
+    /// @notice The container holding the amounts computed for a stake on an argument's rating market.
     /// @param isPro Whether the stake buys pro or con shares.
     /// @param voteTokensStaked The amount of vote tokens staked.
     /// @param fee The fee charged for the stake, accruing to the argument's creator.
