@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "arborvote-contracts",
+      "name": "deliberate-contracts",
       "dependencies": {
         "@openzeppelin/upgrades-core": "^1.46.0",
         "solhint": "^6.2.3",

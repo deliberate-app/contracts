@@ -11,7 +11,7 @@ thesis), which raises the question of how manipulation-proof the outcome boolean
 same 100 non-purchasable points can never out-secure an attacker whose external budget exceeds the
 participants' internal stakes — oracle-grade integrity would require capital-at-risk escalation
 (challenge bonds, escalating juries à la Kleros/UMA, open-capital futarchy), a different protocol.
-ArborVote instead optimizes what it can be best at: making an argument tree expensive to distort
+Deliberate instead optimizes what it can be best at: making an argument tree expensive to distort
 *quietly* (every manipulation is profit for whoever corrects it) and surfacing how contested the
 answer was.
 

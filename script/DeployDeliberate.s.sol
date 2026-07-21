@@ -12,21 +12,21 @@ import {MockIdentityRegistry} from "../test/mocks/MockIdentityRegistry.m.sol";
 /// @notice A script deploying the Deliberate contract (not upgradeable, see ADR-0006).
 contract DeployDeliberate is Script {
     /// @notice Deploys Deliberate against an existing identity registry (or an adapter to one).
-    function run(address identityRegistry) public returns (address arborVote) {
+    function run(address identityRegistry) public returns (address deliberate) {
         vm.startBroadcast();
 
-        arborVote = address(new Deliberate(IIdentityRegistry(identityRegistry)));
+        deliberate = address(new Deliberate(IIdentityRegistry(identityRegistry)));
 
         vm.stopBroadcast();
     }
 
     /// @notice Deploys a MockIdentityRegistry (everyone counts as registered) alongside
     /// Deliberate - for test networks without a real identity registry.
-    function runWithMockRegistry() public returns (address arborVote, address identityRegistry) {
+    function runWithMockRegistry() public returns (address deliberate, address identityRegistry) {
         vm.startBroadcast();
 
         identityRegistry = address(new MockIdentityRegistry());
-        arborVote = address(new Deliberate(IIdentityRegistry(identityRegistry)));
+        deliberate = address(new Deliberate(IIdentityRegistry(identityRegistry)));
 
         vm.stopBroadcast();
     }

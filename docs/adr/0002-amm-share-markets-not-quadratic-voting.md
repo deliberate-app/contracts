@@ -13,5 +13,5 @@ The 2020–2021 design (old monorepo, docs site, whitepaper) rated arguments by 
 
 ## Consequences
 
-- The swap formula is not final (`ArborVote.sol:939`, `TODO Revisit formulas`) — finishing that math is finishing this decision, not changing it.
+- The swap formula is not final (`Deliberate.sol:939`, `TODO Revisit formulas`) — finishing that math is finishing this decision, not changing it.
 - `docs/rating.md` (quadratic-cost formulas) and the whitepaper's mechanism description are outdated and need rewriting; `docs/ratingmarkets.md` — the stub — is the page that should carry the real mechanism.

@@ -27,14 +27,14 @@ contract DeliberateHarness is Deliberate {
 contract DeliberateHarnessTest is Test {
     uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
 
-    DeliberateHarness internal _arborVote;
+    DeliberateHarness internal _deliberate;
 
     function setUp() public {
-        _arborVote = new DeliberateHarness(new MockIdentityRegistry());
+        _deliberate = new DeliberateHarness(new MockIdentityRegistry());
     }
 
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
-        debateId = _arborVote.createDebate({
+        debateId = _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
@@ -42,8 +42,8 @@ contract DeliberateHarnessTest is Test {
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
-        _arborVote.join(debateId);
-        argumentId = _arborVote.addArgument({
+        _deliberate.join(debateId);
+        argumentId = _deliberate.addArgument({
             debateId: debateId,
             parentArgumentId: 0,
             contentURI: "This is a good idea.",
@@ -61,7 +61,7 @@ contract DeliberateHarnessTest is Test {
 
         // Give the argument a child of its own, once it has locked in and can be replied to.
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
-        _arborVote.addArgument({
+        _deliberate.addArgument({
             debateId: debateId,
             parentArgumentId: parentId,
             contentURI: "A supporting detail.",
@@ -71,10 +71,10 @@ contract DeliberateHarnessTest is Test {
         });
 
         // Jump straight to tallying the interior node, skipping its child.
-        (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
+        (,, uint48 ratingEndTime,) = _deliberate.phases(debateId);
         vm.warp(ratingEndTime + 1);
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ChildsUntallied.selector, uint16(1)));
-        _arborVote.exposedTallyNode(debateId, parentId);
+        _deliberate.exposedTallyNode(debateId, parentId);
     }
 
     // Children only attach beneath final parents and finality is time-monotone, so a moved draft's
@@ -84,6 +84,6 @@ contract DeliberateHarnessTest is Test {
         (uint256 debateId, uint16 argumentId) = _debateWithADraft();
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentId));
-        _arborVote.exposedUpdateParentAfterChildRemoval(debateId, argumentId);
+        _deliberate.exposedUpdateParentAfterChildRemoval(debateId, argumentId);
     }
 }

@@ -98,8 +98,8 @@ forge script script/DeployDeliberate.s.sol:DeployDeliberate \
   --verify --verifier blockscout --verifier-url https://base-sepolia.blockscout.com/api/
 ```
 
-The script prints both addresses; the `arborVote` address and its deployment block feed the
-indexer's `config.base-sepolia.yaml` and the frontend's `VITE_ARBORVOTE_ADDRESS`
+The script prints both addresses; the `deliberate` address and its deployment block feed the
+indexer's `config.base-sepolia.yaml` and the frontend's `VITE_DELIBERATE_ADDRESS`
 (deployment pipeline: contracts -> indexer -> frontend).
 
 ## Layout

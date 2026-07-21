@@ -19,11 +19,11 @@ contract DeployDeliberateTest is Test {
     function test_run_deploysDeliberateAgainstTheGivenRegistry() public {
         MockIdentityRegistry registry = new MockIdentityRegistry();
 
-        address arborVote = _script.run(address(registry));
-        assertGt(arborVote.code.length, 0);
+        address deliberate = _script.run(address(registry));
+        assertGt(deliberate.code.length, 0);
 
         // The given registry is wired into the join gate: an account it denies cannot join.
-        uint256 debateId = Deliberate(arborVote)
+        uint256 debateId = Deliberate(deliberate)
             .createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: 60,
@@ -36,13 +36,13 @@ contract DeployDeliberateTest is Test {
         registry.deny(denied);
         vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
         vm.prank(denied);
-        Deliberate(arborVote).join(debateId);
+        Deliberate(deliberate).join(debateId);
     }
 
     function test_runWithMockRegistry_deploysThePair() public {
-        (address arborVote, address identityRegistry) = _script.runWithMockRegistry();
+        (address deliberate, address identityRegistry) = _script.runWithMockRegistry();
 
-        assertGt(arborVote.code.length, 0);
+        assertGt(deliberate.code.length, 0);
         assertGt(identityRegistry.code.length, 0);
         // The mock admits everyone, so any account can join the debates deployed against it.
         assertTrue(MockIdentityRegistry(identityRegistry).isRegistered(makeAddr("anyone")));

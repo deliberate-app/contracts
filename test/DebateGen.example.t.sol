@@ -19,14 +19,14 @@ contract DebateGenExampleTest is Test {
     address internal immutable _BOB = makeAddr("bob");
     address internal immutable _CAROL = makeAddr("carol");
 
-    Deliberate internal _arborVote;
+    Deliberate internal _deliberate;
 
     function setUp() public {
-        _arborVote = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate(new MockIdentityRegistry());
     }
 
     function test_everyArgumentsContentIsItsOwnId() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
 
         uint16 pro = vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
         uint16 con = vm.addCon(debate, _BOB, DebateGen.ROOT, 60);
@@ -36,7 +36,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_talliesASupportingArgumentToApproval() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
 
         vm.warpToTallying(debate);
@@ -48,7 +48,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_stakingConLowersTheApproval() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50); // reserves 5/5 at the min deposit
 
         vm.warpToRating(debate);
@@ -59,7 +59,7 @@ contract DebateGenExampleTest is Test {
     }
 
     function test_buildsADeeperTreeAcrossFinalizationWindows() public {
-        DebateGen.Debate memory debate = vm.createDebate(_arborVote, _ALICE, _LOCKING_DURATION);
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
 
         uint16 a1 = vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
         vm.warpWindows(debate, 1); // a1 finalizes, so it can now be a parent

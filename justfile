@@ -73,53 +73,53 @@ check:
 simulate identity-registry chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
-    forge script script/DeployArborVote.s.sol:DeployArborVote \
+    forge script script/DeployDeliberate.s.sol:DeployDeliberate \
         --sig "run(address)" {{ identity-registry }} \
         --rpc-url {{ chain }} {{ args }}
 
-# Deploy ArborVote
+# Deploy Deliberate
 deploy deployer identity-registry chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
-    forge script script/DeployArborVote.s.sol:DeployArborVote \
+    forge script script/DeployDeliberate.s.sol:DeployDeliberate \
         --sig "run(address)" {{ identity-registry }} \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
-# Deploy ArborVote together with a MockIdentityRegistry (test networks without a real registry)
+# Deploy Deliberate together with a MockIdentityRegistry (test networks without a real registry)
 deploy-with-mock deployer chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
-    forge script script/DeployArborVote.s.sol:DeployArborVote \
+    forge script script/DeployDeliberate.s.sol:DeployDeliberate \
         --sig "runWithMockRegistry()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
 # --- Verification ---
 # The deploy recipes verify inline when passed `--verify ...`; these re-verify a
 # standing deployment (constructor args and all) when that inline pass was skipped
-# or timed out. ArborVote's constructor takes the identity registry address, so it
+# or timed out. Deliberate's constructor takes the identity registry address, so it
 # must be supplied to reconstruct the constructor arguments.
 
-# Verify ArborVote on both Sourcify and Etherscan
+# Verify Deliberate on both Sourcify and Etherscan
 verify address identity-registry chain: (verify-sourcify address identity-registry chain) (verify-etherscan address identity-registry chain)
 
-# Verify ArborVote on Sourcify (keyless, chain-agnostic)
+# Verify Deliberate on Sourcify (keyless, chain-agnostic)
 verify-sourcify address identity-registry chain *args:
-    env -u ETHERSCAN_API_KEY forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
+    env -u ETHERSCAN_API_KEY forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier sourcify --watch {{ args }}
 
-# Verify ArborVote on an Etherscan-family explorer (needs ETHERSCAN_API_KEY)
+# Verify Deliberate on an Etherscan-family explorer (needs ETHERSCAN_API_KEY)
 verify-etherscan address identity-registry chain *args:
-    forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
+    forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier etherscan --watch {{ args }}
 
-# Verify ArborVote on a custom explorer (pass its verifier URL; add `--verifier blockscout` for Blockscout)
+# Verify Deliberate on a custom explorer (pass its verifier URL; add `--verifier blockscout` for Blockscout)
 verify-custom address identity-registry chain verifier-url *args:
-    forge verify-contract {{ address }} src/ArborVote.sol:ArborVote \
+    forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
 # Publish contracts to the Soldeer registry
 publish version *args:
-    forge soldeer push arborvote-contracts~{{ version }} {{ args }}
+    forge soldeer push deliberate-contracts~{{ version }} {{ args }}

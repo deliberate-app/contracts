@@ -13,7 +13,7 @@ import {MockERC20, MockERC20FeeOnTransfer} from "./mocks/MockERC20.m.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DeliberateBountyTest is Test {
-    Deliberate internal _arborVote;
+    Deliberate internal _deliberate;
     MockERC20 internal _token;
 
     uint48 internal constant _LOCKING_DURATION = 1 * 60;
@@ -23,16 +23,16 @@ contract DeliberateBountyTest is Test {
     address internal _lateStaker = makeAddr("lateStaker");
 
     function setUp() public {
-        _arborVote = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate(new MockIdentityRegistry());
         _token = new MockERC20();
         _token.mint(address(this), 1_000_000 ether);
-        _token.approve(address(_arborVote), type(uint256).max);
+        _token.approve(address(_deliberate), type(uint256).max);
     }
 
     // --- helpers ---
 
     function _createBountyDebate(uint256 bountyAmount) internal returns (uint256 debateId) {
-        debateId = _arborVote.createDebate({
+        debateId = _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
@@ -43,7 +43,7 @@ contract DeliberateBountyTest is Test {
     }
 
     function _createBountylessDebate() internal returns (uint256 debateId) {
-        debateId = _arborVote.createDebate({
+        debateId = _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
@@ -54,12 +54,12 @@ contract DeliberateBountyTest is Test {
     }
 
     function _endEditing(uint256 debateId) internal {
-        (, uint48 editingEndTime,,) = _arborVote.phases(debateId);
+        (, uint48 editingEndTime,,) = _deliberate.phases(debateId);
         vm.warp(editingEndTime + 1);
     }
 
     function _endRating(uint256 debateId) internal {
-        (,, uint48 ratingEndTime,) = _arborVote.phases(debateId);
+        (,, uint48 ratingEndTime,) = _deliberate.phases(debateId);
         vm.warp(ratingEndTime + 1);
     }
 
@@ -68,8 +68,8 @@ contract DeliberateBountyTest is Test {
     /// three participants have joined (`100 * N = 300`).
     function _finishedBountyDebate() internal returns (uint256 debateId, uint16 argumentId) {
         debateId = _createBountyDebate(_POOL);
-        _arborVote.join(debateId);
-        argumentId = _arborVote.addArgument({
+        _deliberate.join(debateId);
+        argumentId = _deliberate.addArgument({
             debateId: debateId,
             parentArgumentId: 0,
             contentURI: "This is a good idea.",
@@ -81,21 +81,21 @@ contract DeliberateBountyTest is Test {
         _endEditing(debateId);
 
         vm.startPrank(_earlyStaker);
-        _arborVote.join(debateId);
-        _arborVote.stakePro(debateId, argumentId, 10);
+        _deliberate.join(debateId);
+        _deliberate.stakePro(debateId, argumentId, 10);
         vm.stopPrank();
 
         vm.startPrank(_lateStaker);
-        _arborVote.join(debateId);
-        _arborVote.stakePro(debateId, argumentId, 20);
+        _deliberate.join(debateId);
+        _deliberate.stakePro(debateId, argumentId, 20);
         vm.stopPrank();
 
         _endRating(debateId);
-        _arborVote.tallyTree(debateId);
+        _deliberate.tallyTree(debateId);
     }
 
     function _claimWindowEnd(uint256 debateId) internal view returns (uint48 closesAt) {
-        (,,,, closesAt) = _arborVote.bounty(debateId);
+        (,,,, closesAt) = _deliberate.bounty(debateId);
     }
 
     // --- createDebate ---
@@ -105,26 +105,26 @@ contract DeliberateBountyTest is Test {
         emit IDeliberate.BountyFunded({debateId: 0, funder: address(this), token: _token, amount: _POOL, pool: _POOL});
         uint256 debateId = _createBountyDebate(_POOL);
 
-        (IERC20 token, uint256 pool, uint256 claimed, bool swept, uint48 claimEndTime) = _arborVote.bounty(debateId);
+        (IERC20 token, uint256 pool, uint256 claimed, bool swept, uint48 claimEndTime) = _deliberate.bounty(debateId);
         assertEq(address(token), address(_token));
         assertEq(pool, _POOL);
         assertEq(claimed, 0);
         assertFalse(swept);
         // The window is unanchored until the tally runs.
         assertEq(claimEndTime, 0);
-        assertEq(_token.balanceOf(address(_arborVote)), _POOL);
+        assertEq(_token.balanceOf(address(_deliberate)), _POOL);
     }
 
     function test_createDebate_acceptsATokenWithoutFunding() public {
         uint256 debateId = _createBountyDebate(0);
-        (IERC20 token, uint256 pool,,,) = _arborVote.bounty(debateId);
+        (IERC20 token, uint256 pool,,,) = _deliberate.bounty(debateId);
         assertEq(address(token), address(_token));
         assertEq(pool, 0);
     }
 
     function test_createDebate_revertsForAnAmountWithoutAToken() public {
         vm.expectRevert(Deliberate.BountyTokenZero.selector);
-        _arborVote.createDebate({
+        _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
@@ -142,28 +142,28 @@ contract DeliberateBountyTest is Test {
         address donor = makeAddr("donor");
         _token.mint(donor, 50 ether);
         vm.startPrank(donor);
-        _token.approve(address(_arborVote), 50 ether);
+        _token.approve(address(_deliberate), 50 ether);
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountyFunded({
             debateId: debateId, funder: donor, token: _token, amount: 50 ether, pool: _POOL + 50 ether
         });
-        _arborVote.fundBounty(debateId, 50 ether);
+        _deliberate.fundBounty(debateId, 50 ether);
         vm.stopPrank();
 
-        (, uint256 pool,,,) = _arborVote.bounty(debateId);
+        (, uint256 pool,,,) = _deliberate.bounty(debateId);
         assertEq(pool, _POOL + 50 ether);
     }
 
     function test_fundBounty_revertsWithoutABounty() public {
         uint256 debateId = _createBountylessDebate();
         vm.expectRevert(Deliberate.BountyMissing.selector);
-        _arborVote.fundBounty(debateId, 1 ether);
+        _deliberate.fundBounty(debateId, 1 ether);
     }
 
     function test_fundBounty_revertsForAZeroAmount() public {
         uint256 debateId = _createBountyDebate(_POOL);
         vm.expectRevert(Deliberate.BountyAmountZero.selector);
-        _arborVote.fundBounty(debateId, 0);
+        _deliberate.fundBounty(debateId, 0);
     }
 
     function test_fundBounty_revertsOnceFinished() public {
@@ -171,15 +171,15 @@ contract DeliberateBountyTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.PhaseExceeded.selector, Phase.Status.Tallying, Phase.Status.Finished)
         );
-        _arborVote.fundBounty(debateId, 1 ether);
+        _deliberate.fundBounty(debateId, 1 ether);
     }
 
     function test_fundBounty_recordsWhatArrivesFromAFeeOnTransferToken() public {
         MockERC20FeeOnTransfer feeToken = new MockERC20FeeOnTransfer();
         feeToken.mint(address(this), 100 ether);
-        feeToken.approve(address(_arborVote), type(uint256).max);
+        feeToken.approve(address(_deliberate), type(uint256).max);
 
-        uint256 debateId = _arborVote.createDebate({
+        uint256 debateId = _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
@@ -189,23 +189,23 @@ contract DeliberateBountyTest is Test {
         });
 
         // 10% burned in transit: the pool records the 90 that arrived, staying payable.
-        (, uint256 pool,,,) = _arborVote.bounty(debateId);
+        (, uint256 pool,,,) = _deliberate.bounty(debateId);
         assertEq(pool, 90 ether);
-        assertEq(feeToken.balanceOf(address(_arborVote)), 90 ether);
+        assertEq(feeToken.balanceOf(address(_deliberate)), 90 ether);
     }
 
     // --- join ---
 
     function test_join_countsParticipants() public {
         uint256 debateId = _createBountyDebate(_POOL);
-        (,, uint32 participantsCount) = _arborVote.debates(debateId);
+        (,, uint32 participantsCount) = _deliberate.debates(debateId);
         assertEq(participantsCount, 0);
 
-        _arborVote.join(debateId);
+        _deliberate.join(debateId);
         vm.prank(_earlyStaker);
-        _arborVote.join(debateId);
+        _deliberate.join(debateId);
 
-        (,, participantsCount) = _arborVote.debates(debateId);
+        (,, participantsCount) = _deliberate.debates(debateId);
         assertEq(participantsCount, 2);
     }
 
@@ -221,22 +221,22 @@ contract DeliberateBountyTest is Test {
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 2 ether});
         vm.prank(_earlyStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
 
         // The claim settled the shares (102 tokens) and paid pool * 2/300.
-        assertEq(_arborVote.getUserTokens(debateId, _earlyStaker), 102);
+        assertEq(_deliberate.getUserTokens(debateId, _earlyStaker), 102);
         assertEq(_token.balanceOf(_earlyStaker), 2 ether);
-        (, uint256 pool, uint256 claimed,,) = _arborVote.bounty(debateId);
+        (, uint256 pool, uint256 claimed,,) = _deliberate.bounty(debateId);
         assertEq(pool, _POOL);
         assertEq(claimed, 2 ether);
     }
 
     function test_claimBounty_acceptsAPreSettledClaim() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
-        _arborVote.redeemArgumentShares(debateId, argumentId, _earlyStaker);
+        _deliberate.redeemArgumentShares(debateId, argumentId, _earlyStaker);
 
         vm.prank(_earlyStaker);
-        _arborVote.claimBounty(debateId, new uint16[](0));
+        _deliberate.claimBounty(debateId, new uint16[](0));
 
         assertEq(_token.balanceOf(_earlyStaker), 2 ether);
     }
@@ -247,9 +247,9 @@ contract DeliberateBountyTest is Test {
         toSettle[0] = argumentId;
 
         vm.startPrank(_earlyStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
         vm.expectRevert(Deliberate.BountyAlreadyClaimed.selector);
-        _arborVote.claimBounty(debateId, new uint16[](0));
+        _deliberate.claimBounty(debateId, new uint16[](0));
         vm.stopPrank();
     }
 
@@ -261,17 +261,17 @@ contract DeliberateBountyTest is Test {
         // The late staker redeemed 19 on 20 staked: 99 tokens is no win.
         vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 99));
         vm.prank(_lateStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
     }
 
     function test_claimBounty_revertsWithoutABounty() public {
         uint256 debateId = _createBountylessDebate();
-        _arborVote.join(debateId);
+        _deliberate.join(debateId);
         _endRating(debateId);
-        _arborVote.tallyTree(debateId);
+        _deliberate.tallyTree(debateId);
 
         vm.expectRevert(Deliberate.BountyMissing.selector);
-        _arborVote.claimBounty(debateId, new uint16[](0));
+        _deliberate.claimBounty(debateId, new uint16[](0));
     }
 
     function test_claimBounty_revertsBeforeFinished() public {
@@ -279,7 +279,7 @@ contract DeliberateBountyTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.PhaseInvalid.selector, Phase.Status.Finished, Phase.Status.Editing)
         );
-        _arborVote.claimBounty(debateId, new uint16[](0));
+        _deliberate.claimBounty(debateId, new uint16[](0));
     }
 
     function test_claimBounty_revertsAfterTheClaimWindow() public {
@@ -291,14 +291,14 @@ contract DeliberateBountyTest is Test {
         toSettle[0] = argumentId;
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ClaimWindowClosed.selector, closesAt));
         vm.prank(_earlyStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
     }
 
     function test_claimBounty_marksAClaimEvenWhenItRoundsToZero() public {
         // A dust pool: 100 wei * 2/300 rounds to zero - the claim is still consumed and emits.
         uint256 debateId = _createBountyDebate(100);
-        _arborVote.join(debateId);
-        uint16 argumentId = _arborVote.addArgument({
+        _deliberate.join(debateId);
+        uint16 argumentId = _deliberate.addArgument({
             debateId: debateId,
             parentArgumentId: 0,
             contentURI: "This is a good idea.",
@@ -309,22 +309,22 @@ contract DeliberateBountyTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
         vm.startPrank(_earlyStaker);
-        _arborVote.join(debateId);
-        _arborVote.stakePro(debateId, argumentId, 10);
+        _deliberate.join(debateId);
+        _deliberate.stakePro(debateId, argumentId, 10);
         vm.stopPrank();
         vm.startPrank(_lateStaker);
-        _arborVote.join(debateId);
-        _arborVote.stakePro(debateId, argumentId, 20);
+        _deliberate.join(debateId);
+        _deliberate.stakePro(debateId, argumentId, 20);
         vm.stopPrank();
         _endRating(debateId);
-        _arborVote.tallyTree(debateId);
+        _deliberate.tallyTree(debateId);
 
         uint16[] memory toSettle = new uint16[](1);
         toSettle[0] = argumentId;
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 0});
         vm.prank(_earlyStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
 
         assertEq(_token.balanceOf(_earlyStaker), 0);
     }
@@ -336,17 +336,17 @@ contract DeliberateBountyTest is Test {
         uint16[] memory toSettle = new uint16[](1);
         toSettle[0] = argumentId;
         vm.prank(_earlyStaker);
-        _arborVote.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, toSettle);
 
         vm.warp(_claimWindowEnd(debateId) + 1);
         uint256 balanceBefore = _token.balanceOf(address(this));
 
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2 ether});
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
 
         assertEq(_token.balanceOf(address(this)) - balanceBefore, _POOL - 2 ether);
-        (,,, bool swept,) = _arborVote.bounty(debateId);
+        (,,, bool swept,) = _deliberate.bounty(debateId);
         assertTrue(swept);
     }
 
@@ -355,7 +355,7 @@ contract DeliberateBountyTest is Test {
         vm.warp(_claimWindowEnd(debateId) + 1);
 
         uint256 balanceBefore = _token.balanceOf(address(this));
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
         assertEq(_token.balanceOf(address(this)) - balanceBefore, _POOL);
     }
 
@@ -365,7 +365,7 @@ contract DeliberateBountyTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.AddressInvalid.selector, address(this), _earlyStaker));
         vm.prank(_earlyStaker);
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
     }
 
     function test_sweepBounty_revertsWhileTheClaimWindowIsOpen() public {
@@ -373,26 +373,26 @@ contract DeliberateBountyTest is Test {
         uint48 closesAt = _claimWindowEnd(debateId);
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ClaimWindowOpen.selector, closesAt));
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
     }
 
     function test_sweepBounty_isOneShot() public {
         (uint256 debateId,) = _finishedBountyDebate();
         vm.warp(_claimWindowEnd(debateId) + 1);
 
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
         vm.expectRevert(Deliberate.BountyAlreadySwept.selector);
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
     }
 
     function test_sweepBounty_revertsWithoutABounty() public {
         uint256 debateId = _createBountylessDebate();
-        _arborVote.join(debateId);
+        _deliberate.join(debateId);
         _endRating(debateId);
-        _arborVote.tallyTree(debateId);
+        _deliberate.tallyTree(debateId);
 
         vm.expectRevert(Deliberate.BountyMissing.selector);
-        _arborVote.sweepBounty(debateId);
+        _deliberate.sweepBounty(debateId);
     }
 
     // --- bounty view ---
