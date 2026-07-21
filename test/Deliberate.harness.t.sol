@@ -39,6 +39,7 @@ contract DeliberateHarnessTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });

@@ -19,13 +19,14 @@ Two roles trade with each other through the argument-specific rating markets:
 - **Authors** pay a deposit (≥ 10) to add an argument. The deposit seeds the market's reserves at
   the author's chosen initial approval (bounded 50–99%) and the author receives **no shares** — the
   deposit is sunk, ultimately redeemed by whoever holds shares. The author's revenue is the **market
-  fee**: 5% of every stake on their argument, claimable as vote tokens once the debate is finished.
-  Break-even is `20 × deposit` in stake volume.
+  fee**: the debate's fee percentage (creator-chosen at creation, 0–99%, see ADR-0010) of every
+  stake on their argument, claimable as vote tokens once the debate is finished. Break-even is
+  `(100 / fee) × deposit` in stake volume — `20 × deposit` at a 5% fee.
 - **Raters** stake tokens on a market's pro or con side and profit at redemption if the final rating
   moved their way beyond their own trade. Two facts shape this: the fee means only mispricings
-  larger than ~5% are worth correcting, and the **self-impact limit** — you cannot profit from the
-  price move you yourself cause — means profit requires either *other raters being wrong* or
-  *mispriced seeded reserves*.
+  larger than roughly the fee percentage are worth correcting, and the **self-impact limit** — you
+  cannot profit from the price move you yourself cause — means profit requires either *other raters
+  being wrong* or *mispriced seeded reserves*.
 
 Together this is a deliberate **two-sided payment loop**: authors pay raters (the sunk deposit in
 mispriced reserves is the pot that makes rating profitable even in a consensus debate), and raters
@@ -247,7 +248,9 @@ humans stays out of scope by design (§5, §7).
 ## 9. Open questions
 
 - **Protocol fee** — none in v1; revisit later, possibly as part of the market-fee mechanism.
-- **Market fee level (5%) and deposit floor (10)** — tune with usage data (existing TODO).
+- **Deposit floor (10)** — tune with usage data (existing TODO). The market fee level is no longer
+  a protocol constant to tune — debate creators choose it per debate (ADR-0010); what remains
+  observable is which fees debates actually pick.
 - **Time-weighted tally** — the designated snipe fix (§5); needs the accumulator design.
 - **Participants counter + getter** — needed by the payout denominator and by consumer quorums.
 - **Per-debate join fee** — a future creator-option knob: a flat ERC-20 toll flowing *into* the

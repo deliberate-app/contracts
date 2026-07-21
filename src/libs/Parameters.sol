@@ -12,8 +12,10 @@ library Parameters {
     /// weight an argument carries into the tally.
     uint32 internal constant _MIN_DEBATE_DEPOSIT = 10;
 
-    /// @notice The market fee in percent, accrued to the argument's creator on every stake.
-    uint32 internal constant _FEE_PERCENTAGE = 5;
+    /// @notice The highest market fee (in percent) a debate creator may set. Capping below 100 keeps
+    /// every nonzero stake's net amount at least 1, so a stake can never degenerate into a pure fee
+    /// transfer that moves no market.
+    uint32 internal constant _MAX_FEE_PERCENTAGE = 99;
 
     /// @notice The initial vote token balance granted to a user upon joining a debate.
     uint32 public constant INITIAL_TOKENS = 100;

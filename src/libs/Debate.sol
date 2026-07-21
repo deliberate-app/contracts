@@ -15,13 +15,16 @@ library Debate {
     /// @param totalVotes The total votes cast in the debate.
     /// @param argumentsCount The number of arguments in the debate.
     /// @param participantsCount The number of accounts that joined the debate - the `N` in the bounty payout.
+    /// @param feePercentage The market fee in percent, chosen by the debate creator at creation and accrued
+    /// to an argument's creator on every stake on that argument.
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
         uint32 totalVotes; //                     ┐   4
         uint16 argumentsCount; //                 | + 2
         uint32 participantsCount; //              | + 4
-        EnumerableSet.UintSet leafArgumentIds; // ┘ = 10
+        uint32 feePercentage; //                  | + 4
+        EnumerableSet.UintSet leafArgumentIds; // ┘ = 14
     }
 
     /// @notice Increments the argument counter of a debate.

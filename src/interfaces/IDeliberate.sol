@@ -19,13 +19,15 @@ interface IDeliberate {
     /// @param lockingDuration How long a new or edited argument stays a draft before it locks in.
     /// @param editingEndTime The end time of the editing phase.
     /// @param ratingEndTime The end time of the rating phase.
+    /// @param feePercentage The debate's market fee in percent, accrued to an argument's creator on every stake.
     event DebateCreated(
         uint256 indexed debateId,
         address indexed creator,
         bytes32 contentURI,
         uint48 lockingDuration,
         uint48 editingEndTime,
-        uint48 ratingEndTime
+        uint48 ratingEndTime,
+        uint32 feePercentage
     );
 
     /// @notice Emitted when a user joins a debate.
@@ -152,6 +154,8 @@ interface IDeliberate {
     /// can lock in and be replied to.
     /// @param ratingDuration The length of the rating phase; at least one locking window, so every argument is
     /// final by the time the tally runs.
+    /// @param feePercentage The market fee in percent (at most 99), accrued to an argument's creator on every
+    /// stake on that argument; fixed for the debate's lifetime.
     /// @param bountyToken The ERC-20 the bounty is denominated in; the zero address attaches no bounty and the
     /// token cannot be changed later. Any ERC-20 works - the token is deliberately uncurated.
     /// @param bountyAmount The bounty amount to pull from the caller (requires a prior approval); may be zero
@@ -162,6 +166,7 @@ interface IDeliberate {
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
+        uint32 feePercentage,
         IERC20 bountyToken,
         uint256 bountyAmount
     ) external returns (uint256 debateId);
@@ -299,10 +304,11 @@ interface IDeliberate {
     /// @return totalVotes The total votes cast in the debate.
     /// @return argumentsCount The number of arguments in the debate.
     /// @return participantsCount The number of accounts that joined the debate.
+    /// @return feePercentage The debate's market fee in percent, chosen by its creator at creation.
     function debates(uint256 debateId)
         external
         view
-        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount);
+        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount, uint32 feePercentage);
 
     /// @notice Returns the bounty state of a debate.
     /// @param debateId The ID of the debate.

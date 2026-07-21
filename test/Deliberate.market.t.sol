@@ -110,6 +110,31 @@ contract DeliberateMarketTest is Test {
         assertEq(vm.tokensOf(debate, _BOB), 98);
     }
 
+    function test_aOnePercentFeeTurnsTheLoneCorrectorProfitable() public {
+        // The same lone-corrector scenario at the frontend's new default fee of 1% instead of the
+        // replayed era's 5%: fee 1 -> 99 net, (5, 5) -> (1, 104), shares 5 + 99 - 1 = 103.
+        DebateGen.Debate memory debate = vm.createDebateWithFee(_deliberate, _ALICE, _LOCKING_DURATION, 1);
+        uint16 argumentId = vm.addArgument({
+            debate: debate,
+            author: _ALICE,
+            parentId: DebateGen.ROOT,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: 10
+        });
+        vm.warpToRating(debate);
+        vm.stakePro(debate, _BOB, argumentId, 100);
+
+        vm.warpToTallying(debate);
+        vm.tally(debate);
+        vm.redeem(debate, _BOB, argumentId);
+
+        // floor(103 * 104/105) = 102: the curve gain now exceeds the fee, so the identical trade
+        // that lost 2 tokens at 5% earns 2 at 1% - the fee level, not the market math, decided.
+        assertEq(vm.feeOf(debate), 1);
+        assertEq(vm.tokensOf(debate, _BOB), 102);
+    }
+
     function test_profitNeedsACounterpartyOnTheWrongSide() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 

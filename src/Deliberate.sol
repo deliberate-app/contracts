@@ -96,6 +96,11 @@ contract Deliberate is IDeliberate {
     /// @param actual The duration passed.
     error DurationTooShort(uint48 minimum, uint48 actual);
 
+    /// @notice Thrown if a debate is created with a market fee above the permitted maximum.
+    /// @param limit The highest permitted fee percentage.
+    /// @param actual The fee percentage passed.
+    error FeePercentageExceeded(uint32 limit, uint32 actual);
+
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
     /// @param actual The actual initial approval value.
@@ -203,6 +208,7 @@ contract Deliberate is IDeliberate {
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
+        uint32 feePercentage,
         IERC20 bountyToken,
         uint256 bountyAmount
     ) external override returns (uint256 debateId) {
@@ -219,6 +225,10 @@ contract Deliberate is IDeliberate {
         // last moment is final by the time the tally runs.
         if (ratingDuration < lockingDuration) {
             revert DurationTooShort({minimum: lockingDuration, actual: ratingDuration});
+        }
+        // A fee of 100% or more would let a stake degenerate into a pure fee transfer moving no market.
+        if (feePercentage > Parameters._MAX_FEE_PERCENTAGE) {
+            revert FeePercentageExceeded({limit: Parameters._MAX_FEE_PERCENTAGE, actual: feePercentage});
         }
 
         debateId = _debatesCounter;
@@ -241,6 +251,8 @@ contract Deliberate is IDeliberate {
         phaseData.editingEndTime = Time.timestamp() + editingDuration;
         phaseData.ratingEndTime = phaseData.editingEndTime + ratingDuration;
 
+        newDebate.feePercentage = feePercentage;
+
         // increment counters
         newDebate.incrementArgumentCounter();
 
@@ -250,7 +262,8 @@ contract Deliberate is IDeliberate {
             contentURI: contentURI,
             lockingDuration: lockingDuration,
             editingEndTime: phaseData.editingEndTime,
-            ratingEndTime: phaseData.ratingEndTime
+            ratingEndTime: phaseData.ratingEndTime,
+            feePercentage: feePercentage
         });
 
         // Attach the optional bounty: the token is fixed for the debate's lifetime, the amount may be
@@ -479,7 +492,7 @@ contract Deliberate is IDeliberate {
         }
 
         uint32 tokens = user.tokens;
-        if (tokens <= Parameters.INITIAL_TOKENS) {
+        if (tokens < Parameters.INITIAL_TOKENS + 1) {
             revert BountyNotWon({tokens: tokens});
         }
         uint32 excess = tokens - Parameters.INITIAL_TOKENS;
@@ -509,7 +522,7 @@ contract Deliberate is IDeliberate {
             revert AddressInvalid({expected: creator, actual: msg.sender});
         }
         uint48 closesAt = _phases[debateId].finishTime + Parameters.CLAIM_WINDOW;
-        if (Time.timestamp() <= closesAt) {
+        if (Time.timestamp() < closesAt + 1) {
             revert ClaimWindowOpen({closesAt: closesAt});
         }
         if (bountyData.swept) {
@@ -576,10 +589,10 @@ contract Deliberate is IDeliberate {
         external
         view
         override
-        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount)
+        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount, uint32 feePercentage)
     {
         Debate.Data storage debate = _debates[debateId];
-        return (debate.totalVotes, debate.argumentsCount, debate.participantsCount);
+        return (debate.totalVotes, debate.argumentsCount, debate.participantsCount, debate.feePercentage);
     }
 
     /// @inheritdoc IDeliberate
@@ -714,11 +727,12 @@ contract Deliberate is IDeliberate {
         override
         returns (Argument.Stake memory stakeData)
     {
-        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+        Debate.Data storage debate = _debates[debateId];
+        Argument.Data storage argument = debate.arguments[argumentId];
 
         stakeData.isPro = isPro;
         stakeData.voteTokensStaked = voteTokenAmount;
-        stakeData.fee = voteTokenAmount.multiplyByFraction({numerator: Parameters._FEE_PERCENTAGE, denominator: 100});
+        stakeData.fee = voteTokenAmount.multiplyByFraction({numerator: debate.feePercentage, denominator: 100});
 
         uint32 net = voteTokenAmount - stakeData.fee;
 

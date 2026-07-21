@@ -29,6 +29,7 @@ contract DeployDeliberateTest is Test {
             lockingDuration: 60,
             editingDuration: 7 * 60,
             ratingDuration: 3 * 60,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });

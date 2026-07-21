@@ -25,10 +25,30 @@ library DebateGen {
 
     // --- create ---
 
+    // The DSL's standing market fee: the 5% every existing scenario (and the replayed production
+    // era) was computed with, so the library's arithmetic stays stable.
+    uint32 internal constant FEE_PERCENTAGE = 5;
+
     function createDebate(Vm vm, Deliberate deliberate, address creator, uint48 lockingDuration)
         internal
         returns (Debate memory debate)
     {
+        debate = createDebateWithFee({
+            vm: vm,
+            deliberate: deliberate,
+            creator: creator,
+            lockingDuration: lockingDuration,
+            feePercentage: FEE_PERCENTAGE
+        });
+    }
+
+    function createDebateWithFee(
+        Vm vm,
+        Deliberate deliberate,
+        address creator,
+        uint48 lockingDuration,
+        uint32 feePercentage
+    ) internal returns (Debate memory debate) {
         vm.prank(creator);
         // The thesis is argument 0, so its content is bytes32(0) under the "content is the id" convention.
         // One knob for tests: the classic 7/3 split derives both phases from the locking duration.
@@ -37,6 +57,7 @@ library DebateGen {
             lockingDuration: lockingDuration,
             editingDuration: 7 * lockingDuration,
             ratingDuration: 3 * lockingDuration,
+            feePercentage: feePercentage,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -65,7 +86,7 @@ library DebateGen {
     ) internal returns (uint16 argumentId) {
         join(vm, debate, author);
         // The next id is the current argument count (ids are dense from 0); use it as the content.
-        (, uint16 nextId,) = debate.deliberate.debates(debate.id);
+        (, uint16 nextId,,) = debate.deliberate.debates(debate.id);
         vm.prank(author);
         argumentId = debate.deliberate
             .addArgument({
@@ -204,7 +225,11 @@ library DebateGen {
     }
 
     function totalVotesOf(Vm, Debate memory debate) internal view returns (uint32 totalVotes) {
-        (totalVotes,,) = debate.deliberate.debates(debate.id);
+        (totalVotes,,,) = debate.deliberate.debates(debate.id);
+    }
+
+    function feeOf(Vm, Debate memory debate) internal view returns (uint32 feePercentage) {
+        (,,, feePercentage) = debate.deliberate.debates(debate.id);
     }
 
     // --- internal ---

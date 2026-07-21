@@ -37,6 +37,7 @@ contract DeliberateBountyTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: _token,
             bountyAmount: bountyAmount
         });
@@ -48,6 +49,7 @@ contract DeliberateBountyTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -129,6 +131,7 @@ contract DeliberateBountyTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 1 ether
         });
@@ -184,6 +187,7 @@ contract DeliberateBountyTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: feeToken,
             bountyAmount: 100 ether
         });
@@ -198,14 +202,14 @@ contract DeliberateBountyTest is Test {
 
     function test_join_countsParticipants() public {
         uint256 debateId = _createBountyDebate(_POOL);
-        (,, uint32 participantsCount) = _deliberate.debates(debateId);
+        (,, uint32 participantsCount,) = _deliberate.debates(debateId);
         assertEq(participantsCount, 0);
 
         _deliberate.join(debateId);
         vm.prank(_earlyStaker);
         _deliberate.join(debateId);
 
-        (,, participantsCount) = _deliberate.debates(debateId);
+        (,, participantsCount,) = _deliberate.debates(debateId);
         assertEq(participantsCount, 2);
     }
 

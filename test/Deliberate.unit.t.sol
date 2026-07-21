@@ -37,6 +37,19 @@ contract DeliberateTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
+        });
+    }
+
+    function _createDebateWithFee(uint32 feePercentage) internal returns (uint256 debateId) {
+        debateId = _deliberate.createDebate({
+            contentURI: _THESIS_CONTENT,
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: feePercentage,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -193,6 +206,40 @@ contract DeliberateTest is Test {
         assertEq(_deliberate.debatesCount(), 2);
     }
 
+    function test_createDebate_storesTheChosenFee() public {
+        uint256 debateId = _createDebate();
+        (,,, uint32 feePercentage) = _deliberate.debates(debateId);
+        assertEq(feePercentage, 5);
+    }
+
+    function test_createDebate_acceptsAZeroAndTheMaximumFee() public {
+        uint256 freeDebateId = _createDebateWithFee(0);
+        (,,, uint32 freeFee) = _deliberate.debates(freeDebateId);
+        assertEq(freeFee, 0);
+
+        uint256 maxDebateId = _createDebateWithFee(99);
+        (,,, uint32 maxFee) = _deliberate.debates(maxDebateId);
+        assertEq(maxFee, 99);
+    }
+
+    function test_createDebate_revertsForAFeeAbove99() public {
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.FeePercentageExceeded.selector, 99, 100));
+        _createDebateWithFee(100);
+    }
+
+    function test_quoteStake_usesTheDebatesFee() public {
+        // A 1% debate charges 1 on a 100-token stake; the standing 5% helper charges 5.
+        uint256 onePercentId = _createDebateWithFee(1);
+        assertEq(
+            _deliberate.quoteStake({debateId: onePercentId, argumentId: 1, isPro: true, voteTokenAmount: 100}).fee, 1
+        );
+
+        uint256 fivePercentId = _createDebate();
+        assertEq(
+            _deliberate.quoteStake({debateId: fivePercentId, argumentId: 1, isPro: true, voteTokenAmount: 100}).fee, 5
+        );
+    }
+
     function test_createDebate_initializesThePhaseData() public {
         uint256 debateId = _createDebate();
 
@@ -213,6 +260,7 @@ contract DeliberateTest is Test {
             lockingDuration: 0,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -225,6 +273,7 @@ contract DeliberateTest is Test {
             lockingDuration: 30 minutes,
             editingDuration: 3 days,
             ratingDuration: 1 days,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -246,6 +295,7 @@ contract DeliberateTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -260,6 +310,7 @@ contract DeliberateTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: _LOCKING_DURATION - 1,
+            feePercentage: 5,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -491,7 +542,7 @@ contract DeliberateTest is Test {
 
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
 
-        (uint32 totalVotes,,) = _deliberate.debates(debateId);
+        (uint32 totalVotes,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 20);
     }
 
@@ -508,7 +559,7 @@ contract DeliberateTest is Test {
         assertEq(argument.votes, 40);
 
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 40);
-        (uint32 totalVotes,,) = _deliberate.debates(debateId);
+        (uint32 totalVotes,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 40);
         assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
     }
@@ -1274,7 +1325,8 @@ contract DeliberateTest is Test {
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingEndTime: creationTime + 7 * _LOCKING_DURATION,
-            ratingEndTime: creationTime + 10 * _LOCKING_DURATION
+            ratingEndTime: creationTime + 10 * _LOCKING_DURATION,
+            feePercentage: 5
         });
         _createDebate();
     }
