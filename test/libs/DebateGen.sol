@@ -151,6 +151,16 @@ library DebateGen {
         debate.deliberate.tallyTree(debate.id);
     }
 
+    // --- settlement (Finished phase; permissionless, so no prank is needed) ---
+
+    function redeem(Vm, Debate memory debate, address account, uint16 argumentId) internal {
+        debate.deliberate.redeemArgumentShares(debate.id, argumentId, account);
+    }
+
+    function claimFees(Vm, Debate memory debate, uint16 argumentId) internal {
+        debate.deliberate.claimFees(debate.id, argumentId);
+    }
+
     // --- reads (the `Vm` receiver is unused; it keeps the uniform `vm.read(d, ...)` call form) ---
 
     function argumentOf(Vm, Debate memory debate, uint16 argumentId)
@@ -183,6 +193,18 @@ library DebateGen {
 
     function tokensOf(Vm, Debate memory debate, address account) internal view returns (uint32 tokens) {
         (, tokens,) = debate.deliberate.users(debate.id, account);
+    }
+
+    function sharesOf(Vm, Debate memory debate, address account, uint16 argumentId)
+        internal
+        view
+        returns (User.Shares memory shares)
+    {
+        shares = debate.deliberate.getUserShares(debate.id, argumentId, account);
+    }
+
+    function totalVotesOf(Vm, Debate memory debate) internal view returns (uint32 totalVotes) {
+        (totalVotes,,) = debate.deliberate.debates(debate.id);
     }
 
     // --- internal ---
