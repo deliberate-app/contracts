@@ -256,8 +256,8 @@ humans stays out of scope by design (§5, §7).
   keep non-purchasable. The incentive-clean equivalents already exist: the **deposit** is the
   argument-level prize (extractable only by correcting the price), authors already compete for the
   debate bounty **through fees driving excess**, and anyone can subsidize a debate via `fundBounty`
-  top-ups. The UI surfaces each market's winnable pot (its reserves) as the attention beacon
-  instead.
+  top-ups. The UI surfaces each market's upside (its reserves — the mechanism-exact bound on what
+  correcting it can free) as the attention beacon instead.
 - **Deposit floor (10)** — tune with usage data (existing TODO). The market fee level is no longer
   a protocol constant to tune — debate creators choose it per debate (ADR-0010); what remains
   observable is which fees debates actually pick.
