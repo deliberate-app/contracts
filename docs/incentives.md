@@ -127,7 +127,8 @@ posture per vector:
 | Wash-trading ring | `k` verified accounts funnel points to their winners; near-free internally (fees on own arguments return to the ring) | Bounded to `(k−1)/N` of the pool; each seat costs a real personhood-verified identity |
 | **Last-block snipe** | Redemption pays the final reserve ratio — the price the attacker set — so pushing a thin market from 50% to ~99% costs only the fee plus rounding. In the last block nobody can correct it, so the outcome is flippable for ~a fee | **Designated fix: time-weighted tally.** The tally reads the time-weighted approval over the rating window (one O(1) accumulator per argument); redemption keeps paying final reserves, so solvency is untouched. A snipe then moves the tallied rating by ~ε, and moving it materially requires holding a mispriced market all window — feeding correctors. TODO, tracked project-wide |
 | Sustained manipulation | Hold a wrong price the whole window | Every token spent is profit for correctors; with the time-weighted tally this is the *only* way to attack, and it subsidizes the honest side |
-| Argument spam / dilution | Min-deposit arguments dilute finalized siblings' weight (`childsVote` denominator), and the ≥50% seed floor means each enters contributing *positively* to its parent until down-rated; `MAX_ARGUMENTS = 1024` can be filled to lock out authors | Spam costs 10 per argument (10 max per solo participant); down-rating spam is *profitable* (the spammer's deposits are the pot); the cap-fill needs ~100 colluding identities. Residual risk: spam consumes honest raters' attention and budget |
+| Argument spam / dilution | Min-deposit arguments dilute finalized siblings' subtree-stake shares (ADR-0011), and the ≥50% seed floor means each enters contributing *positively* to its parent until down-rated; `MAX_ARGUMENTS = 1024` can be filled to lock out authors | Spam costs 10 per argument (10 max per solo participant); down-rating spam is *profitable* (the spammer's deposits are the pot); the cap-fill needs ~100 colluding identities. Residual risk: spam consumes honest raters' attention and budget |
+| **Weight stuffing via self-rated decoys** | Stake is voice (ADR-0011), and volume at the price extremes round-trips nearly free: attach a garbage argument to the side you *oppose*, then buy the side that redeems near 1 (crashing your own decoy) — fees return to you as its creator, principal redeems at ~face value, net cost ≈ the 10-token deposit. The decoy's ~100-token subtree weight dilutes its genuinely strong siblings' shares, and correctly down-rating it fixes the *price* while *feeding the weight* — correction cannot remove stake | Open. The cost is real but small (deposit + locked-capital opportunity + curve rounding), and unlike spam the decoy's rating is *meant* to be crashed. Likely fix direction: extend the time-weighted tally (above) to the **weights** — weight from stake held through the window, so stuffing pays a full window of exposure. Any mechanism that attracts stake to chosen arguments (e.g. per-argument bounties, §9) industrializes this vector |
 | Bribery with external budget | Pay participants off-chain to rate a side | Out of scope by design — an equal-points game cannot out-secure external budgets larger than participants' stakes. This is exactly why the outcome is a signal, not a trigger (§6); §7 records what closing the gap would take |
 | Hostile bounty token | Creator-controlled token: blacklist claimers, fee-on-transfer skimming, upgradeable rug | Uncurated by design; participants judge the token before investing effort. Implementation notes: balance-delta accounting on deposit, per-claimer pull payments so one blocked transfer cannot block others |
 | Never tallied / never redeemed | Funds stuck if no one pokes | `tallyTree` is permissionless and bounty winners are motivated callers; stragglers only forfeit their own claim, bounded by the claim window |
@@ -248,6 +249,15 @@ humans stays out of scope by design (§5, §7).
 ## 9. Open questions
 
 - **Protocol fee** — none in v1; revisit later, possibly as part of the market-fee mechanism.
+- **Per-argument bounties — considered and rejected (2026-07-22).** Creator-funded ERC-20 prizes on
+  individual markets, and fee-scored debate-bounty shares for authors, both score *stake volume* —
+  which round-trips nearly free at the price extremes, is sybil-linear, and (since ADR-0011)
+  purchases tally weight, bridging external money into influence the vote-token design exists to
+  keep non-purchasable. The incentive-clean equivalents already exist: the **deposit** is the
+  argument-level prize (extractable only by correcting the price), authors already compete for the
+  debate bounty **through fees driving excess**, and anyone can subsidize a debate via `fundBounty`
+  top-ups. The UI surfaces each market's winnable pot (its reserves) as the attention beacon
+  instead.
 - **Deposit floor (10)** — tune with usage data (existing TODO). The market fee level is no longer
   a protocol constant to tune — debate creators choose it per debate (ADR-0010); what remains
   observable is which fees debates actually pick.
