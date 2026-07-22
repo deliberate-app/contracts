@@ -333,7 +333,7 @@ contract DeliberateTest is Test {
 
         assertEq(rootArgument.isSupporting, false);
         assertEq(rootArgument.parentArgumentId, 0);
-        assertEq(rootArgument.childsVote, 0);
+        assertEq(rootArgument.subtreeVotes, 0);
 
         assertEq(_deliberate.getLeafArgumentIds(debateId).length, 0);
     }
@@ -442,7 +442,7 @@ contract DeliberateTest is Test {
 
         assertEq(proArgument.isSupporting, true);
         assertEq(proArgument.parentArgumentId, 0);
-        assertEq(proArgument.childsVote, 0);
+        assertEq(proArgument.subtreeVotes, 0);
 
         uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
         assertEq(leafArgumentIds.length, 1);
@@ -469,7 +469,7 @@ contract DeliberateTest is Test {
 
         assertEq(conArgument.isSupporting, false);
         assertEq(conArgument.parentArgumentId, 0);
-        assertEq(conArgument.childsVote, 0);
+        assertEq(conArgument.subtreeVotes, 0);
 
         uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
         assertEq(leafArgumentIds.length, 1);
@@ -540,7 +540,8 @@ contract DeliberateTest is Test {
         _addArgument(debateId, true, 50);
         _addArgument(debateId, false, 50);
 
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
+        // Stake weights are tally-time state; only the debate total is maintained on the way in.
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, 0);
 
         (uint32 totalVotes,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 20);
@@ -558,7 +559,6 @@ contract DeliberateTest is Test {
         assertEq(argument.con, 20);
         assertEq(argument.votes, 40);
 
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 40);
         (uint32 totalVotes,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 40);
         assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
@@ -685,15 +685,13 @@ contract DeliberateTest is Test {
             initialApproval: 50,
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
-        assertEq(_deliberate.getArgument(debateId, parentArgumentId).childsVote, 10);
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 10);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).parentArgumentId, parentArgumentId);
 
         _deliberate.moveArgument({
             debateId: debateId, argumentId: childArgumentId, newParentArgumentId: _ROOT_ARGUMENT_ID, initialApproval: 50
         });
 
-        assertEq(_deliberate.getArgument(debateId, parentArgumentId).childsVote, 0);
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).childsVote, 20);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).parentArgumentId, _ROOT_ARGUMENT_ID);
     }
 
     function test_moveArgument_reseedsTheMarketAtTheNewApproval() public {

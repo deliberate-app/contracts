@@ -21,6 +21,10 @@ _Avoid_: node, fact node
 
 **Tally**:
 The on-chain, leaves-to-root aggregation of argument impact that produces the debate's outcome.
+Each argument's tallied rating blends its own approval with its descendants' aggregate, weighted by
+the stake behind each, and a child pulls on its parent with its whole subtree's stake (ADR-0011) —
+a childless argument sways with its full approval; a debated one is corrected in proportion to the
+stake that debate attracted.
 
 **Outcome**:
 The tally's verdict on the thesis — confirmed or objected. A credible deliberation signal, not a manipulation-proof oracle: automation that consumes it must bring its own guardrails.

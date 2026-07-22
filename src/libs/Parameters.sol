@@ -32,12 +32,6 @@ library Parameters {
     /// finalization latency inside the editing phase - so the cap effectively governs breadth.
     uint16 public constant MAX_ARGUMENTS = 1024;
 
-    /// @notice The weight of the descendants' impact in the tally blend (one half, in `_MIX_MAX` fixed-point).
-    int64 internal constant _MIX_VAL = type(int64).max / 2;
-
-    /// @notice The fixed-point scale of the tally blend weights.
-    int64 internal constant _MIX_MAX = type(int64).max;
-
     /// @notice The fixed-point scale of an argument's own approval impact (full approval equals `type(uint32).max`).
     int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
 }

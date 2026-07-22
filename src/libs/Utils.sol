@@ -74,6 +74,23 @@ library Utils {
         result = SafeCast.toInt64(int256(value) * int256(uint256(numerator)) / int256(uint256(denominator)));
     }
 
+    /// @notice Calculates the weighted mean of two signed values, `(a * weightA + b * weightB) / (weightA + weightB)`,
+    /// rounded toward zero.
+    /// @dev The `int256` intermediates keep the products overflow-free; the result is bounded by the larger
+    /// magnitude of the two inputs, so the cast back to `int64` cannot overflow. The caller guarantees
+    /// `weightA + weightB > 0`.
+    /// @param a The first value.
+    /// @param weightA The weight of the first value.
+    /// @param b The second value.
+    /// @param weightB The weight of the second value.
+    /// @return result The weighted mean.
+    function weightedMean(int64 a, uint32 weightA, int64 b, uint32 weightB) internal pure returns (int64 result) {
+        result = SafeCast.toInt64(
+            (int256(a) * int256(uint256(weightA)) + int256(b) * int256(uint256(weightB)))
+                / int256(uint256(weightA) + uint256(weightB))
+        );
+    }
+
     /// @notice Splits a value `v` into two parts proportional to `a` and `b`.
     /// @param v The value to split.
     /// @param a The weight of the first part.

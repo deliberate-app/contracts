@@ -114,7 +114,9 @@ interface IDeliberate {
     /// @notice Emitted when the impact of an argument in a debate was calculated.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @param impact The impact value of the argument.
+    /// @param impact The argument's tallied rating: its own approval and its descendants' aggregate blended
+    /// by the stake behind each (`_MAX_APPROVAL` fixed point). Its signed pull on the parent is
+    /// `isSupporting ? impact : -impact`, weighted by its subtree stake among its siblings'.
     event ArgumentImpactCalculated(uint256 indexed debateId, uint16 indexed argumentId, int64 impact);
 
     /// @notice Emitted when the market fees accrued by an argument are claimed for its creator.

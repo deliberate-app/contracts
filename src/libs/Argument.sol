@@ -20,9 +20,10 @@ library Argument {
     /// @param con The con share reserve of the rating market.
     /// @param votes The vote tokens collateralizing the rating market (deposit and net stakes).
     /// @param fees The fees accrued by the argument for its creator.
-    /// @param childsVote The votes staked on the child arguments.
-    /// @param descendantsImpact The tallied impact of all descendants: each child folds its own approval and its
-    /// subtree into what it adds here.
+    /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
+    /// argument's full subtree stake (own votes included) once the argument itself is tallied. Zero until the tally.
+    /// @param descendantsImpact The tallied children's signed impacts as a running mean, each child weighted by
+    /// its subtree stake.
     struct Data {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
@@ -34,7 +35,7 @@ library Argument {
         uint32 con; //              | + 4
         uint32 votes; //            | + 4
         uint32 fees; //             | + 4
-        uint32 childsVote; //       | + 4
+        uint32 subtreeVotes; //     | + 4
         int64 descendantsImpact; // ┘ + 8 = 28
     }
 

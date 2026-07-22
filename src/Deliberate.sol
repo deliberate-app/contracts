@@ -341,7 +341,6 @@ contract Deliberate is IDeliberate {
         // change old parent's argument state
         uint16 oldParentArgumentId = movedArgument.parentArgumentId;
         _updateParentAfterChildRemoval({debateId: debateId, parentArgumentId: oldParentArgumentId});
-        debate.arguments[oldParentArgumentId].childsVote -= movedArgument.votes;
 
         // change argument state
         movedArgument.parentArgumentId = newParentArgumentId;
@@ -349,12 +348,11 @@ contract Deliberate is IDeliberate {
         // Re-seed the market at the new approval. Only a draft can move and drafts cannot be
         // staked on, so the reserves are still the pristine deposit split - re-splitting the
         // argument's own deposit (its unchanged votes) is lossless, whatever deposit the
-        // creator chose. The votes total is unchanged, so the childsVote transfer stays correct.
+        // creator chose.
         (movedArgument.pro, movedArgument.con) = movedArgument.votes.split(100 - initialApproval, initialApproval);
 
         // change new parent argument state
         debate.arguments[newParentArgumentId].untalliedChilds++;
-        debate.arguments[newParentArgumentId].childsVote += movedArgument.votes;
         if (newParentArgumentId != 0) {
             // The removal is idempotent: a no-op if the new parent was already interior.
             // slither-disable-next-line unused-return
@@ -689,10 +687,10 @@ contract Deliberate is IDeliberate {
             deposit: deposit
         });
 
-        // Update the parent: one more child to tally whose deposit counts toward the children's vote weight.
+        // Update the parent: one more child to tally. Stake weights are not maintained here - the
+        // tally derives every subtree's stake bottom-up when it runs.
         Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
         parentArgument.untalliedChilds++;
-        parentArgument.childsVote += deposit;
 
         // The deposit is committed to the new argument's market and counts toward the debate total.
         debate.totalVotes += deposit;
@@ -923,7 +921,6 @@ contract Deliberate is IDeliberate {
         argument.votes += net;
         argument.fees += stakeData.fee;
         debate.totalVotes += net;
-        debate.arguments[argument.parentArgumentId].childsVote += net;
 
         emit Staked({debateId: debateId, argumentId: argumentId, staker: msg.sender, data: stakeData});
     }
@@ -944,17 +941,24 @@ contract Deliberate is IDeliberate {
         // argument is final (its window ends before rating does), so this guards a case the phase clock rules out.
 
         if (_isFinal(argument)) {
-            // Calculate own impact
-            int64 ownImpact = _calculateImpact({
-                debateId: debateId, argumentId: argumentId
-            }).multiplyByFraction({numerator: argument.votes, denominator: parentArgument.childsVote});
+            // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
+            // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
+            // stakes; afterwards it holds the argument's full subtree stake, the weight it folds in with.
+            int64 impact = _calculateImpact({debateId: debateId, argumentId: argumentId});
+            uint32 subtreeVotes = argument.votes + argument.subtreeVotes;
+            argument.subtreeVotes = subtreeVotes;
 
-            emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: ownImpact});
+            emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: impact});
 
-            // Update the parent argument impact
-            argument.isSupporting
-                ? parentArgument.descendantsImpact += ownImpact
-                : parentArgument.descendantsImpact -= ownImpact;
+            // Fold the signed impact into the parent's running mean, weighted by the subtree stake -
+            // a sub-debate speaks with the stake that actually happened in it.
+            parentArgument.descendantsImpact = parentArgument.descendantsImpact
+                .weightedMean({
+                    weightA: parentArgument.subtreeVotes,
+                    b: argument.isSupporting ? impact : -impact,
+                    weightB: subtreeVotes
+                });
+            parentArgument.subtreeVotes += subtreeVotes;
         }
 
         parentArgument.untalliedChilds--;
@@ -1072,13 +1076,15 @@ contract Deliberate is IDeliberate {
 
         // Calculate the own approval impact. Approval is the pro-share PRICE of the market:
         // the scarcer the pro reserve, the higher the approval - i.e. con/(pro+con).
-        impact = Parameters._MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
+        int64 approvalImpact = Parameters._MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
 
-        impact = impact.multiplyByFraction({
-            numerator: Parameters._MIX_MAX - Parameters._MIX_VAL, denominator: Parameters._MIX_MAX
-        })
-        + argument.descendantsImpact
-            .multiplyByFraction({numerator: Parameters._MIX_VAL, denominator: Parameters._MIX_MAX});
+        // Blend own approval and the descendants' aggregate by the stake behind each: the argument's
+        // own market votes against its subtree's votes (accumulated by the tallied children). A childless
+        // argument keeps its full own approval; a heavily debated one is corrected in proportion to the
+        // stake that debate attracted. The denominator is at least the argument's deposit, never zero.
+        impact = approvalImpact.weightedMean({
+            weightA: argument.votes, b: argument.descendantsImpact, weightB: argument.subtreeVotes
+        });
     }
 
     /// @notice An internal function reverting if an initial approval is outside the seedable range.
