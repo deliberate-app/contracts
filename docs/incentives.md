@@ -246,23 +246,27 @@ adapters:
 Whatever the provider, the gate only prices sybils at "one more verified identity"; bribing *real*
 humans stays out of scope by design (§5, §7).
 
-## 9. What a live agent run showed (2026-08-10, provisional)
+## 9. What a live agent run showed (2026-08-10)
 
 The first live multi-agent run — ten LLM agents on Base Sepolia, debate 3, thesis *"Humans should act
 to fight climate change."*, 5% fee, 10 EURC bounty, 60-minute editing / 30-minute rating — produced
 the first behavioural evidence about these incentives. **Read it as one observation, not a result:**
-one thesis, one parameter set, `N = 10`, agents that are language models rather than people, and the
-numbers below are from the editing phase — the rating phase, where most of the economy actually
-happens, had not started. Everything here is a hypothesis the next runs should try to break.
+one thesis, one parameter set, `N = 10`, and agents that are language models rather than people.
 
-**9.1 Supporting sub-arguments are dominated; attacks have no substitute.** Every argument below the
+The run ended in a way that is itself the headline. Editing worked: 48 arguments, three levels deep.
+Rating did not happen — the agents' language-model budget was exhausted partway into the phase and
+the population stopped acting after **three stakes**. The debate was tallied and closed by hand
+afterwards. So §§9.1–9.5 rest on a full editing phase and are solid; §§9.6–9.7 describe a rating
+phase that barely began, and are pointers for the next run rather than findings.
+
+**9.1 Supporting sub-arguments are dominated; attacks have no substitute.** Every one of the 32 arguments below the
 top level attacked its parent — without exception:
 
 | depth | supports | attacks |
 |---|---|---|
-| 1 | 12 | 3 |
-| 2 | 0 | 24 |
-| 3 | 0 | 5 |
+| 1 | 13 | 3 |
+| 2 | 0 | 26 |
+| 3 | 0 | 6 |
 
 This is not a mechanical dead end: `_tallyNode` folds a child in as `isSupporting ? impact : -impact`,
 so the two directions are symmetric in the tally. The asymmetry is in the *alternatives*. To push the
@@ -294,12 +298,28 @@ and nothing rations them across phases. By the end of editing:
 | author-pro-2 | 25 |
 | raters | 73–85 |
 
-The heaviest authors ended below or near the 10-token deposit floor, entering the rating phase with
-roughly a *seventh* of a rater's staking power — and one of them can no longer author either. The
-role split was never assigned; it fell out of deposits costing tokens. Whether that is the design
-working (specialization emerges, authors are paid in fees rather than in rating profit) or a trap
-(an author who cannot rate cannot defend their own argument's price, and the fee revenue only
-arrives *after* the debate is finished) is the sharpest open question this run raises.
+The role split was never assigned; it fell out of deposits costing tokens. By the end of rating the
+separation was total:
+
+| | final tokens |
+|---|---|
+| raters | 48–85 |
+| creator | 15 |
+| author-con-1 / author-pro-2 / author-pro-1 | 3 / 2 / 1 |
+| author-con-2 | **0** |
+
+**Every author spent itself to zero.** Not "entered rating with less" — four of the five authoring
+agents finished the debate unable to place even a minimum stake, and one could no longer author
+either. This is the trap rather than the specialization: an author who cannot rate cannot defend its
+own argument's price, and fee revenue only arrives *after* the debate is finished, so there is no
+in-debate feedback loop that would have told them to stop. Nothing in the mechanism rations the 100
+tokens across the two phases, and nothing warns an author approaching the floor.
+
+The lever is not obviously "raise the grant" — a larger grant spent the same way reaches the same
+place. Candidates worth testing: reserving a fraction of the grant for the rating phase, making
+deposits partially refundable at redemption, or surfacing the remaining budget against the phase
+clock so the trade-off is visible at the moment of decision (§9.4 suggests visibility is what
+actually steers these agents).
 
 **9.3 The deposit floor is the de facto deposit, and seeds cluster.** Every deposit was 10, 12, or 15
 against a floor of 10 and no ceiling; 23 of 44 seeds were priced at exactly 65% against a permitted
@@ -330,10 +350,51 @@ at the moment of decision does not steer behaviour**, however well it is specifi
 **9.5 Self-dealing was discovered unprompted.** Two agents independently reasoned toward staking on
 their own arguments — *"fee-efficient since I'm the author"* and *"with author fees flowing back to
 me"* — without any prompt describing the tactic. This is the cheap end of the weight-stuffing vector
-in §5, found by inspection of the rules alone within one hour. Caveat: at the time of writing these
-are *stated intentions* during editing; no stake had been executed, so whether the round-trip is
-actually profitable at a 5% fee is untested. Worth measuring directly in the next run — it is the
-vector §5 marks "open".
+in §5, found by inspection of the rules alone within one hour.
+
+**It was never executed.** All three stakes the run produced went to *other* authors' arguments; the
+agents that reasoned toward self-dealing ran out of tokens (§9.2) before the rating phase they were
+planning for. So the finding is about discoverability, not profitability: the tactic is reachable by
+reading the rules, and the only thing that stopped it here was bankruptcy. Whether the round-trip
+actually pays at a 5% fee remains untested and is the first thing the next run should measure — it
+is the vector §5 marks "open".
+
+**9.6 Rating never priced the tree, and the outcome came from the seeds.** Three stakes landed
+before the population went quiet. Their distribution is the interesting part:
+
+| argument | stake | final approval |
+|---|---|---|
+| 1 (first argument posted) | 34 tokens across 2 stakes, plus one attack | 93% |
+| every other top-level argument | none | 60% — the seeded price, untouched |
+
+Two of the three stakes went to argument 1, which finished with 48 votes against 15 for everything
+else. The market that formed was a *first-mover* market: the earliest argument accumulated nearly
+all the attention, and forty-odd later arguments were never priced at all.
+
+The consequence for the outcome is the one to sit with. `outcome(3)` returned **true** — the thesis
+confirmed — but with 45 of 48 markets sitting exactly at their authors' seeded prices, that verdict
+was produced almost entirely by *what authors claimed their own arguments were worth*, corrected by
+three trades. The tally is only a deliberation signal when rating actually happens; a debate where
+it does not is closer to a poll of authors. §6's advice to require a quorum should therefore be read
+as covering **stake volume**, not just participant count — this run would have passed a headcount
+quorum comfortably while carrying almost no rating information.
+
+**9.7 The bounty paid nothing, exactly as specified.** Zero of the 10 EURC was claimed, because
+eligibility requires ending strictly above the 100-token grant (§4) and nobody did: with three
+stakes there was almost no trading, so no tokens moved between participants and nobody accumulated
+excess. This is the `c ≈ 0` corner of the §4 table — a debate that resolved no disagreement pays out
+nothing and the creator sweeps the pool after the claim window. The mechanism behaved correctly
+under a degenerate run, which is worth knowing, but it also means **a bounty cannot rescue a debate
+that fails to trade**: the prize only pays for disagreement actually resolved, so a creator whose
+debate stalls gets their money back rather than the answer they wanted.
+
+**9.8 Operating cost is a live constraint on the mechanism, not just on the experiment.** The run
+died because its agents' language-model budget ran out mid-rating — the editing phase, which is
+cheap for the protocol, is expensive for anything automating participation. Any future in which
+agents participate at scale inherits this: authoring is a few decisions, while rating well means
+reading and pricing every argument in a growing tree, so per-participant cost rises with tree size
+exactly when rating matters most. That pressure points the same way as the economics in §9.6 —
+toward participants who price a handful of prominent arguments and ignore the tail.
 
 ## 10. Open questions
 
