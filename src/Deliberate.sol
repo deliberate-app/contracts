@@ -950,12 +950,20 @@ contract Deliberate is IDeliberate {
 
             emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: impact});
 
-            // Fold the signed impact into the parent's running mean, weighted by the subtree stake -
-            // a sub-debate speaks with the stake that actually happened in it.
+            // A refuted argument is silenced, not inverted: clamping at neutral means the stance
+            // negation below can weaken a side but never hand its pull to the other one - without
+            // the clamp, refuting an attack pushed the attacked argument UP, so planting a weak
+            // attack and refuting it would out-pay arguing for the argument directly.
+            int64 strength = impact > 0 ? impact : int64(0);
+
+            // Fold the stance-signed strength into the parent's running mean, weighted by the
+            // subtree stake - a sub-debate speaks with the stake that actually happened in it.
+            // The refuted fold at zero keeps its weight on purpose: dropping it would hand a
+            // refuted argument's share of the mean to its siblings, punishing the refuters.
             parentArgument.descendantsImpact = parentArgument.descendantsImpact
                 .weightedMean({
                     weightA: parentArgument.subtreeVotes,
-                    b: argument.isSupporting ? impact : -impact,
+                    b: argument.isSupporting ? strength : -strength,
                     weightB: subtreeVotes
                 });
             parentArgument.subtreeVotes += subtreeVotes;
@@ -1074,14 +1082,23 @@ contract Deliberate is IDeliberate {
         uint32 pro = argument.pro;
         uint32 con = argument.con;
 
-        // Calculate the own approval impact. Approval is the pro-share PRICE of the market:
-        // the scarcer the pro reserve, the higher the approval - i.e. con/(pro+con).
-        int64 approvalImpact = Parameters._MAX_APPROVAL.multiplyByFraction({numerator: con, denominator: pro + con});
+        // The own approval, centered so the market's undecided price is zero: approval is the
+        // pro-share PRICE of the market - con/(pro+con), the scarcer the pro reserve the higher -
+        // and centering maps it to (con-pro)/(pro+con). A 50% market carries no conviction either
+        // way, and both blend operands now live on one signed scale, where the aggregate of the
+        // descendants' signed pulls already was; blending an unsigned approval with that signed
+        // aggregate let a refuted sub-debate drag the mean below zero and, through the stance
+        // negation, turn a demolished attack into support for the thing it attacked.
+        int64 approvalImpact = Parameters._MAX_APPROVAL
+            .multiplyByFraction({
+                numerator: int64(uint64(con)) - int64(uint64(pro)), denominator: int64(uint64(pro)) + int64(uint64(con))
+            });
 
         // Blend own approval and the descendants' aggregate by the stake behind each: the argument's
         // own market votes against its subtree's votes (accumulated by the tallied children). A childless
-        // argument keeps its full own approval; a heavily debated one is corrected in proportion to the
-        // stake that debate attracted. The denominator is at least the argument's deposit, never zero.
+        // argument keeps its full own centered approval; a heavily debated one is corrected in proportion
+        // to the stake that debate attracted. The denominator is at least the argument's deposit, never
+        // zero. Negative means refuted: the debate rates this argument as standing against itself.
         impact = approvalImpact.weightedMean({
             weightA: argument.votes, b: argument.descendantsImpact, weightB: argument.subtreeVotes
         });
