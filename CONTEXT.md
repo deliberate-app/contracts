@@ -20,11 +20,23 @@ A node in the debate tree that supports (pro) or attacks (con) its parent; the o
 _Avoid_: node, fact node
 
 **Tally**:
-The on-chain, leaves-to-root aggregation of argument impact that produces the debate's outcome.
-Each argument's tallied rating blends its own approval with its descendants' aggregate, weighted by
-the stake behind each, and a child pulls on its parent with its whole subtree's stake (ADR-0011) —
-a childless argument sways with its full approval; a debated one is corrected in proportion to the
-stake that debate attracted.
+The on-chain, leaves-to-root aggregation of argument sway that produces the debate's outcome.
+Each argument's tallied rating blends its own approval with its descendants' aggregate, weighted
+by the stake behind each (ADR-0011) — a childless argument's rating is its approval; a debated one
+is corrected in proportion to the stake that debate attracted.
+
+**Tallied rating**:
+The tally's verdict on one argument, on a signed scale whose zero is the market's undecided
+price: positive is endorsed, negative is refuted. Distinct from approval (the market's live,
+unsigned price) and from sway (what the rating exerts on the parent).
+_Avoid_: impact (the legacy name — it conflated the rating with the sway), score
+
+**Sway**:
+An argument's pull on its parent's rating: its tallied rating clamped at neutral — a refuted
+argument sways nothing rather than aiding the other side (ADR-0012) — signed by its stance and
+carrying its whole subtree's stake. A refuted child keeps its weight in the parent's aggregate,
+so a demolished sub-debate dampens its neighborhood instead of vanishing from it.
+_Avoid_: pull, impact
 
 **Outcome**:
 The tally's verdict on the thesis — confirmed or objected. A credible deliberation signal, not a manipulation-proof oracle: automation that consumes it must bring its own guardrails.
