@@ -111,13 +111,14 @@ interface IDeliberate {
         uint32 payout
     );
 
-    /// @notice Emitted when the impact of an argument in a debate was calculated.
+    /// @notice Emitted when the tally rates an argument.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @param impact The argument's tallied rating: its own approval and its descendants' aggregate blended
-    /// by the stake behind each (`_MAX_APPROVAL` fixed point). Its signed pull on the parent is
-    /// `isSupporting ? impact : -impact`, weighted by its subtree stake among its siblings'.
-    event ArgumentImpactCalculated(uint256 indexed debateId, uint16 indexed argumentId, int64 impact);
+    /// @param rating The argument's tallied rating: its own centered approval and its descendants' aggregate
+    /// blended by the stake behind each, on the signed `_MAX_APPROVAL` fixed point whose zero is the market's
+    /// undecided price - negative means refuted. Its sway on the parent is the rating clamped at zero, negated
+    /// if it attacks, weighted by its subtree stake among its siblings'.
+    event ArgumentRated(uint256 indexed debateId, uint16 indexed argumentId, int64 rating);
 
     /// @notice Emitted when the market fees accrued by an argument are claimed for its creator.
     /// @param debateId The ID of the debate.

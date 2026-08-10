@@ -208,8 +208,8 @@ library DebateGen {
         bps = total == 0 ? 5000 : (uint256(argument.con) * 10000) / total;
     }
 
-    function descendantsImpact(Vm, Debate memory debate, uint16 argumentId) internal view returns (int64 impact) {
-        impact = debate.deliberate.getArgument(debate.id, argumentId).descendantsImpact;
+    function descendantsAggregate(Vm, Debate memory debate, uint16 argumentId) internal view returns (int64 aggregate) {
+        aggregate = debate.deliberate.getArgument(debate.id, argumentId).descendantsAggregate;
     }
 
     function tokensOf(Vm, Debate memory debate, address account) internal view returns (uint32 tokens) {

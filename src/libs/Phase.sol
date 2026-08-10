@@ -14,7 +14,7 @@ library Phase {
         Editing,
         /// Participants rate arguments by staking vote tokens on their rating markets.
         Rating,
-        /// Rating has ended; the tally aggregating argument impact leaves-to-root can run.
+        /// Rating has ended; the tally aggregating argument sway leaves-to-root can run.
         Tallying,
         /// Terminal: the tally has run, the outcome is final, and argument shares can be redeemed.
         Finished

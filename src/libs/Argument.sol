@@ -22,8 +22,9 @@ library Argument {
     /// @param fees The fees accrued by the argument for its creator.
     /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
     /// argument's full subtree stake (own votes included) once the argument itself is tallied. Zero until the tally.
-    /// @param descendantsImpact The tallied children's signed impacts as a running mean, each child weighted by
-    /// its subtree stake.
+    /// @param descendantsAggregate The tallied children's sways as a running mean, each child weighted by its
+    /// subtree stake - a sway is the child's rating clamped at zero, negated if it attacks, so the aggregate
+    /// moves toward a side only on positive conviction.
     struct Data {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
@@ -36,7 +37,7 @@ library Argument {
         uint32 votes; //            | + 4
         uint32 fees; //             | + 4
         uint32 subtreeVotes; //     | + 4
-        int64 descendantsImpact; // ┘ + 8 = 28
+        int64 descendantsAggregate; // ┘ + 8 = 28
     }
 
     /// @notice The container holding the amounts computed for a stake on an argument's rating market.

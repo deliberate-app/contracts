@@ -44,7 +44,7 @@ contract DebateGenExampleTest is Test {
 
         assertEq(uint256(vm.phaseOf(debate)), uint256(Phase.Status.Finished));
         assertTrue(vm.outcome(debate));
-        assertGt(vm.descendantsImpact(debate, DebateGen.ROOT), 0);
+        assertGt(vm.descendantsAggregate(debate, DebateGen.ROOT), 0);
     }
 
     function test_stakingConLowersTheApproval() public {

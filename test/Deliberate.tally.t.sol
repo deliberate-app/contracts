@@ -52,7 +52,7 @@ contract DeliberateTallyTest is Test {
         vm.tally(debate);
 
         // Centered: floor(MAX * (104-1)/105) = 4213158394 ~ 98.1% conviction, folded with full weight.
-        assertEq(vm.descendantsImpact(debate, DebateGen.ROOT), 4213158394);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 4213158394);
         assertTrue(vm.outcome(debate));
     }
 
@@ -84,7 +84,7 @@ contract DeliberateTallyTest is Test {
         // Parent blend: (floor(MAX * (100-1)/101) * 105 - 3435973836 * 10) / 115 = 3545058239 ~ 82.5%.
         assertEq(vm.argumentOf(debate, child).subtreeVotes, 10);
         assertEq(vm.argumentOf(debate, parent).subtreeVotes, 115);
-        assertEq(vm.descendantsImpact(debate, DebateGen.ROOT), 3545058239);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3545058239);
         assertTrue(vm.outcome(debate));
     }
 
@@ -118,7 +118,7 @@ contract DeliberateTallyTest is Test {
         // Thesis: (3435973836 * 10 + 2748779068 * 50) / 60 = 2863311529 - the subtree-weighted mean,
         // not the own-votes mean (3092376452).
         assertEq(vm.argumentOf(debate, b).subtreeVotes, 50);
-        assertEq(vm.descendantsImpact(debate, DebateGen.ROOT), 2863311529);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2863311529);
 
         // The thesis' accumulated weight is the whole debate's stake - every market counted once.
         assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
@@ -162,7 +162,7 @@ contract DeliberateTallyTest is Test {
         // kept weight, not raised by it (unclamped it would read (34359738360 + 2576980377 * 40)
         // / 50, the attack aiding the thesis), and not the supporter's lone voice either.
         assertEq(vm.argumentOf(debate, attack).subtreeVotes, 40);
-        assertEq(vm.descendantsImpact(debate, DebateGen.ROOT), 687194767);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 687194767);
         assertTrue(vm.outcome(debate));
         assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
     }
@@ -184,7 +184,7 @@ contract DeliberateTallyTest is Test {
         vm.warpToTallying(debate);
         vm.tally(debate);
 
-        assertEq(vm.descendantsImpact(debate, DebateGen.ROOT), 0);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 0);
         assertFalse(vm.outcome(debate));
     }
 }

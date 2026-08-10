@@ -427,7 +427,7 @@ contract Deliberate is IDeliberate {
         _phases[debateId].finished = true;
         _phases[debateId].finishTime = Time.timestamp();
 
-        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsImpact > 0});
+        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsAggregate > 0});
     }
 
     /// @inheritdoc IDeliberate
@@ -635,7 +635,7 @@ contract Deliberate is IDeliberate {
             revert PhaseInvalid({expected: Phase.Status.Finished, actual: currentPhase});
         }
 
-        approved = _debates[debateId].arguments[0].descendantsImpact > 0;
+        approved = _debates[debateId].arguments[0].descendantsAggregate > 0;
     }
 
     /// @inheritdoc IDeliberate
@@ -937,30 +937,30 @@ contract Deliberate is IDeliberate {
             revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
         }
 
-        // Only final arguments carry impact - those whose editing window elapsed. By the Tallying phase every
+        // Only final arguments carry sway - those whose editing window elapsed. By the Tallying phase every
         // argument is final (its window ends before rating does), so this guards a case the phase clock rules out.
 
         if (_isFinal(argument)) {
             // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
             // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
             // stakes; afterwards it holds the argument's full subtree stake, the weight it folds in with.
-            int64 impact = _calculateImpact({debateId: debateId, argumentId: argumentId});
+            int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
             uint32 subtreeVotes = argument.votes + argument.subtreeVotes;
             argument.subtreeVotes = subtreeVotes;
 
-            emit ArgumentImpactCalculated({debateId: debateId, argumentId: argumentId, impact: impact});
+            emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
 
             // A refuted argument is silenced, not inverted: clamping at neutral means the stance
             // negation below can weaken a side but never hand its pull to the other one - without
             // the clamp, refuting an attack pushed the attacked argument UP, so planting a weak
             // attack and refuting it would out-pay arguing for the argument directly.
-            int64 strength = impact > 0 ? impact : int64(0);
+            int64 strength = rating > 0 ? rating : int64(0);
 
             // Fold the stance-signed strength into the parent's running mean, weighted by the
             // subtree stake - a sub-debate speaks with the stake that actually happened in it.
             // The refuted fold at zero keeps its weight on purpose: dropping it would hand a
             // refuted argument's share of the mean to its siblings, punishing the refuters.
-            parentArgument.descendantsImpact = parentArgument.descendantsImpact
+            parentArgument.descendantsAggregate = parentArgument.descendantsAggregate
                 .weightedMean({
                     weightA: parentArgument.subtreeVotes,
                     b: argument.isSupporting ? strength : -strength,
@@ -972,7 +972,7 @@ contract Deliberate is IDeliberate {
         parentArgument.untalliedChilds--;
 
         // If all children of the parent are tallied, tally the parent - unless the parent is the root: the root
-        // (the thesis) has no market and no parent of its own, and its `descendantsImpact` - which `outcome` reads -
+        // (the thesis) has no market and no parent of its own, and its `descendantsAggregate` - which `outcome` reads -
         // is complete once all of its children have been tallied.
         if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             _tallyNode({debateId: debateId, argumentId: parentArgumentId});
@@ -1072,11 +1072,11 @@ contract Deliberate is IDeliberate {
         }
     }
 
-    /// @notice Internal function to calculate the impact of an argument in a debate.
+    /// @notice Internal function to calculate the tallied rating of an argument in a debate.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @return impact The impact of the argument.
-    function _calculateImpact(uint256 debateId, uint16 argumentId) internal view returns (int64 impact) {
+    /// @return rating The tallied rating of the argument - signed, negative meaning refuted.
+    function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int64 rating) {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         uint32 pro = argument.pro;
@@ -1089,7 +1089,7 @@ contract Deliberate is IDeliberate {
         // descendants' signed pulls already was; blending an unsigned approval with that signed
         // aggregate let a refuted sub-debate drag the mean below zero and, through the stance
         // negation, turn a demolished attack into support for the thing it attacked.
-        int64 approvalImpact = Parameters._MAX_APPROVAL
+        int64 centeredApproval = Parameters._MAX_APPROVAL
             .multiplyByFraction({
                 numerator: int64(uint64(con)) - int64(uint64(pro)), denominator: int64(uint64(pro)) + int64(uint64(con))
             });
@@ -1099,8 +1099,8 @@ contract Deliberate is IDeliberate {
         // argument keeps its full own centered approval; a heavily debated one is corrected in proportion
         // to the stake that debate attracted. The denominator is at least the argument's deposit, never
         // zero. Negative means refuted: the debate rates this argument as standing against itself.
-        impact = approvalImpact.weightedMean({
-            weightA: argument.votes, b: argument.descendantsImpact, weightB: argument.subtreeVotes
+        rating = centeredApproval.weightedMean({
+            weightA: argument.votes, b: argument.descendantsAggregate, weightB: argument.subtreeVotes
         });
     }
 

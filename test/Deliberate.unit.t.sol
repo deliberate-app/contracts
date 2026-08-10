@@ -1032,7 +1032,7 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
+        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
         assertTrue(_deliberate.outcome(debateId));
     }
 
@@ -1044,7 +1044,7 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertLt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
+        assertLt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
         assertFalse(_deliberate.outcome(debateId));
     }
 
@@ -1053,7 +1053,7 @@ contract DeliberateTest is Test {
         _fillDebateToTheArgumentCap(debateId);
 
         // By the Tallying phase every argument is final (each editing window elapsed), so all of them carry
-        // impact - the expensive path this benchmark must stay within block gas for.
+        // sway - the expensive path this benchmark must stay within block gas for.
         _endRating(debateId);
 
         uint256 gasBefore = gasleft();
@@ -1075,7 +1075,7 @@ contract DeliberateTest is Test {
 
         _deliberate.tallyTree(debateId);
 
-        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsImpact, 0);
+        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
         assertTrue(_deliberate.outcome(debateId));
     }
 
@@ -1098,7 +1098,7 @@ contract DeliberateTest is Test {
         _deliberate.tallyTree(debateId);
 
         // The fully-approved opposing child weakens its parent from below ...
-        assertLt(_deliberate.getArgument(debateId, argumentId).descendantsImpact, 0);
+        assertLt(_deliberate.getArgument(debateId, argumentId).descendantsAggregate, 0);
         // ... and every argument ends up tallied.
         assertEq(_deliberate.getArgument(debateId, argumentId).untalliedChilds, 0);
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);
