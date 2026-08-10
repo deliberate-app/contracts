@@ -323,9 +323,10 @@ actually steers these agents).
 
 **9.3 The deposit floor is the de facto deposit, and seeds cluster.** Every deposit was 10, 12, or 15
 against a floor of 10 and no ceiling; 23 of 44 seeds were priced at exactly 65% against a permitted
-50–99%. Since ADR-0011 makes the deposit the argument's tally weight, a population that all bids the
-floor produces a **nearly flat weight distribution** — the weight lever exists but goes unused, and
-the tally is driven almost entirely by rating-phase stake. The floor is not just a spam price; it is
+50–99%. Under ADR-0011 the deposit is an argument's *starting* tally weight — every later stake adds to
+it — so a population that all bids the floor starts every argument at the same weight, and the
+authors' half of the weight lever goes unused. In this run rating then barely happened (§9.6), so
+the flat start was also nearly the final weight distribution. The floor is not just a spam price; it is
 a focal point that suppresses the weight signal it was meant to carry.
 
 **9.4 The agents reasoned about the mechanism in front of them, not the payoff.** Across 224 stated
