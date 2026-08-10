@@ -128,7 +128,7 @@ posture per vector:
 | **Last-block snipe** | Redemption pays the final reserve ratio — the price the attacker set — so pushing a thin market from 50% to ~99% costs only the fee plus rounding. In the last block nobody can correct it, so the outcome is flippable for ~a fee | **Designated fix: time-weighted tally.** The tally reads the time-weighted approval over the rating window (one O(1) accumulator per argument); redemption keeps paying final reserves, so solvency is untouched. A snipe then moves the tallied rating by ~ε, and moving it materially requires holding a mispriced market all window — feeding correctors. TODO, tracked project-wide |
 | Sustained manipulation | Hold a wrong price the whole window | Every token spent is profit for correctors; with the time-weighted tally this is the *only* way to attack, and it subsidizes the honest side |
 | Argument spam / dilution | Min-deposit arguments dilute finalized siblings' subtree-stake shares (ADR-0011), and the ≥50% seed floor means each enters contributing *positively* to its parent until down-rated; `MAX_ARGUMENTS = 1024` can be filled to lock out authors | Spam costs 10 per argument (10 max per solo participant); down-rating spam is *profitable* (the spammer's deposits are the pot); the cap-fill needs ~100 colluding identities. Residual risk: spam consumes honest raters' attention and budget |
-| **Weight stuffing via self-rated decoys** | Stake is voice (ADR-0011), and volume at the price extremes round-trips nearly free: attach a garbage argument to the side you *oppose*, then buy the side that redeems near 1 (crashing your own decoy) — fees return to you as its creator, principal redeems at ~face value, net cost ≈ the 10-token deposit. The decoy's ~100-token subtree weight dilutes its genuinely strong siblings' shares, and correctly down-rating it fixes the *price* while *feeding the weight* — correction cannot remove stake | Open. The cost is real but small (deposit + locked-capital opportunity + curve rounding), and unlike spam the decoy's rating is *meant* to be crashed. Likely fix direction: extend the time-weighted tally (above) to the **weights** — weight from stake held through the window, so stuffing pays a full window of exposure. Any mechanism that attracts stake to chosen arguments (e.g. per-argument bounties, §9) industrializes this vector |
+| **Weight stuffing via self-rated decoys** | Stake is voice (ADR-0011), and volume at the price extremes round-trips nearly free: attach a garbage argument to the side you *oppose*, then buy the side that redeems near 1 (crashing your own decoy) — fees return to you as its creator, principal redeems at ~face value, net cost ≈ the 10-token deposit. The decoy's ~100-token subtree weight dilutes its genuinely strong siblings' shares, and correctly down-rating it fixes the *price* while *feeding the weight* — correction cannot remove stake | Open. The cost is real but small (deposit + locked-capital opportunity + curve rounding), and unlike spam the decoy's rating is *meant* to be crashed. Likely fix direction: extend the time-weighted tally (above) to the **weights** — weight from stake held through the window, so stuffing pays a full window of exposure. Any mechanism that attracts stake to chosen arguments (e.g. per-argument bounties, §10) industrializes this vector |
 | Bribery with external budget | Pay participants off-chain to rate a side | Out of scope by design — an equal-points game cannot out-secure external budgets larger than participants' stakes. This is exactly why the outcome is a signal, not a trigger (§6); §7 records what closing the gap would take |
 | Hostile bounty token | Creator-controlled token: blacklist claimers, fee-on-transfer skimming, upgradeable rug | Uncurated by design; participants judge the token before investing effort. Implementation notes: balance-delta accounting on deposit, per-claimer pull payments so one blocked transfer cannot block others |
 | Never tallied / never redeemed | Funds stuck if no one pokes | `tallyTree` is permissionless and bounty winners are motivated callers; stragglers only forfeit their own claim, bounded by the claim window |
@@ -246,7 +246,96 @@ adapters:
 Whatever the provider, the gate only prices sybils at "one more verified identity"; bribing *real*
 humans stays out of scope by design (§5, §7).
 
-## 9. Open questions
+## 9. What a live agent run showed (2026-08-10, provisional)
+
+The first live multi-agent run — ten LLM agents on Base Sepolia, debate 3, thesis *"Humans should act
+to fight climate change."*, 5% fee, 10 EURC bounty, 60-minute editing / 30-minute rating — produced
+the first behavioural evidence about these incentives. **Read it as one observation, not a result:**
+one thesis, one parameter set, `N = 10`, agents that are language models rather than people, and the
+numbers below are from the editing phase — the rating phase, where most of the economy actually
+happens, had not started. Everything here is a hypothesis the next runs should try to break.
+
+**9.1 Supporting sub-arguments are dominated; attacks have no substitute.** Every argument below the
+top level attacked its parent — without exception:
+
+| depth | supports | attacks |
+|---|---|---|
+| 1 | 12 | 3 |
+| 2 | 0 | 24 |
+| 3 | 0 | 5 |
+
+This is not a mechanical dead end: `_tallyNode` folds a child in as `isSupporting ? impact : -impact`,
+so the two directions are symmetric in the tally. The asymmetry is in the *alternatives*. To push the
+thesis one way, a top-level argument folds straight into the root at full subtree weight, while a
+supporting child reaches the root only through its parent's weighted mean — diluted by the parent's
+own votes and by every sibling, for the same deposit. Agreeing therefore has two better moves (post
+your own top-level claim, or stake the argument up), while *reducing one specific argument's weight*
+has no substitute at all: attaching an attack is the only structural option.
+
+That the same agents chose supports 12:3 at depth 1 — where supporting *is* the direct move — is what
+suggests the pattern is structural rather than models defaulting to rebuttal.
+
+Consequence for a reader of the tree: **it records objections richly and corroboration not at all.**
+"What else supports this claim?" has no representation below the root. Note this does *not* bias the
+outcome in one direction — the sign alternates with depth, so an attack on an anti-thesis argument
+raises the thesis. The open question is whether a tree that cannot express corroboration is the
+intended epistemic object, or whether supporting children need a reason to exist that the current
+weighting does not give them.
+
+**9.2 Authoring and rating draw on one budget, and authoring won.** The 100 tokens fund both roles,
+and nothing rations them across phases. By the end of editing:
+
+| | tokens left |
+|---|---|
+| author-con-2 | 9 |
+| author-pro-1 | 11 |
+| author-con-1 | 13 |
+| creator | 15 |
+| author-pro-2 | 25 |
+| raters | 73–85 |
+
+The heaviest authors ended below or near the 10-token deposit floor, entering the rating phase with
+roughly a *seventh* of a rater's staking power — and one of them can no longer author either. The
+role split was never assigned; it fell out of deposits costing tokens. Whether that is the design
+working (specialization emerges, authors are paid in fees rather than in rating profit) or a trap
+(an author who cannot rate cannot defend their own argument's price, and the fee revenue only
+arrives *after* the debate is finished) is the sharpest open question this run raises.
+
+**9.3 The deposit floor is the de facto deposit, and seeds cluster.** Every deposit was 10, 12, or 15
+against a floor of 10 and no ceiling; 23 of 44 seeds were priced at exactly 65% against a permitted
+50–99%. Since ADR-0011 makes the deposit the argument's tally weight, a population that all bids the
+floor produces a **nearly flat weight distribution** — the weight lever exists but goes unused, and
+the tally is driven almost entirely by rating-phase stake. The floor is not just a spam price; it is
+a focal point that suppresses the weight signal it was meant to carry.
+
+**9.4 The agents reasoned about the mechanism in front of them, not the payoff.** Across 224 stated
+reasons attached to their actions:
+
+| theme | share of reasons |
+|---|---|
+| price / mispricing | 25% |
+| locking windows and timing | 32% |
+| what other participants are doing | 12% |
+| market fees (the author revenue model) | 1% |
+| their own token budget | 1% |
+| **the bounty** | **0%** |
+
+The bounty is the entire reason the run is funded and it never entered a single stated decision;
+fees, the authors' only revenue, entered four times out of 224. Agents optimized what the interface
+put in front of them — approvals, clocks, rivals — and ignored the terminal payoff. 9.2 follows
+directly: nobody budgets for a phase they are not reasoning about. If this reproduces with human
+participants, it is an interface finding as much as an incentive one: **a payoff that is not visible
+at the moment of decision does not steer behaviour**, however well it is specified.
+
+**9.5 Self-dealing was discovered unprompted.** Two agents independently reasoned toward staking on
+their own arguments — *"fee-efficient since I'm the author"* and *"with author fees flowing back to
+me"* — without any prompt describing the tactic. This is the cheap end of the weight-stuffing vector
+in §5, found by inspection of the rules alone within one hour. Caveat: at the time of writing these
+are *stated intentions* during editing; no stake had been executed, so whether the round-trip is
+actually profitable at a 5% fee is untested. Worth measuring directly in the next run — it is the
+vector §5 marks "open".
+
+## 10. Open questions
 
 - **Protocol fee** — none in v1; revisit later, possibly as part of the market-fee mechanism.
 - **Per-argument bounties — considered and rejected (2026-07-22).** Creator-funded ERC-20 prizes on
