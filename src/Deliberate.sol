@@ -950,16 +950,11 @@ contract Deliberate is IDeliberate {
 
             emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
 
-            // A refuted argument is silenced, not inverted: clamping at neutral means the stance
-            // negation below can weaken a side but never hand its pull to the other one - without
-            // the clamp, refuting an attack pushed the attacked argument UP, so planting a weak
-            // attack and refuting it would out-pay arguing for the argument directly.
+            // A refuted argument is silenced, not inverted.
             int64 strength = rating > 0 ? rating : int64(0);
 
             // Fold the stance-signed strength into the parent's running mean, weighted by the
-            // subtree stake - a sub-debate speaks with the stake that actually happened in it.
-            // The refuted fold at zero keeps its weight on purpose: dropping it would hand a
-            // refuted argument's share of the mean to its siblings, punishing the refuters.
+            // subtree stake.
             parentArgument.descendantsAggregate = parentArgument.descendantsAggregate
                 .weightedMean({
                     weightA: parentArgument.subtreeVotes,
@@ -1082,13 +1077,7 @@ contract Deliberate is IDeliberate {
         uint32 pro = argument.pro;
         uint32 con = argument.con;
 
-        // The own approval, centered so the market's undecided price is zero: approval is the
-        // pro-share PRICE of the market - con/(pro+con), the scarcer the pro reserve the higher -
-        // and centering maps it to (con-pro)/(pro+con). A 50% market carries no conviction either
-        // way, and both blend operands now live on one signed scale, where the aggregate of the
-        // descendants' signed pulls already was; blending an unsigned approval with that signed
-        // aggregate let a refuted sub-debate drag the mean below zero and, through the stance
-        // negation, turn a demolished attack into support for the thing it attacked.
+        // The own approval, centered so the market's undecided price is zero.
         int64 centeredApproval = Parameters._MAX_APPROVAL
             .multiplyByFraction({
                 numerator: int64(uint64(con)) - int64(uint64(pro)), denominator: int64(uint64(pro)) + int64(uint64(con))
