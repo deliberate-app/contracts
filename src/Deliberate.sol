@@ -854,17 +854,24 @@ contract Deliberate is IDeliberate {
             return;
         }
 
-        uint32 marketSize = argument.pro + argument.con;
+        // A share settles against the tallied rating - the tree's verdict on the argument, not the
+        // price its own market happened to close at: a pro share pays the rating mapped back onto
+        // the price scale, a con share the complement. For a childless argument the rating is its
+        // own time-weighted price, so the rule reduces to the market price wherever the tree had
+        // nothing to say; for a debated one the sub-debate corrects the settlement in proportion
+        // to the stake behind it. Rounding down keeps redemptions within what the market took in:
+        // together the two prices pay out at most one full side's shares, which the market's
+        // deposit and net stakes cover.
+        uint256 proPrice = SafeCast.toUint256(int256(Parameters._MAX_APPROVAL) + argument.rating);
+        uint256 fullScale = 2 * SafeCast.toUint256(int256(Parameters._MAX_APPROVAL));
 
-        // Each pro share pays out the final approval - the con reserve's share of the market
-        // - and each con share the complement. Rounding down keeps the market solvent.
         uint32 payout = 0;
         if (proShares > 0) {
-            payout += proShares.multiplyByFraction({numerator: argument.con, denominator: marketSize});
+            payout += SafeCast.toUint32(uint256(proShares) * proPrice / fullScale);
             userShares.pro = 0;
         }
         if (conShares > 0) {
-            payout += conShares.multiplyByFraction({numerator: argument.pro, denominator: marketSize});
+            payout += SafeCast.toUint32(uint256(conShares) * (fullScale - proPrice) / fullScale);
             userShares.con = 0;
         }
         user.tokens += payout;
@@ -951,6 +958,9 @@ contract Deliberate is IDeliberate {
             int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
             uint32 subtreeVotes = _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
             argument.subtreeVotes = subtreeVotes;
+            // Stored for redemption to settle against: `subtreeVotes` is repurposed above, so the
+            // rating could not be re-derived later without double-counting the argument's own stake.
+            argument.rating = rating;
 
             emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
 
@@ -996,10 +1006,10 @@ contract Deliberate is IDeliberate {
             return;
         }
 
-        argument.centeredApprovalSeconds += SafeCast.toInt96(
+        argument.centeredApprovalSeconds += SafeCast.toInt88(
             int256(_centeredApproval(argument)) * int256(uint256(elapsed))
         );
-        argument.votesSeconds += SafeCast.toUint96(uint256(argument.votes) * uint256(elapsed));
+        argument.votesSeconds += SafeCast.toUint88(uint256(argument.votes) * uint256(elapsed));
         argument.lastAccrualTime = until;
     }
 
@@ -1107,7 +1117,7 @@ contract Deliberate is IDeliberate {
         // The own approval, centered so the market's undecided price is zero and time-weighted over the
         // rating window: what the market said, for as long as it said it. A push in the window's closing
         // seconds moves this average by the tail fraction only.
-        (int96 centeredApprovalSeconds,) = _completedTallyInputs({debateId: debateId, argument: argument});
+        (int88 centeredApprovalSeconds,) = _completedTallyInputs({debateId: debateId, argument: argument});
         uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
         int64 centeredApproval = SafeCast.toInt64(int256(centeredApprovalSeconds) / int256(uint256(window)));
 
@@ -1149,7 +1159,7 @@ contract Deliberate is IDeliberate {
     function _completedTallyInputs(uint256 debateId, Argument.Data storage argument)
         internal
         view
-        returns (int96 centeredApprovalSeconds, uint96 votesSeconds)
+        returns (int88 centeredApprovalSeconds, uint88 votesSeconds)
     {
         Phase.Data storage phaseData = _phases[debateId];
 
@@ -1158,8 +1168,8 @@ contract Deliberate is IDeliberate {
         uint48 elapsed = phaseData.ratingEndTime - start;
 
         centeredApprovalSeconds = argument.centeredApprovalSeconds
-            + SafeCast.toInt96(int256(_centeredApproval(argument)) * int256(uint256(elapsed)));
-        votesSeconds = argument.votesSeconds + SafeCast.toUint96(uint256(argument.votes) * uint256(elapsed));
+            + SafeCast.toInt88(int256(_centeredApproval(argument)) * int256(uint256(elapsed)));
+        votesSeconds = argument.votesSeconds + SafeCast.toUint88(uint256(argument.votes) * uint256(elapsed));
     }
 
     /// @notice An internal function reading an argument's time-weighted stake: the vote tokens held in its
@@ -1174,7 +1184,7 @@ contract Deliberate is IDeliberate {
         view
         returns (uint32 timeWeightedVotes)
     {
-        (, uint96 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
+        (, uint88 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
         uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
 
         // An average of uint32 stake levels stays within uint32.

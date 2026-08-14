@@ -19,23 +19,28 @@ library Argument {
     /// @param pro The pro share reserve of the rating market (scarce pro = high approval).
     /// @param con The con share reserve of the rating market.
     /// @param votes The vote tokens collateralizing the rating market (deposit and net stakes).
-    /// @param fees The fees accrued by the argument for its creator.
     /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
     /// argument's full subtree stake (own time-weighted stake included) once the argument itself is tallied.
     /// Zero until the tally.
     /// @param descendantsAggregate The tallied children's sways as a running mean, each child weighted by its
     /// subtree stake - a sway is the child's rating clamped at zero, negated if it attacks, so the aggregate
     /// moves toward a side only on positive conviction.
+    /// @param rating The tallied rating, written by the tally: signed, negative meaning refuted, and the value
+    /// the argument's shares settle against at redemption. Zero until the tally. Stored beside the tally-time
+    /// state it shares a slot with - `subtreeVotes` is repurposed by the tally, so re-deriving the rating
+    /// later would double-count the argument's own stake.
     /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
     /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
     /// bought by holding it, not by having the last word. Bounded by the full-scale approval (2^32) times a
-    /// uint48 window - below 2^80, comfortably inside 96 bits.
+    /// uint48 window - below 2^80, comfortably inside 88 bits.
     /// @param votesSeconds The market stake multiplied by the seconds it was held, accumulated over the rating
     /// window. The tally divides by the window to read the time-weighted stake: weight is earned by exposure,
     /// so the deposit (standing the whole window) counts in full while late stakes count in proportion.
     /// Bounded like `centeredApprovalSeconds`.
     /// @param lastAccrualTime The time up to which the two accumulators are complete; zero until the first
     /// accrual, which opens the window at the end of the editing phase.
+    /// @param fees The fees accrued by the argument for its creator. Packed with the accrual state its writes
+    /// coincide with (both move on stakes), leaving the tally's slot to the tally's own outputs.
     struct Data {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
@@ -46,12 +51,13 @@ library Argument {
         uint32 pro; //              ┐   4
         uint32 con; //              | + 4
         uint32 votes; //            | + 4
-        uint32 fees; //             | + 4
         uint32 subtreeVotes; //     | + 4
-        int64 descendantsAggregate; // ┘ + 8 = 28
-        int96 centeredApprovalSeconds; // ┐  12
-        uint96 votesSeconds; //           | +12
-        uint48 lastAccrualTime; //        ┘ + 6 = 30
+        int64 descendantsAggregate; // | + 8
+        int64 rating; //            ┘ + 8 = 32
+        int88 centeredApprovalSeconds; // ┐  11
+        uint88 votesSeconds; //           | +11
+        uint48 lastAccrualTime; //        | + 6
+        uint32 fees; //                   ┘ + 4 = 32
     }
 
     /// @notice The container holding the amounts computed for a stake on an argument's rating market.
