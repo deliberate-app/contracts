@@ -48,9 +48,9 @@ _Avoid_: rating market
 
 **Good-argument share / Bad-argument share**:
 The display names of an argument market's pro and con shares (`shares.pro`/`shares.con` in the
-contract). A good-argument share pays the argument's final rating at redemption, a bad-argument
-share its complement — the name says what the claim is on, not which side of the parent the
-argument takes. Bought by staking "underrated" and "overrated" respectively.
+contract). A good-argument share pays the argument's final approval at redemption — the price its
+market closed at, not its tallied rating — and a bad-argument share its complement; the name says
+what the claim is on, not which side of the parent the argument takes. Bought by staking "underrated" and "overrated" respectively.
 _Avoid_: pro share, con share (in user-facing copy — they collide with the pro/con stance of
 arguments)
 
