@@ -20,15 +20,19 @@ A node in the debate tree that supports (pro) or attacks (con) its parent; the o
 _Avoid_: node, fact node
 
 **Tally**:
-The on-chain, leaves-to-root aggregation of argument sway that produces the debate's outcome.
-Each argument's tallied rating blends its own approval with its descendants' aggregate, weighted
-by the stake behind each (ADR-0011) — a childless argument's rating is its approval; a debated one
-is corrected in proportion to the stake that debate attracted.
+The on-chain, leaves-to-root aggregation of argument sway that produces the debate's outcome,
+reading time-weighted inputs: every price and every stake counts for the seconds it stood in the
+rating window (ADR-0013), so a rating is bought by holding a price, not by having the last word,
+and weight is earned by exposure. Each argument's tallied rating blends its own approval with its
+descendants' aggregate, weighted by the stake behind each (ADR-0011) — a childless argument's
+rating is its approval; a debated one is corrected in proportion to the stake that debate
+attracted.
 
 **Tallied rating**:
 The tally's verdict on one argument, on a signed scale whose zero is the market's undecided
-price: positive is endorsed, negative is refuted. Distinct from approval (the market's live,
-unsigned price) and from sway (what the rating exerts on the parent).
+price: positive is endorsed, negative is refuted — and the value the argument's shares settle
+against at redemption (ADR-0014). Distinct from approval (the market's live, unsigned price) and
+from sway (what the rating exerts on the parent).
 _Avoid_: impact (the legacy name — it conflated the rating with the sway), score
 
 **Sway**:
@@ -48,9 +52,10 @@ _Avoid_: rating market
 
 **Good-argument share / Bad-argument share**:
 The display names of an argument market's pro and con shares (`shares.pro`/`shares.con` in the
-contract). A good-argument share pays the argument's final approval at redemption — the price its
-market closed at, not its tallied rating — and a bad-argument share its complement; the name says
-what the claim is on, not which side of the parent the argument takes. Bought by staking "underrated" and "overrated" respectively.
+contract). A good-argument share pays out with the argument's tallied rating at redemption — the
+tree's verdict, which reduces to the market's own time-weighted price when nothing was argued
+beneath the argument — and a bad-argument share its complement; the name says what the claim is
+on, not which side of the parent the argument takes. Bought by staking "underrated" and "overrated" respectively.
 _Avoid_: pro share, con share (in user-facing copy — they collide with the pro/con stance of
 arguments)
 

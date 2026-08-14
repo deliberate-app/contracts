@@ -24,8 +24,9 @@ Two roles trade with each other through the argument-specific rating markets:
   fee**: the debate's fee percentage (creator-chosen at creation, 0–99%, see ADR-0010) of every
   stake on their argument, claimable as vote tokens once the debate is finished. Break-even is
   `(100 / fee) × deposit` in stake volume — `20 × deposit` at a 5% fee.
-- **Raters** stake tokens on a market's pro or con side and profit at redemption if the final
-  approval moved their way beyond their own trade. Two facts shape this: the fee means only mispricings
+- **Raters** stake tokens on a market's pro or con side and profit at redemption if the tallied
+  rating — the time-weighted price, corrected by the sub-debate's verdict — lands their way beyond
+  their own trade. Two facts shape this: the fee means only mispricings
   larger than roughly the fee percentage are worth correcting, and the **self-impact limit** — you
   cannot profit from the price move you yourself cause — means profit requires either _other raters
   being wrong_ or _mispriced seeded reserves_.
