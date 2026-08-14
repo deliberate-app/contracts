@@ -9,11 +9,14 @@ import {Deliberate} from "../src/Deliberate.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
-// The stake-weighted tally (ADR-0011) on the centered scale (ADR-0012): an argument's rating
-// blends its own centered approval - zero at the market's undecided price - with its descendants'
-// aggregate by the stake behind each; a child speaks at its parent with its whole subtree's stake,
-// and a refuted child (negative rating) sways nothing while keeping its weight. Exact fixed-point
-// expectations - a changed rounding, weighting, or clamp fails loudly.
+// The stake-weighted tally (ADR-0011) on the centered scale (ADR-0012), reading time-weighted
+// inputs (ADR-0013): an argument's rating blends its own centered approval - zero at the market's
+// undecided price, each price counting for the seconds it stood in the rating window - with its
+// descendants' aggregate by the time-weighted stake behind each; a child speaks at its parent with
+// its whole subtree's stake, and a refuted child (negative rating) sways nothing while keeping its
+// weight. Exact fixed-point expectations - a changed rounding, weighting, clamp, or accrual fails
+// loudly. Stakes land in the rating window's first second (`warpToRating`), so a seeded price
+// stands 1 of the 180-second window and the corrected price the remaining 179.
 contract DeliberateTallyTest is Test {
     using DebateGen for Vm;
 
@@ -51,8 +54,10 @@ contract DeliberateTallyTest is Test {
         vm.warpToTallying(debate);
         vm.tally(debate);
 
-        // Centered: floor(MAX * (104-1)/105) = 4213158394 ~ 98.1% conviction, folded with full weight.
-        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 4213158394);
+        // Centered final price: floor(MAX * (104-1)/105) = 4213158394, standing 179 of 180 seconds
+        // (the neutral seed the first): floor(4213158394 * 179 / 180) = 4189751958 ~ 97.5%
+        // conviction, folded with full weight.
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 4189751958);
         assertTrue(vm.outcome(debate));
     }
 
@@ -80,11 +85,13 @@ contract DeliberateTallyTest is Test {
         vm.warpToTallying(debate);
         vm.tally(debate);
 
-        // Child (leaf), centered: floor(MAX * (9-1)/10) = 3435973836, subtree stake 10.
-        // Parent blend: (floor(MAX * (100-1)/101) * 105 - 3435973836 * 10) / 115 = 3545058239 ~ 82.5%.
+        // Child (leaf, untouched all window), centered: floor(MAX * (9-1)/10) = 3435973836, subtree
+        // stake 10. Parent: its corrected price floor(MAX * (100-1)/101) = 4209918437 time-weights to
+        // floor(4209918437 * 179 / 180) = 4186530001, and its stake to floor((10*1 + 105*179)/180)
+        // = 104. Blend: (4186530001 * 104 - 3435973836 * 10) / 114 = 3517889313 ~ 81.9%.
         assertEq(vm.argumentOf(debate, child).subtreeVotes, 10);
-        assertEq(vm.argumentOf(debate, parent).subtreeVotes, 115);
-        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3545058239);
+        assertEq(vm.argumentOf(debate, parent).subtreeVotes, 114);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3517889313);
         assertTrue(vm.outcome(debate));
     }
 
@@ -165,6 +172,61 @@ contract DeliberateTallyTest is Test {
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 687194767);
         assertTrue(vm.outcome(debate));
         assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
+    }
+
+    function test_aLastSecondSnipeBuysNeitherRatingNorWeight() public {
+        // The attack the time-weighting exists to kill: push a thin neutral market to ~99% in the
+        // rating window's final second. The final price reads 99% - but the seed's neutral price
+        // stood all 180 seconds and the pushed price zero, so the tally reads exactly the seed:
+        // no rating, and the pushed stake earns no weight either (held for zero seconds).
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
+        uint16 argumentId = vm.addArgument({
+            debate: debate,
+            author: _ALICE,
+            parentId: DebateGen.ROOT,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: 10
+        });
+        (,, uint48 ratingEndTime,) = _deliberate.phases(debate.id);
+        vm.warp(ratingEndTime);
+        vm.stakePro(debate, _BOB, argumentId, 100); // fee 5 -> net 95: reserves (1, 100)
+
+        vm.warpToTallying(debate);
+        vm.tally(debate);
+
+        // The market closed at 100/101 ~ 99%, yet the tally saw a neutral market all window.
+        assertEq(vm.approvalBps(debate, argumentId), 9900);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 0);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 10);
+        assertFalse(vm.outcome(debate));
+    }
+
+    function test_aStakeCarriesWeightForTheTimeItIsHeld() public {
+        // A stake at the window's midpoint: the corrected price and the grown stake each stand 90
+        // of 180 seconds, so both count at half. Half the window, half the voice.
+        DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
+        uint16 argumentId = vm.addArgument({
+            debate: debate,
+            author: _ALICE,
+            parentId: DebateGen.ROOT,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: 10
+        });
+        (, uint48 editingEndTime,,) = _deliberate.phases(debate.id);
+        vm.warp(editingEndTime + 90);
+        vm.stakePro(debate, _BOB, argumentId, 100); // fee 5 -> net 95: reserves (1, 100), votes 105
+
+        vm.warpToTallying(debate);
+        vm.tally(debate);
+
+        // Price: floor(floor(MAX * (100-1)/101) * 90 / 180) = floor(4209918437 / 2) = 2104959218.
+        // Weight: floor((10 * 90 + 105 * 90) / 180) = 57 - the seed's 10 in full, the stake's 95
+        // at half.
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2104959218);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 57);
+        assertTrue(vm.outcome(debate));
     }
 
     function test_aNeutralMarketSwaysNothingAndSilenceObjects() public {

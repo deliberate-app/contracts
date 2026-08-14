@@ -918,22 +918,41 @@ contract DeliberateTest is Test {
         }
     }
 
-    /// @dev Redemption can never pay out more than the market's collateral, whatever is traded.
+    /// @dev Redemption can never pay out more than the market's collateral, whatever is traded,
+    /// whenever it is traded, and however the sub-debate corrects the settlement away from the
+    /// market's own price: any rating in [-MAX, MAX] pays at most one full side's shares, covered
+    /// by the deposit and net stakes.
     function testFuzz_redeem_staysWithinTheMarketCollateral(
         uint32 initialApproval,
         bool firstIsPro,
         uint32 firstAmount,
         bool secondIsPro,
-        uint32 secondAmount
+        uint32 secondAmount,
+        uint48 secondDelay,
+        bool childIsSupporting,
+        uint32 childApproval
     ) public {
         initialApproval = uint32(bound(initialApproval, 50, 99));
         firstAmount = uint32(bound(firstAmount, 1, 100));
         secondAmount = uint32(bound(secondAmount, 1, 100));
+        // The rating window is three locking durations; the second stake lands anywhere inside it.
+        secondDelay = uint48(bound(secondDelay, 0, 3 * _LOCKING_DURATION - 1));
+        childApproval = uint32(bound(childApproval, 50, 99));
 
         uint256 debateId = _createDebate();
         _join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+
+        // A sub-debate beneath the argument corrects its settlement away from its own price.
+        _deliberate.addArgument({
+            debateId: debateId,
+            parentArgumentId: argumentId,
+            contentURI: "A correction.",
+            isSupporting: childIsSupporting,
+            initialApproval: childApproval,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
+        });
         _endEditing(debateId);
 
         address firstStaker = makeAddr("firstStaker");
@@ -945,6 +964,7 @@ contract DeliberateTest is Test {
         else _deliberate.stakeCon(debateId, argumentId, firstAmount);
         vm.stopPrank();
 
+        vm.warp(vm.getBlockTimestamp() + secondDelay);
         vm.startPrank(secondStaker);
         _deliberate.join(debateId);
         if (secondIsPro) _deliberate.stakePro(debateId, argumentId, secondAmount);
@@ -1182,9 +1202,11 @@ contract DeliberateTest is Test {
         _deliberate.redeemArgumentShares(debateId, argumentId, earlyStaker);
         _deliberate.redeemArgumentShares(debateId, argumentId, lateStaker);
 
-        // Early: 13 shares x 34/35 = 12 tokens back on 10 staked - correcting the rating early pays.
+        // Early: 13 shares settling at the tallied rating (~96.9% on the price scale) = 12 tokens
+        // back on 10 staked - correcting the rating early pays.
         assertEq(_deliberate.getUserTokens(debateId, earlyStaker), 102);
-        // Late: 20 shares x 34/35 = 19 tokens back on 20 staked - fee and slippage eat the late trade.
+        // Late: 20 shares at the same settlement = 19 tokens back on 20 staked - fee and slippage
+        // eat the late trade.
         assertEq(_deliberate.getUserTokens(debateId, lateStaker), 99);
         // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
     }
