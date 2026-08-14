@@ -21,10 +21,21 @@ library Argument {
     /// @param votes The vote tokens collateralizing the rating market (deposit and net stakes).
     /// @param fees The fees accrued by the argument for its creator.
     /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
-    /// argument's full subtree stake (own votes included) once the argument itself is tallied. Zero until the tally.
+    /// argument's full subtree stake (own time-weighted stake included) once the argument itself is tallied.
+    /// Zero until the tally.
     /// @param descendantsAggregate The tallied children's sways as a running mean, each child weighted by its
     /// subtree stake - a sway is the child's rating clamped at zero, negated if it attacks, so the aggregate
     /// moves toward a side only on positive conviction.
+    /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
+    /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
+    /// bought by holding it, not by having the last word. Bounded by the full-scale approval (2^32) times a
+    /// uint48 window - below 2^80, comfortably inside 96 bits.
+    /// @param votesSeconds The market stake multiplied by the seconds it was held, accumulated over the rating
+    /// window. The tally divides by the window to read the time-weighted stake: weight is earned by exposure,
+    /// so the deposit (standing the whole window) counts in full while late stakes count in proportion.
+    /// Bounded like `centeredApprovalSeconds`.
+    /// @param lastAccrualTime The time up to which the two accumulators are complete; zero until the first
+    /// accrual, which opens the window at the end of the editing phase.
     struct Data {
         bytes32 contentURI; //      ]  32
         address creator; //         ┐  20
@@ -38,6 +49,9 @@ library Argument {
         uint32 fees; //             | + 4
         uint32 subtreeVotes; //     | + 4
         int64 descendantsAggregate; // ┘ + 8 = 28
+        int96 centeredApprovalSeconds; // ┐  12
+        uint96 votesSeconds; //           | +12
+        uint48 lastAccrualTime; //        ┘ + 6 = 30
     }
 
     /// @notice The container holding the amounts computed for a stake on an argument's rating market.

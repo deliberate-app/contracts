@@ -906,6 +906,9 @@ contract Deliberate is IDeliberate {
         Debate.Data storage debate = _debates[debateId];
         Argument.Data storage argument = debate.arguments[argumentId];
 
+        // The standing price and stake earn their held duration before the trade moves them.
+        _accrueTallyInputs({debateId: debateId, argument: argument});
+
         // Reconstruct the post-trade reserves from the quote: the bought side shrinks by the
         // shares that leave the pool, the opposite side absorbs the net stake.
         if (isPro) {
@@ -943,9 +946,10 @@ contract Deliberate is IDeliberate {
         if (_isFinal(argument)) {
             // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
             // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
-            // stakes; afterwards it holds the argument's full subtree stake, the weight it folds in with.
+            // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
+            // included), the weight it folds in with.
             int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
-            uint32 subtreeVotes = argument.votes + argument.subtreeVotes;
+            uint32 subtreeVotes = _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
             argument.subtreeVotes = subtreeVotes;
 
             emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
@@ -972,6 +976,31 @@ contract Deliberate is IDeliberate {
         if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
             _tallyNode({debateId: debateId, argumentId: parentArgumentId});
         }
+    }
+
+    /// @notice Internal function accruing an argument's time-weighted tally inputs - the centered approval and
+    /// the market stake, each multiplied by the seconds they stood - up to now, capped at the rating window's
+    /// end. Called before a trade moves the market; the tally itself never writes the accumulators (it
+    /// completes them in memory), keeping the atomic whole-tree tally free of per-argument stores.
+    /// @param debateId The ID of the debate.
+    /// @param argument The argument whose accumulators are brought up to date.
+    function _accrueTallyInputs(uint256 debateId, Argument.Data storage argument) internal {
+        Phase.Data storage phaseData = _phases[debateId];
+
+        // A zero accrual time marks untouched accumulators: the window opens when the rating phase does.
+        uint48 start = argument.lastAccrualTime == 0 ? phaseData.editingEndTime : argument.lastAccrualTime;
+        uint48 currentTime = Time.timestamp();
+        uint48 until = currentTime < phaseData.ratingEndTime ? currentTime : phaseData.ratingEndTime;
+        uint48 elapsed = until - start;
+        if (elapsed == 0) {
+            return;
+        }
+
+        argument.centeredApprovalSeconds += SafeCast.toInt96(
+            int256(_centeredApproval(argument)) * int256(uint256(elapsed))
+        );
+        argument.votesSeconds += SafeCast.toUint96(uint256(argument.votes) * uint256(elapsed));
+        argument.lastAccrualTime = until;
     }
 
     /// @notice An internal function reverting if the debate is not in a certain phase.
@@ -1067,30 +1096,89 @@ contract Deliberate is IDeliberate {
         }
     }
 
-    /// @notice Internal function to calculate the tallied rating of an argument in a debate.
+    /// @notice Internal function to calculate the tallied rating of an argument in a debate. Requires the
+    /// argument's accumulators to be complete: accrued through the rating window's end.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @return rating The tallied rating of the argument - signed, negative meaning refuted.
     function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int64 rating) {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
+        // The own approval, centered so the market's undecided price is zero and time-weighted over the
+        // rating window: what the market said, for as long as it said it. A push in the window's closing
+        // seconds moves this average by the tail fraction only.
+        (int96 centeredApprovalSeconds,) = _completedTallyInputs({debateId: debateId, argument: argument});
+        uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
+        int64 centeredApproval = SafeCast.toInt64(int256(centeredApprovalSeconds) / int256(uint256(window)));
+
+        // Blend own approval and the descendants' aggregate by the stake behind each: the argument's own
+        // time-weighted market stake against its subtree's (accumulated by the tallied children). A childless
+        // argument keeps its full own centered approval; a heavily debated one is corrected in proportion
+        // to the stake that debate attracted. The denominator is at least the argument's deposit - which
+        // stands the whole window, so its time-weighted stake is itself - never zero. Negative means
+        // refuted: the debate rates this argument as standing against itself.
+        rating = centeredApproval.weightedMean({
+            weightA: _timeWeightedVotes({debateId: debateId, argument: argument}),
+            b: argument.descendantsAggregate,
+            weightB: argument.subtreeVotes
+        });
+    }
+
+    /// @notice An internal function reading an argument market's current approval, centered so the undecided
+    /// 50% price is zero.
+    /// @param argument The argument whose market is read.
+    /// @return centeredApproval The centered approval, in the tally's fixed point.
+    function _centeredApproval(Argument.Data storage argument) internal view returns (int64 centeredApproval) {
         uint32 pro = argument.pro;
         uint32 con = argument.con;
 
-        // The own approval, centered so the market's undecided price is zero.
-        int64 centeredApproval = Parameters._MAX_APPROVAL
+        centeredApproval = Parameters._MAX_APPROVAL
             .multiplyByFraction({
                 numerator: int64(uint64(con)) - int64(uint64(pro)), denominator: int64(uint64(pro)) + int64(uint64(con))
             });
+    }
 
-        // Blend own approval and the descendants' aggregate by the stake behind each: the argument's
-        // own market votes against its subtree's votes (accumulated by the tallied children). A childless
-        // argument keeps its full own centered approval; a heavily debated one is corrected in proportion
-        // to the stake that debate attracted. The denominator is at least the argument's deposit, never
-        // zero. Negative means refuted: the debate rates this argument as standing against itself.
-        rating = centeredApproval.weightedMean({
-            weightA: argument.votes, b: argument.descendantsAggregate, weightB: argument.subtreeVotes
-        });
+    /// @notice An internal function completing an argument's time-weighted accumulators in memory: the stored
+    /// sums plus the stretch from the last accrual to the rating window's end at the standing values. Nothing
+    /// trades after rating ends, so the standing values are the final ones - the whole-tree tally reads
+    /// completed accumulators without a single per-argument store. Meaningful once rating has ended.
+    /// @param debateId The ID of the debate.
+    /// @param argument The argument whose accumulators are completed.
+    /// @return centeredApprovalSeconds The completed centered-approval accumulator.
+    /// @return votesSeconds The completed stake accumulator.
+    function _completedTallyInputs(uint256 debateId, Argument.Data storage argument)
+        internal
+        view
+        returns (int96 centeredApprovalSeconds, uint96 votesSeconds)
+    {
+        Phase.Data storage phaseData = _phases[debateId];
+
+        // A zero accrual time marks untouched accumulators: the window opens when the rating phase does.
+        uint48 start = argument.lastAccrualTime == 0 ? phaseData.editingEndTime : argument.lastAccrualTime;
+        uint48 elapsed = phaseData.ratingEndTime - start;
+
+        centeredApprovalSeconds = argument.centeredApprovalSeconds
+            + SafeCast.toInt96(int256(_centeredApproval(argument)) * int256(uint256(elapsed)));
+        votesSeconds = argument.votesSeconds + SafeCast.toUint96(uint256(argument.votes) * uint256(elapsed));
+    }
+
+    /// @notice An internal function reading an argument's time-weighted stake: the vote tokens held in its
+    /// market, averaged over the rating window. A stake placed mid-window counts in proportion to the time it
+    /// was held and exposed; the deposit, standing the whole window, counts in full. Meaningful once rating
+    /// has ended.
+    /// @param debateId The ID of the debate.
+    /// @param argument The argument whose stake is read.
+    /// @return timeWeightedVotes The time-weighted stake.
+    function _timeWeightedVotes(uint256 debateId, Argument.Data storage argument)
+        internal
+        view
+        returns (uint32 timeWeightedVotes)
+    {
+        (, uint96 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
+        uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
+
+        // An average of uint32 stake levels stays within uint32.
+        timeWeightedVotes = SafeCast.toUint32(uint256(votesSeconds) / window);
     }
 
     /// @notice An internal function reverting if an initial approval is outside the seedable range.
