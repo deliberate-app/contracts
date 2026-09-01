@@ -15,7 +15,7 @@ library Parameters {
     /// @notice The highest market fee (in percent) a debate creator may set. Capping below 100 keeps
     /// every nonzero stake's net amount at least 1, so a stake can never degenerate into a pure fee
     /// transfer that moves no market.
-    uint32 internal constant _MAX_FEE_PERCENTAGE = 99;
+    uint8 internal constant _MAX_FEE_PERCENTAGE = 99;
 
     /// @notice The initial vote token balance granted to a user upon joining a debate.
     uint32 public constant INITIAL_TOKENS = 100;

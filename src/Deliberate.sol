@@ -29,9 +29,6 @@ contract Deliberate is IDeliberate {
     using Utils for int64;
     using Debate for Debate.Data;
 
-    /// @notice The identity registry gating debate joining (e.g. a personhood registry or an attestation adapter).
-    IIdentityRegistry internal immutable _IDENTITY_REGISTRY;
-
     /// @notice The counter tracking the number of created debates.
     uint256 internal _debatesCounter;
 
@@ -99,7 +96,7 @@ contract Deliberate is IDeliberate {
     /// @notice Thrown if a debate is created with a market fee above the permitted maximum.
     /// @param limit The highest permitted fee percentage.
     /// @param actual The fee percentage passed.
-    error FeePercentageExceeded(uint32 limit, uint32 actual);
+    error FeePercentageExceeded(uint8 limit, uint8 actual);
 
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
@@ -196,19 +193,14 @@ contract Deliberate is IDeliberate {
         _;
     }
 
-    /// @notice Deploys the contract with the identity registry gating debate joining.
-    /// @param identityRegistry The identity registry contract.
-    constructor(IIdentityRegistry identityRegistry) {
-        _IDENTITY_REGISTRY = identityRegistry;
-    }
-
     /// @inheritdoc IDeliberate
     function createDebate(
         bytes32 contentURI,
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
-        uint32 feePercentage,
+        uint8 feePercentage,
+        IIdentityRegistry identityRegistry,
         IERC20 bountyToken,
         uint256 bountyAmount
     ) external override returns (uint256 debateId) {
@@ -253,6 +245,11 @@ contract Deliberate is IDeliberate {
 
         newDebate.feePercentage = feePercentage;
 
+        // Who may join, chosen per debate: the zero address leaves it open to everyone, any other address is
+        // asked `isRegistered` on each join. One registry serves any number of debates, so a creator curating a
+        // membership - their own allowlist, or a Circles group they already maintain - reuses it by address.
+        newDebate.identityRegistry = identityRegistry;
+
         // increment counters
         newDebate.incrementArgumentCounter();
 
@@ -263,7 +260,8 @@ contract Deliberate is IDeliberate {
             lockingDuration: lockingDuration,
             editingEndTime: phaseData.editingEndTime,
             ratingEndTime: phaseData.ratingEndTime,
-            feePercentage: feePercentage
+            feePercentage: feePercentage,
+            identityRegistry: identityRegistry
         });
 
         // Attach the optional bounty: the token is fixed for the debate's lifetime, the amount may be
@@ -289,7 +287,10 @@ contract Deliberate is IDeliberate {
             revert PhaseExceeded({limit: Phase.Status.Rating, actual: currentPhase});
         }
 
-        if (!_IDENTITY_REGISTRY.isRegistered(msg.sender)) {
+        // An open debate has no registry to ask; every other mode is one `isRegistered` call away, which is
+        // what lets a personhood proof, a curated allowlist and a Circles group be the same thing here.
+        IIdentityRegistry registry = _debates[debateId].identityRegistry;
+        if (address(registry) != address(0) && !registry.isRegistered(msg.sender)) {
             revert IdentityProofInvalid();
         }
 
@@ -582,10 +583,22 @@ contract Deliberate is IDeliberate {
         external
         view
         override
-        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount, uint32 feePercentage)
+        returns (
+            uint32 totalVotes,
+            uint16 argumentsCount,
+            uint32 participantsCount,
+            uint8 feePercentage,
+            IIdentityRegistry identityRegistry
+        )
     {
         Debate.Data storage debate = _debates[debateId];
-        return (debate.totalVotes, debate.argumentsCount, debate.participantsCount, debate.feePercentage);
+        return (
+            debate.totalVotes,
+            debate.argumentsCount,
+            debate.participantsCount,
+            debate.feePercentage,
+            debate.identityRegistry
+        );
     }
 
     /// @inheritdoc IDeliberate

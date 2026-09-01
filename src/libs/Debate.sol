@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 
 import {EnumerableSet} from "@openzeppelin-contracts-5.6.1/utils/structs/EnumerableSet.sol";
 
+import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
 import {Argument} from "./Argument.sol";
 
 /// @title Debate
@@ -16,15 +17,18 @@ library Debate {
     /// @param argumentsCount The number of arguments in the debate.
     /// @param participantsCount The number of accounts that joined the debate - the `N` in the bounty payout.
     /// @param feePercentage The market fee in percent, chosen by the debate creator at creation and accrued
-    /// to an argument's creator on every stake on that argument.
+    /// to an argument's creator on every stake on that argument. Stored narrow: the domain is 0..99.
+    /// @param identityRegistry The registry gating who may join, chosen by the creator per debate. The zero
+    /// address leaves the debate open to everyone.
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
-        uint32 totalVotes; //                     ┐   4
-        uint16 argumentsCount; //                 | + 2
-        uint32 participantsCount; //              | + 4
-        uint32 feePercentage; //                  | + 4
-        EnumerableSet.UintSet leafArgumentIds; // ┘ = 14
+        uint32 totalVotes; //                       ┐   4
+        uint16 argumentsCount; //                   | + 2
+        uint32 participantsCount; //                | + 4
+        uint8 feePercentage; //                     | + 1
+        IIdentityRegistry identityRegistry; //      | + 20
+        EnumerableSet.UintSet leafArgumentIds; //   ┘ = 31, one slot
     }
 
     /// @notice Increments the argument counter of a debate.

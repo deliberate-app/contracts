@@ -7,10 +7,10 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
 import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
+import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {MockERC20, MockERC20FeeOnTransfer} from "./mocks/MockERC20.m.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DeliberateBountyTest is Test {
     Deliberate internal _deliberate;
@@ -23,7 +23,7 @@ contract DeliberateBountyTest is Test {
     address internal _lateStaker = makeAddr("lateStaker");
 
     function setUp() public {
-        _deliberate = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate();
         _token = new MockERC20();
         _token.mint(address(this), 1_000_000 ether);
         _token.approve(address(_deliberate), type(uint256).max);
@@ -38,6 +38,7 @@ contract DeliberateBountyTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: _token,
             bountyAmount: bountyAmount
         });
@@ -50,6 +51,7 @@ contract DeliberateBountyTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -132,6 +134,7 @@ contract DeliberateBountyTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 1 ether
         });
@@ -188,6 +191,7 @@ contract DeliberateBountyTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: feeToken,
             bountyAmount: 100 ether
         });
@@ -202,14 +206,14 @@ contract DeliberateBountyTest is Test {
 
     function test_join_countsParticipants() public {
         uint256 debateId = _createBountyDebate(_POOL);
-        (,, uint32 participantsCount,) = _deliberate.debates(debateId);
+        (,, uint32 participantsCount,,) = _deliberate.debates(debateId);
         assertEq(participantsCount, 0);
 
         _deliberate.join(debateId);
         vm.prank(_earlyStaker);
         _deliberate.join(debateId);
 
-        (,, participantsCount,) = _deliberate.debates(debateId);
+        (,, participantsCount,,) = _deliberate.debates(debateId);
         assertEq(participantsCount, 2);
     }
 

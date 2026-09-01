@@ -7,6 +7,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
 import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
+import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
 import {Argument} from "../src/libs/Argument.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
@@ -25,7 +26,7 @@ contract DeliberateTest is Test {
 
     function setUp() public {
         _mockIdentityRegistry = new MockIdentityRegistry();
-        _deliberate = new Deliberate(_mockIdentityRegistry);
+        _deliberate = new Deliberate();
     }
 
     // --- helpers ---
@@ -38,18 +39,33 @@ contract DeliberateTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
     }
 
-    function _createDebateWithFee(uint32 feePercentage) internal returns (uint256 debateId) {
+    function _createGatedDebate(IIdentityRegistry identityRegistry) internal returns (uint256 debateId) {
+        debateId = _deliberate.createDebate({
+            contentURI: _THESIS_CONTENT,
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
+            identityRegistry: identityRegistry,
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
+        });
+    }
+
+    function _createDebateWithFee(uint8 feePercentage) internal returns (uint256 debateId) {
         debateId = _deliberate.createDebate({
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: feePercentage,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -208,17 +224,17 @@ contract DeliberateTest is Test {
 
     function test_createDebate_storesTheChosenFee() public {
         uint256 debateId = _createDebate();
-        (,,, uint32 feePercentage) = _deliberate.debates(debateId);
+        (,,, uint8 feePercentage,) = _deliberate.debates(debateId);
         assertEq(feePercentage, 5);
     }
 
     function test_createDebate_acceptsAZeroAndTheMaximumFee() public {
         uint256 freeDebateId = _createDebateWithFee(0);
-        (,,, uint32 freeFee) = _deliberate.debates(freeDebateId);
+        (,,, uint8 freeFee,) = _deliberate.debates(freeDebateId);
         assertEq(freeFee, 0);
 
         uint256 maxDebateId = _createDebateWithFee(99);
-        (,,, uint32 maxFee) = _deliberate.debates(maxDebateId);
+        (,,, uint8 maxFee,) = _deliberate.debates(maxDebateId);
         assertEq(maxFee, 99);
     }
 
@@ -261,6 +277,7 @@ contract DeliberateTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -274,6 +291,7 @@ contract DeliberateTest is Test {
             editingDuration: 3 days,
             ratingDuration: 1 days,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -296,6 +314,7 @@ contract DeliberateTest is Test {
             editingDuration: _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -311,6 +330,7 @@ contract DeliberateTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: _LOCKING_DURATION - 1,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -361,12 +381,63 @@ contract DeliberateTest is Test {
     }
 
     function test_join_revertsIfTheUserHasNoValidIdentityProof() public {
-        uint256 debateId = _createDebate();
+        uint256 debateId = _createGatedDebate(_mockIdentityRegistry);
 
         _mockIdentityRegistry.deny(address(this));
 
         vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
         _deliberate.join(debateId);
+    }
+
+    function test_join_admitsAnyoneWhenTheDebateNamesNoRegistry() public {
+        // The open mode, and the reason it is the zero address rather than a registry that answers yes to
+        // everything: there is nothing to deploy, and nothing that could later answer differently.
+        uint256 debateId = _createDebate();
+
+        vm.prank(makeAddr("a stranger"));
+        _deliberate.join(debateId);
+
+        assertEq(uint8(_deliberate.getUserRole(debateId, makeAddr("a stranger"))), uint8(User.Role.Participant));
+    }
+
+    function test_join_admitsOnlyTheRegistrysMembersWhenTheDebateNamesOne() public {
+        uint256 debateId = _createGatedDebate(_mockIdentityRegistry);
+        address barred = makeAddr("barred");
+        address admitted = makeAddr("admitted");
+        _mockIdentityRegistry.deny(barred);
+
+        vm.prank(admitted);
+        _deliberate.join(debateId);
+
+        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
+        vm.prank(barred);
+        _deliberate.join(debateId);
+    }
+
+    function test_createDebate_recordsTheGateItWasGiven() public {
+        uint256 openDebateId = _createDebate();
+        uint256 gatedDebateId = _createGatedDebate(_mockIdentityRegistry);
+
+        (,,,, IIdentityRegistry openGate) = _deliberate.debates(openDebateId);
+        (,,,, IIdentityRegistry namedGate) = _deliberate.debates(gatedDebateId);
+
+        assertEq(address(openGate), address(0));
+        assertEq(address(namedGate), address(_mockIdentityRegistry));
+    }
+
+    function test_createDebate_letsOneRegistryGateSeveralDebates() public {
+        // The property that makes a curated group worth maintaining: it is deployed once and named by every
+        // debate it should decide.
+        uint256 firstDebateId = _createGatedDebate(_mockIdentityRegistry);
+        uint256 secondDebateId = _createGatedDebate(_mockIdentityRegistry);
+        address barred = makeAddr("barred");
+        _mockIdentityRegistry.deny(barred);
+
+        for (uint256 i = 0; i < 2; i++) {
+            vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
+            vm.prank(barred);
+            _deliberate.join(i == 0 ? firstDebateId : secondDebateId);
+        }
     }
 
     function test_join_succeedsDuringTheRatingPhase() public {
@@ -543,7 +614,7 @@ contract DeliberateTest is Test {
         // Stake weights are tally-time state; only the debate total is maintained on the way in.
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, 0);
 
-        (uint32 totalVotes,,,) = _deliberate.debates(debateId);
+        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 20);
     }
 
@@ -559,7 +630,7 @@ contract DeliberateTest is Test {
         assertEq(argument.con, 20);
         assertEq(argument.votes, 40);
 
-        (uint32 totalVotes,,,) = _deliberate.debates(debateId);
+        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
         assertEq(totalVotes, 40);
         assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
     }
@@ -1346,7 +1417,8 @@ contract DeliberateTest is Test {
             lockingDuration: _LOCKING_DURATION,
             editingEndTime: creationTime + 7 * _LOCKING_DURATION,
             ratingEndTime: creationTime + 10 * _LOCKING_DURATION,
-            feePercentage: 5
+            feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0))
         });
         _createDebate();
     }

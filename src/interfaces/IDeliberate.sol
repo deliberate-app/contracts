@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Argument} from "../libs/Argument.sol";
 import {Phase} from "../libs/Phase.sol";
 import {User} from "../libs/User.sol";
+import {IIdentityRegistry} from "./IIdentityRegistry.sol";
 
 /// @title IDeliberate
 /// @author Michael Heuer
@@ -20,6 +21,7 @@ interface IDeliberate {
     /// @param editingEndTime The end time of the editing phase.
     /// @param ratingEndTime The end time of the rating phase.
     /// @param feePercentage The debate's market fee in percent, accrued to an argument's creator on every stake.
+    /// @param identityRegistry The registry gating who may join; the zero address leaves the debate open.
     event DebateCreated(
         uint256 indexed debateId,
         address indexed creator,
@@ -27,7 +29,8 @@ interface IDeliberate {
         uint48 lockingDuration,
         uint48 editingEndTime,
         uint48 ratingEndTime,
-        uint32 feePercentage
+        uint8 feePercentage,
+        IIdentityRegistry identityRegistry
     );
 
     /// @notice Emitted when a user joins a debate.
@@ -159,6 +162,10 @@ interface IDeliberate {
     /// final by the time the tally runs.
     /// @param feePercentage The market fee in percent (at most 99), accrued to an argument's creator on every
     /// stake on that argument; fixed for the debate's lifetime.
+    /// @param identityRegistry The registry deciding who may join. The zero address leaves the debate open to
+    /// everyone; any other address is asked `isRegistered` on each join, which is how a personhood proof, a
+    /// curated allowlist and a Circles group all become the same gate. One registry serves any number of
+    /// debates, so a creator maintaining a membership reuses it by address.
     /// @param bountyToken The ERC-20 the bounty is denominated in; the zero address attaches no bounty and the
     /// token cannot be changed later. Any ERC-20 works - the token is deliberately uncurated.
     /// @param bountyAmount The bounty amount to pull from the caller (requires a prior approval); may be zero
@@ -169,7 +176,8 @@ interface IDeliberate {
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
-        uint32 feePercentage,
+        uint8 feePercentage,
+        IIdentityRegistry identityRegistry,
         IERC20 bountyToken,
         uint256 bountyAmount
     ) external returns (uint256 debateId);
@@ -308,10 +316,17 @@ interface IDeliberate {
     /// @return argumentsCount The number of arguments in the debate.
     /// @return participantsCount The number of accounts that joined the debate.
     /// @return feePercentage The debate's market fee in percent, chosen by its creator at creation.
+    /// @return identityRegistry The registry gating who may join; the zero address means the debate is open.
     function debates(uint256 debateId)
         external
         view
-        returns (uint32 totalVotes, uint16 argumentsCount, uint32 participantsCount, uint32 feePercentage);
+        returns (
+            uint32 totalVotes,
+            uint16 argumentsCount,
+            uint32 participantsCount,
+            uint8 feePercentage,
+            IIdentityRegistry identityRegistry
+        );
 
     /// @notice Returns the bounty state of a debate.
     /// @param debateId The ID of the debate.

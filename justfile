@@ -75,54 +75,42 @@ check:
     @just test
 
 # Simulate deployment (dry-run)
-simulate identity-registry chain *args:
+simulate chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
     forge script script/DeployDeliberate.s.sol:DeployDeliberate \
-        --sig "run(address)" {{ identity-registry }} \
+        --sig "run()" \
         --rpc-url {{ chain }} {{ args }}
 
-# Deploy Deliberate
-deploy deployer identity-registry chain *args:
+# Deploy Deliberate. Who may join is chosen per debate, so the contract takes no constructor arguments.
+deploy deployer chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
     forge script script/DeployDeliberate.s.sol:DeployDeliberate \
-        --sig "run(address)" {{ identity-registry }} \
-        --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
-
-# Deploy Deliberate together with a MockIdentityRegistry (test networks without a real registry)
-deploy-with-mock deployer chain *args:
-    @echo "Cleaning contracts to ensure reproducible build..."
-    @just clean
-    forge script script/DeployDeliberate.s.sol:DeployDeliberate \
-        --sig "runWithMockRegistry()" \
+        --sig "run()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
 # --- Verification ---
 # The deploy recipes verify inline when passed `--verify ...`; these re-verify a
-# standing deployment (constructor args and all) when that inline pass was skipped
-# or timed out. Deliberate's constructor takes the identity registry address, so it
-# must be supplied to reconstruct the constructor arguments.
+# standing deployment when that inline pass was skipped or timed out. Deliberate
+# takes no constructor arguments, so nothing has to be reconstructed.
 
 # Verify Deliberate on both Sourcify and Etherscan
-verify address identity-registry chain: (verify-sourcify address identity-registry chain) (verify-etherscan address identity-registry chain)
+verify address chain: (verify-sourcify address chain) (verify-etherscan address chain)
 
 # Verify Deliberate on Sourcify (keyless, chain-agnostic)
-verify-sourcify address identity-registry chain *args:
+verify-sourcify address chain *args:
     env -u ETHERSCAN_API_KEY forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier sourcify --watch {{ args }}
 
 # Verify Deliberate on an Etherscan-family explorer (needs ETHERSCAN_API_KEY)
-verify-etherscan address identity-registry chain *args:
+verify-etherscan address chain *args:
     forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier etherscan --watch {{ args }}
 
 # Verify Deliberate on a custom explorer (pass its verifier URL; add `--verifier blockscout` for Blockscout)
-verify-custom address identity-registry chain verifier-url *args:
+verify-custom address chain verifier-url *args:
     forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
-        --constructor-args $(cast abi-encode "constructor(address)" {{ identity-registry }}) \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
 # Publish contracts to the Soldeer registry

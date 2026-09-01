@@ -8,13 +8,10 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Deliberate} from "../src/Deliberate.sol";
 import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 // Exposes the internal tally/tree plumbing so its defensive guards can be exercised: through the
 // public surface their invariants hold by construction, leaving the guards otherwise unreachable.
 contract DeliberateHarness is Deliberate {
-    constructor(IIdentityRegistry identityRegistry) Deliberate(identityRegistry) {}
-
     function exposedTallyNode(uint256 debateId, uint16 argumentId) external {
         _tallyNode(debateId, argumentId);
     }
@@ -30,7 +27,7 @@ contract DeliberateHarnessTest is Test {
     DeliberateHarness internal _deliberate;
 
     function setUp() public {
-        _deliberate = new DeliberateHarness(new MockIdentityRegistry());
+        _deliberate = new DeliberateHarness();
     }
 
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
@@ -40,6 +37,7 @@ contract DeliberateHarnessTest is Test {
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });

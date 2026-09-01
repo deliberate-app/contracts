@@ -7,7 +7,6 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 // The stake-weighted tally (ADR-0011) on the centered scale (ADR-0012), reading time-weighted
 // inputs (ADR-0013): an argument's rating blends its own centered approval - zero at the market's
@@ -32,7 +31,7 @@ contract DeliberateTallyTest is Test {
     Deliberate internal _deliberate;
 
     function setUp() public {
-        _deliberate = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate();
     }
 
     function test_aLoneArgumentSwaysTheThesisWithItsFullApproval() public {

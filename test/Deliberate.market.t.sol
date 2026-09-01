@@ -8,7 +8,6 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 import {Deliberate} from "../src/Deliberate.sol";
 import {Argument} from "../src/libs/Argument.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 // Forensic replay of production debate 4 (Base Sepolia, Deliberate 0xFb21…4A5b) and the isolated
 // causes behind its counterintuitive numbers: 200 tokens staked, end balances 98 and 94, "total
@@ -31,7 +30,7 @@ contract DeliberateMarketTest is Test {
     Deliberate internal _deliberate;
 
     function setUp() public {
-        _deliberate = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate();
     }
 
     // The seed shared by every scenario: the production argument - a 10-token deposit at 50%

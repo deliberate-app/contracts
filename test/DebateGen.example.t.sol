@@ -8,7 +8,6 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 import {Deliberate} from "../src/Deliberate.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DebateGenExampleTest is Test {
     using DebateGen for Vm;
@@ -22,7 +21,7 @@ contract DebateGenExampleTest is Test {
     Deliberate internal _deliberate;
 
     function setUp() public {
-        _deliberate = new Deliberate(new MockIdentityRegistry());
+        _deliberate = new Deliberate();
     }
 
     function test_everyArgumentsContentIsItsOwnId() public {

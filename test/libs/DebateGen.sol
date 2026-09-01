@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../../src/Deliberate.sol";
+import {IIdentityRegistry} from "../../src/interfaces/IIdentityRegistry.sol";
 import {Argument} from "../../src/libs/Argument.sol";
 import {Parameters} from "../../src/libs/Parameters.sol";
 import {Phase} from "../../src/libs/Phase.sol";
@@ -27,7 +28,7 @@ library DebateGen {
 
     // The DSL's standing market fee: the 5% every existing scenario (and the replayed production
     // era) was computed with, so the library's arithmetic stays stable.
-    uint32 internal constant FEE_PERCENTAGE = 5;
+    uint8 internal constant FEE_PERCENTAGE = 5;
 
     function createDebate(Vm vm, Deliberate deliberate, address creator, uint48 lockingDuration)
         internal
@@ -47,7 +48,7 @@ library DebateGen {
         Deliberate deliberate,
         address creator,
         uint48 lockingDuration,
-        uint32 feePercentage
+        uint8 feePercentage
     ) internal returns (Debate memory debate) {
         vm.prank(creator);
         // The thesis is argument 0, so its content is bytes32(0) under the "content is the id" convention.
@@ -58,6 +59,7 @@ library DebateGen {
             editingDuration: 7 * lockingDuration,
             ratingDuration: 3 * lockingDuration,
             feePercentage: feePercentage,
+            identityRegistry: IIdentityRegistry(address(0)),
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
@@ -86,7 +88,7 @@ library DebateGen {
     ) internal returns (uint16 argumentId) {
         join(vm, debate, author);
         // The next id is the current argument count (ids are dense from 0); use it as the content.
-        (, uint16 nextId,,) = debate.deliberate.debates(debate.id);
+        (, uint16 nextId,,,) = debate.deliberate.debates(debate.id);
         vm.prank(author);
         argumentId = debate.deliberate
             .addArgument({
@@ -225,11 +227,11 @@ library DebateGen {
     }
 
     function totalVotesOf(Vm, Debate memory debate) internal view returns (uint32 totalVotes) {
-        (totalVotes,,,) = debate.deliberate.debates(debate.id);
+        (totalVotes,,,,) = debate.deliberate.debates(debate.id);
     }
 
-    function feeOf(Vm, Debate memory debate) internal view returns (uint32 feePercentage) {
-        (,,, feePercentage) = debate.deliberate.debates(debate.id);
+    function feeOf(Vm, Debate memory debate) internal view returns (uint8 feePercentage) {
+        (,,, feePercentage,) = debate.deliberate.debates(debate.id);
     }
 
     // --- internal ---

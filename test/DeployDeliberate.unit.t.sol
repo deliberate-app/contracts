@@ -7,6 +7,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {DeployDeliberate} from "../script/DeployDeliberate.s.sol";
 import {Deliberate} from "../src/Deliberate.sol";
+import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DeployDeliberateTest is Test {
@@ -16,36 +17,45 @@ contract DeployDeliberateTest is Test {
         _script = new DeployDeliberate();
     }
 
-    function test_run_deploysDeliberateAgainstTheGivenRegistry() public {
-        MockIdentityRegistry registry = new MockIdentityRegistry();
-
-        address deliberate = _script.run(address(registry));
-        assertGt(deliberate.code.length, 0);
-
-        // The given registry is wired into the join gate: an account it denies cannot join.
-        uint256 debateId = Deliberate(deliberate)
-            .createDebate({
+    function _createDebate(Deliberate deliberate, IIdentityRegistry identityRegistry)
+        internal
+        returns (uint256 debateId)
+    {
+        debateId = deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: 60,
             editingDuration: 7 * 60,
             ratingDuration: 3 * 60,
             feePercentage: 5,
+            identityRegistry: identityRegistry,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
-        address denied = makeAddr("denied");
-        registry.deny(denied);
-        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
-        vm.prank(denied);
-        Deliberate(deliberate).join(debateId);
     }
 
-    function test_runWithMockRegistry_deploysThePair() public {
-        (address deliberate, address identityRegistry) = _script.runWithMockRegistry();
+    function test_run_deploysDeliberate() public {
+        address deliberate = _script.run();
 
         assertGt(deliberate.code.length, 0);
-        assertGt(identityRegistry.code.length, 0);
-        // The mock admits everyone, so any account can join the debates deployed against it.
-        assertTrue(MockIdentityRegistry(identityRegistry).isRegistered(makeAddr("anyone")));
+    }
+
+    function test_run_deploysAContractWhoseDebatesChooseTheirOwnGate() public {
+        // One deployment serves every mode, which is why the script takes no arguments: the gate is a
+        // property of each debate, not of the contract they all live in.
+        Deliberate deliberate = Deliberate(_script.run());
+        MockIdentityRegistry registry = new MockIdentityRegistry();
+
+        uint256 openDebateId = _createDebate(deliberate, IIdentityRegistry(address(0)));
+        uint256 gatedDebateId = _createDebate(deliberate, registry);
+
+        address denied = makeAddr("denied");
+        registry.deny(denied);
+
+        vm.prank(denied);
+        deliberate.join(openDebateId);
+
+        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
+        vm.prank(denied);
+        deliberate.join(gatedDebateId);
     }
 }
