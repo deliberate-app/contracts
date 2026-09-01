@@ -1039,7 +1039,7 @@ contract Deliberate is IDeliberate {
         argument.centeredApprovalSeconds += SafeCast.toInt88(
             int256(_centeredApproval(argument)) * int256(uint256(elapsed))
         );
-        argument.votesSeconds += SafeCast.toUint88(uint256(argument.votes) * uint256(elapsed));
+        argument.votesSeconds += SafeCast.toUint80(uint256(argument.votes) * uint256(elapsed));
         argument.lastAccrualTime = until;
     }
 
@@ -1189,7 +1189,7 @@ contract Deliberate is IDeliberate {
     function _completedTallyInputs(uint256 debateId, Argument.Data storage argument)
         internal
         view
-        returns (int88 centeredApprovalSeconds, uint88 votesSeconds)
+        returns (int88 centeredApprovalSeconds, uint80 votesSeconds)
     {
         Phase.Data storage phaseData = _phases[debateId];
 
@@ -1199,7 +1199,7 @@ contract Deliberate is IDeliberate {
 
         centeredApprovalSeconds = argument.centeredApprovalSeconds
             + SafeCast.toInt88(int256(_centeredApproval(argument)) * int256(uint256(elapsed)));
-        votesSeconds = argument.votesSeconds + SafeCast.toUint88(uint256(argument.votes) * uint256(elapsed));
+        votesSeconds = argument.votesSeconds + SafeCast.toUint80(uint256(argument.votes) * uint256(elapsed));
     }
 
     /// @notice An internal function reading an argument's time-weighted stake: the vote tokens held in its
@@ -1214,7 +1214,7 @@ contract Deliberate is IDeliberate {
         view
         returns (uint32 timeWeightedVotes)
     {
-        (, uint88 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
+        (, uint80 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
         uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
 
         // An average of uint32 stake levels stays within uint32.

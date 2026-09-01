@@ -31,12 +31,12 @@ library Argument {
     /// later would double-count the argument's own stake.
     /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
     /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
-    /// bought by holding it, not by having the last word. Bounded by the full-scale approval (2^32) times a
-    /// uint48 window - below 2^80, comfortably inside 88 bits.
+    /// bought by holding it, not by having the last word. Its magnitude is bounded by the full-scale approval
+    /// (2^32) times a uint48 window, so it needs 80 bits and a sign - one more than an int80 carries, hence 88.
     /// @param votesSeconds The market stake multiplied by the seconds it was held, accumulated over the rating
     /// window. The tally divides by the window to read the time-weighted stake: weight is earned by exposure,
     /// so the deposit (standing the whole window) counts in full while late stakes count in proportion.
-    /// Bounded like `centeredApprovalSeconds`.
+    /// Bounded by a uint32 stake times a uint48 window, which is exactly what 80 unsigned bits hold.
     /// @param lastAccrualTime The time up to which the two accumulators are complete; zero until the first
     /// accrual, which opens the window at the end of the editing phase.
     /// @param fees The fees accrued by the argument for its creator. Packed with the accrual state its writes
@@ -55,9 +55,9 @@ library Argument {
         int64 descendantsAggregate; // | + 8
         int64 rating; //            ┘ + 8 = 32
         int88 centeredApprovalSeconds; // ┐  11
-        uint88 votesSeconds; //           | +11
+        uint80 votesSeconds; //           | +10
         uint48 lastAccrualTime; //        | + 6
-        uint32 fees; //                   ┘ + 4 = 32
+        uint32 fees; //                   ┘ + 4 = 31
     }
 
     /// @notice The container holding the amounts computed for a stake on an argument's rating market.
