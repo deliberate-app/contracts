@@ -352,12 +352,7 @@ contract Deliberate is IDeliberate {
         (movedArgument.pro, movedArgument.con) = movedArgument.votes.split(100 - initialApproval, initialApproval);
 
         // change new parent argument state
-        debate.arguments[newParentArgumentId].untalliedChilds++;
-        if (newParentArgumentId != 0) {
-            // The removal is idempotent: a no-op if the new parent was already interior.
-            // slither-disable-next-line unused-return
-            debate.leafArgumentIds.remove(newParentArgumentId);
-        }
+        _updateParentAfterChildAttachment({debateId: debateId, parentArgumentId: newParentArgumentId});
 
         emit ArgumentMoved({
             debateId: debateId,
@@ -687,20 +682,12 @@ contract Deliberate is IDeliberate {
             deposit: deposit
         });
 
-        // Update the parent: one more child to tally. Stake weights are not maintained here - the
-        // tally derives every subtree's stake bottom-up when it runs.
-        Argument.Data storage parentArgument = debate.arguments[parentArgumentId];
-        parentArgument.untalliedChilds++;
+        _updateParentAfterChildAttachment({debateId: debateId, parentArgumentId: parentArgumentId});
 
         // The deposit is committed to the new argument's market and counts toward the debate total.
         debate.totalVotes += deposit;
 
-        // Update the debate's leaves: the parent stops being one (a no-op if it was already interior,
-        // and the root is never a leaf), the new argument starts as one.
-        if (parentArgumentId != 0) {
-            // slither-disable-next-line unused-return
-            debate.leafArgumentIds.remove(parentArgumentId);
-        }
+        // The new argument starts as a leaf.
         // slither-disable-next-line unused-return
         debate.leafArgumentIds.add(newArgumentId);
 
@@ -781,6 +768,28 @@ contract Deliberate is IDeliberate {
         argument.isSupporting = isSupporting;
 
         argument.contentURI = contentURI;
+    }
+
+    /// @notice Internal function to update a parent argument after a child argument attaches to it in a debate.
+    /// @dev The counterpart of `_updateParentAfterChildRemoval`; both maintain the child count the tally
+    /// consumes and the leaf set it starts from, which is why they are one pair rather than open code at
+    /// each of the three sites that attach or detach a child.
+    /// @param debateId The ID of the debate.
+    /// @param parentArgumentId The ID of the parent argument.
+    function _updateParentAfterChildAttachment(uint256 debateId, uint16 parentArgumentId) internal {
+        Debate.Data storage debate = _debates[debateId];
+
+        // One more child to tally. Stake weights are not maintained here - the tally derives every
+        // subtree's stake bottom-up when it runs.
+        debate.arguments[parentArgumentId].untalliedChilds++;
+
+        // The parent stops being a leaf on its first child. The removal is idempotent, so it is a
+        // no-op if the parent was already interior, and the root is never a leaf: it has no market
+        // and is never tallied as one.
+        if (parentArgumentId != 0) {
+            // slither-disable-next-line unused-return
+            debate.leafArgumentIds.remove(parentArgumentId);
+        }
     }
 
     /// @notice Internal function to update a parent argument after the removal of a child argument in a debate.
