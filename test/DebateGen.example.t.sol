@@ -51,10 +51,10 @@ contract DebateGenExampleTest is Test {
         uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50); // reserves 5/5 at the min deposit
 
         vm.warpToRating(debate);
-        vm.stakeCon(debate, _BOB, argumentId, 20);
+        vm.stakeCon(debate, _BOB, argumentId, 2000);
 
         assertLt(vm.approvalBps(debate, argumentId), 5000); // pushed below neutral
-        assertEq(vm.tokensOf(debate, _BOB), 80); // 100 granted on join, 20 staked
+        assertEq(vm.tokensOf(debate, _BOB), 8000); // 10000 granted on join, 2000 staked
     }
 
     function test_buildsADeeperTreeAcrossFinalizationWindows() public {

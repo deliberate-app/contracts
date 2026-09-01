@@ -86,12 +86,12 @@ contract DeliberateBountyTest is Test {
 
         vm.startPrank(_earlyStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 10);
+        _deliberate.stakePro(debateId, argumentId, 1000);
         vm.stopPrank();
 
         vm.startPrank(_lateStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
         vm.stopPrank();
 
         _endRating(debateId);
@@ -227,16 +227,16 @@ contract DeliberateBountyTest is Test {
         toSettle[0] = argumentId;
 
         vm.expectEmit(true, true, true, true);
-        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 2 ether});
+        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 2.45 ether});
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, toSettle);
 
         // The claim settled the shares (102 tokens) and paid pool * 2/300.
-        assertEq(_deliberate.getUserTokens(debateId, _earlyStaker), 102);
-        assertEq(_token.balanceOf(_earlyStaker), 2 ether);
+        assertEq(_deliberate.getUserTokens(debateId, _earlyStaker), 10245);
+        assertEq(_token.balanceOf(_earlyStaker), 2.45 ether);
         (, uint256 pool, uint256 claimed,,) = _deliberate.bounty(debateId);
         assertEq(pool, _POOL);
-        assertEq(claimed, 2 ether);
+        assertEq(claimed, 2.45 ether);
     }
 
     function test_claimBounty_acceptsAPreSettledClaim() public {
@@ -246,7 +246,7 @@ contract DeliberateBountyTest is Test {
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, new uint16[](0));
 
-        assertEq(_token.balanceOf(_earlyStaker), 2 ether);
+        assertEq(_token.balanceOf(_earlyStaker), 2.45 ether);
     }
 
     function test_claimBounty_isOneShot() public {
@@ -267,7 +267,7 @@ contract DeliberateBountyTest is Test {
         toSettle[0] = argumentId;
 
         // The late staker redeemed 19 on 20 staked: 99 tokens is no win.
-        vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 99));
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 9948));
         vm.prank(_lateStaker);
         _deliberate.claimBounty(debateId, toSettle);
     }
@@ -318,11 +318,11 @@ contract DeliberateBountyTest is Test {
         _endEditing(debateId);
         vm.startPrank(_earlyStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 10);
+        _deliberate.stakePro(debateId, argumentId, 1000);
         vm.stopPrank();
         vm.startPrank(_lateStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
         vm.stopPrank();
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -330,7 +330,7 @@ contract DeliberateBountyTest is Test {
         uint16[] memory toSettle = new uint16[](1);
         toSettle[0] = argumentId;
         vm.expectEmit(true, true, true, true);
-        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 2, amount: 0});
+        emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 0});
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, toSettle);
 
@@ -350,10 +350,10 @@ contract DeliberateBountyTest is Test {
         uint256 balanceBefore = _token.balanceOf(address(this));
 
         vm.expectEmit(true, true, true, true);
-        emit IDeliberate.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2 ether});
+        emit IDeliberate.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2.45 ether});
         _deliberate.sweepBounty(debateId);
 
-        assertEq(_token.balanceOf(address(this)) - balanceBefore, _POOL - 2 ether);
+        assertEq(_token.balanceOf(address(this)) - balanceBefore, _POOL - 2.45 ether);
         (,,, bool swept,) = _deliberate.bounty(debateId);
         assertTrue(swept);
     }

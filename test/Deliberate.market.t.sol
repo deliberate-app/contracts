@@ -7,10 +7,11 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
 import {Argument} from "../src/libs/Argument.sol";
+import {Parameters} from "../src/libs/Parameters.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 
 // Forensic replay of production debate 4 (Base Sepolia, Deliberate 0xFb21…4A5b) and the isolated
-// causes behind its counterintuitive numbers: 200 tokens staked, end balances 98 and 94, "total
+// causes behind its counterintuitive numbers: the whole budget staked, end balances short of it, "total
 // stake" shown as 191. Every figure is re-derived from the mechanism alone, so a failing assert
 // here would be an actual math bug - a passing suite pins each surprise on market economics
 // instead. Since ADR-0013/0014 a share settles at the tallied rating built from time-weighted
@@ -43,7 +44,7 @@ contract DeliberateMarketTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
     }
@@ -51,27 +52,28 @@ contract DeliberateMarketTest is Test {
     function test_replaysProductionDebate4ToTheToken() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 
-        // 0x990c staked 100 UNDERRATED (the on-chain Staked event says isPro - not overrated):
-        // 5% fee -> 95 net into the con reserve, pro restored to the invariant rounded up:
-        // (5, 5) -> (1, 100), shares out 5 + 95 - 1 = 99.
-        vm.stakePro(debate, _BOB, argumentId, 100);
+        // 0x990c staked their whole budget UNDERRATED (the on-chain Staked event says isPro - not
+        // overrated): 5% fee -> 9500 net into the con reserve, pro restored to the invariant rounded up:
+        // (500, 500) -> (25, 10000), shares out 500 + 9500 - 25 = 9975.
+        vm.stakePro(debate, _BOB, argumentId, 10000);
         Argument.Data memory afterBob = vm.argumentOf(debate, argumentId);
-        assertEq(afterBob.pro, 1);
-        assertEq(afterBob.con, 100);
-        assertEq(vm.sharesOf(debate, _BOB, argumentId).pro, 99);
+        assertEq(afterBob.pro, 25);
+        assertEq(afterBob.con, 10000);
+        assertEq(vm.sharesOf(debate, _BOB, argumentId).pro, 9975);
 
-        // 0x4161 then staked their remaining 90, also UNDERRATED: fee 4 -> 86 net,
-        // (1, 100) -> (1, 186), shares out 1 + 86 - 1 = 86.
-        vm.stakePro(debate, _ALICE, argumentId, 90);
+        // 0x4161 then staked their remaining nine tenths, also UNDERRATED: fee 450 -> 8550 net,
+        // (25, 10000) -> (14, 18550), shares out 25 + 8550 - 14 = 8561.
+        vm.stakePro(debate, _ALICE, argumentId, 9000);
         Argument.Data memory afterAlice = vm.argumentOf(debate, argumentId);
-        assertEq(afterAlice.pro, 1);
-        assertEq(afterAlice.con, 186);
-        assertEq(vm.sharesOf(debate, _ALICE, argumentId).pro, 86);
+        assertEq(afterAlice.pro, 14);
+        assertEq(afterAlice.con, 18550);
+        assertEq(vm.sharesOf(debate, _ALICE, argumentId).pro, 8561);
 
         // The UI's "total stake" is the tokens sitting IN the markets: deposit + net stakes,
-        // 10 + 95 + 86 = 191 = 200 gross - 9 fees. The fees moved to the creator, not vanished.
-        assertEq(vm.totalVotesOf(debate), 191);
-        assertEq(afterAlice.fees, 9);
+        // 1000 + 9500 + 8550 = 19050 = 19000 gross plus the deposit, less 950 in fees. The fees moved
+        // to the creator, not vanished.
+        assertEq(vm.totalVotesOf(debate), 19050);
+        assertEq(afterAlice.fees, 950);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -84,37 +86,36 @@ contract DeliberateMarketTest is Test {
         vm.redeem(debate, _ALICE, argumentId);
         vm.claimFees(debate, argumentId);
 
-        // The production end state, still to the token (the floors absorb the seed's second):
-        // 98 for 0x990c, and 85 plus the 9 creator fees = 94 for 0x4161.
-        assertEq(vm.tokensOf(debate, _BOB), 98);
-        assertEq(vm.tokensOf(debate, _ALICE), 94);
+        // The end state, still to the token: 9939 for 0x990c, and 8530 plus the 950 creator fees
+        // = 9480 for 0x4161.
+        assertEq(vm.tokensOf(debate, _BOB), 9939);
+        assertEq(vm.tokensOf(debate, _ALICE), 9480);
 
-        // Conservation: of the 200 minted, 192 came back and 8 stay stranded in the market -
-        // the spent seed deposit net of payout rounding, owned by nobody by design.
-        assertEq(vm.tokensOf(debate, _BOB) + vm.tokensOf(debate, _ALICE), 192);
+        // Conservation: of the 20000 minted, 19419 came back and the rest stays stranded in the
+        // market - the spent seed deposit net of payout rounding, owned by nobody by design.
+        assertEq(vm.tokensOf(debate, _BOB) + vm.tokensOf(debate, _ALICE), 19419);
     }
 
     function test_aLoneCorrectorPaysForTheirOwnPriceMove() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 
-        // Bob's 95-net trade against the 10-token 50/50 seed IS the whole correction: it moves
-        // the approval from 50% to 100/101 ~ 99% and he pays the average price along that curve.
-        vm.stakePro(debate, _BOB, argumentId, 100);
+        // Bob's 9500-net trade against the 1000-token 50/50 seed IS the whole correction: it moves
+        // the approval from 50% to 10000/10025 ~ 99.8% and he pays the average price along that curve.
+        vm.stakePro(debate, _BOB, argumentId, 10000);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
         vm.redeem(debate, _BOB, argumentId);
 
-        // 97 back on 100 staked: his shares settle at the time-weighted price he set (99% for
-        // 179 of 180 seconds - one token cheaper than the closing price alone paid). An AMM pays
-        // for moves OTHERS make after you; his own move cost the curve's average price, and the
-        // 5-token fee ate more than the curve gain.
-        assertEq(vm.tokensOf(debate, _BOB), 97);
+        // 9922 back on 10000 staked: his shares settle at the time-weighted price he set, below the
+        // closing price alone. An AMM pays for moves OTHERS make after you; his own move cost the
+        // curve's average price, and the 500-token fee ate more than the curve gain.
+        assertEq(vm.tokensOf(debate, _BOB), 9922);
     }
 
     function test_aOnePercentFeeTurnsTheLoneCorrectorProfitable() public {
         // The same lone-corrector scenario at the frontend's new default fee of 1% instead of the
-        // replayed era's 5%: fee 1 -> 99 net, (5, 5) -> (1, 104), shares 5 + 99 - 1 = 103.
+        // replayed era's 5%: fee 100 -> 9900 net, (500, 500) -> (25, 10400), shares 500 + 9900 - 25 = 10375.
         DebateGen.Debate memory debate = vm.createDebateWithFee(_deliberate, _ALICE, _LOCKING_DURATION, 1);
         uint16 argumentId = vm.addArgument({
             debate: debate,
@@ -122,42 +123,41 @@ contract DeliberateMarketTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, argumentId, 100);
+        vm.stakePro(debate, _BOB, argumentId, 10000);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
         vm.redeem(debate, _BOB, argumentId);
 
-        // 101 back on 100 staked: the curve gain now exceeds the fee, so the identical trade that
-        // lost 3 tokens at 5% earns 1 at 1% - the fee level, not the market math, decided.
+        // 10321 back on 10000 staked: the curve gain now exceeds the fee, so the identical trade that
+        // lost tokens at 5% earns them at 1% - the fee level, not the market math, decided.
         assertEq(vm.feeOf(debate), 1);
-        assertEq(vm.tokensOf(debate, _BOB), 101);
+        assertEq(vm.tokensOf(debate, _BOB), 10321);
     }
 
     function test_profitNeedsACounterpartyOnTheWrongSide() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 
         // The outcome the intuition expected, reconstructed: Carol calls the argument overrated
-        // and is wrong - her 95 net crashes the approval to ~1% ((5, 5) -> (100, 1), 99 con
-        // shares). Bob then buys the pro side cheap: (100, 1) -> (2, 96), 100 + 95 - 2 = 193 pro
-        // shares for the same 100-token stake that bought only 99 in the replay.
-        vm.stakeCon(debate, _CAROL, argumentId, 100);
-        vm.stakePro(debate, _BOB, argumentId, 100);
+        // and is wrong - her 9500 net crashes the approval ((500, 500) -> (10000, 25), 9975 con
+        // shares). Bob then buys the pro side cheap: (10000, 25) -> (27, 9525), 10000 + 9500 - 27 =
+        // 19473 pro shares for the same 10000-token stake that bought only 9975 in the replay.
+        vm.stakeCon(debate, _CAROL, argumentId, 10000);
+        vm.stakePro(debate, _BOB, argumentId, 10000);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
         vm.redeem(debate, _BOB, argumentId);
         vm.redeem(debate, _CAROL, argumentId);
 
-        // The market closes at 96/98 and the shares settle at its time-weighted rating: Bob
-        // redeems 188, Carol 2. "Many more points at the expense of the other" requires opposing
-        // sides; in production both stakes were pro, so the only tokens winnable were the
-        // 10-token seed.
-        assertEq(vm.tokensOf(debate, _BOB), 188);
-        assertEq(vm.tokensOf(debate, _CAROL), 2);
+        // The shares settle at the market's time-weighted rating. "Many more points at the expense
+        // of the other" requires opposing sides; in the replay both stakes were pro, so the only
+        // tokens winnable were the seed.
+        assertEq(vm.tokensOf(debate, _BOB), 19364);
+        assertEq(vm.tokensOf(debate, _CAROL), 55);
     }
 
     function test_refutationByChildrenSettlesTheParentsShares() public {
@@ -173,25 +173,25 @@ contract DeliberateMarketTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 90,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
         vm.addArgument({
-            debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 30
+            debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 3000
         });
         vm.warpToRating(debate);
-        vm.stakeCon(debate, _BOB, parent, 1); // fee 0 -> net 1: reserves (2, 5), 5 con shares
+        vm.stakeCon(debate, _BOB, parent, 100); // fee 0 -> net 1: reserves (2, 5), 5 con shares
 
         vm.warpToTallying(debate);
         vm.tally(debate);
         vm.redeem(debate, _BOB, parent);
 
-        // The parent's own market closed pro-leaning at 5/7 ~ 71%, yet its rating - its
-        // time-weighted price at stake 10 against the counter-argument's 90% conviction at
-        // subtree stake 30 - lands refuted at -2114589652 ~ -49%. Bob's 5 con shares settle at
-        // floor(5 * (MAX + 2114589652) / 2 MAX) = 3 on the 1 token he staked.
-        assertEq(vm.argumentOf(debate, parent).rating, -2114589652);
-        assertEq(vm.tokensOf(debate, _BOB), 102); // 100 - 1 + 3
+        // The parent's own market closed pro-leaning, yet its rating - its time-weighted price at
+        // stake 1000 against the counter-argument's 90% conviction at subtree stake 3000 - lands
+        // refuted at -2048884181 ~ -48%. Bob's con shares settle against that rating rather than
+        // against the lazy market that shielded the argument.
+        assertEq(vm.argumentOf(debate, parent).rating, -2048884181);
+        assertEq(vm.tokensOf(debate, _BOB), 10293);
         // And toward the thesis the refuted parent is silenced, not inverted: silence objects.
         assertFalse(vm.outcome(debate));
     }

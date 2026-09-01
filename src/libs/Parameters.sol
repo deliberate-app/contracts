@@ -9,16 +9,24 @@ library Parameters {
     /// @notice The smallest vote token deposit an argument's creator may stake to seed the market reserves.
     /// @dev The creator picks the deposit; this floor keeps both market reserves non-empty across the seedable
     /// approval range (a degenerate zero reserve would freeze the constant-product market) and sets the minimum
-    /// weight an argument carries into the tally.
-    uint32 internal constant _MIN_DEBATE_DEPOSIT = 10;
+    /// weight an argument carries into the tally. A multiple of 100, so that seeding at any whole percent splits
+    /// the smallest permitted deposit exactly.
+    uint32 internal constant _MIN_DEBATE_DEPOSIT = 1_000;
 
     /// @notice The highest market fee (in percent) a debate creator may set. Capping below 100 keeps
     /// every nonzero stake's net amount at least 1, so a stake can never degenerate into a pure fee
     /// transfer that moves no market.
     uint8 internal constant _MAX_FEE_PERCENTAGE = 99;
 
-    /// @notice The initial vote token balance granted to a user upon joining a debate.
-    uint32 public constant INITIAL_TOKENS = 100;
+    /// @notice The initial vote token balance granted to a user upon joining a debate, in the protocol's
+    /// smallest unit.
+    /// @dev A participant's budget is one hundred tokens, held in hundredths so that the integer arithmetic
+    /// downstream lands where the inputs say it should. Approvals and fees are whole percents, so a budget of
+    /// exactly 100 units left both coarse: seeding the smallest permitted deposit was exact for five of the
+    /// fifty seedable approvals and off by up to nine percentage points otherwise, and a 5% fee on any stake
+    /// below a fifth of a budget rounded away to nothing. In hundredths every whole-percent seeding is exact
+    /// and the fee survives stakes a hundred times smaller. Clients divide by one hundred to display it.
+    uint32 public constant INITIAL_TOKENS = 10_000;
 
     /// @notice The window after a debate finishes during which bounty claims are open; afterwards the
     /// creator may sweep the remainder.

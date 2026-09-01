@@ -6,6 +6,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
+import {Parameters} from "../src/libs/Parameters.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 
 // The stake-weighted tally (ADR-0011) on the centered scale (ADR-0012), reading time-weighted
@@ -45,18 +46,18 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, argumentId, 100); // fee 1 -> net 99: reserves (1, 104), votes 109
+        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 100 -> net 9900: reserves (25, 10400), votes 10900
 
         vm.warpToTallying(debate);
         vm.tally(debate);
 
-        // Centered final price: floor(MAX * (104-1)/105) = 4213158394, standing 179 of 180 seconds
-        // (the neutral seed the first): floor(4213158394 * 179 / 180) = 4189751958 ~ 97.5%
+        // Centered final price: floor(MAX * (10400-25)/10425) = 4274367931, standing 179 of 180
+        // seconds (the neutral seed the first): floor(4274367931 * 179 / 180) = 4250621442 ~ 99.0%
         // conviction, folded with full weight.
-        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 4189751958);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 4250621442);
         assertTrue(vm.outcome(debate));
     }
 
@@ -72,14 +73,19 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
         uint16 child = vm.addArgument({
-            debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 10
+            debate: debate,
+            author: _CAROL,
+            parentId: parent,
+            isSupporting: false,
+            initialApproval: 90,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, parent, 100); // fee 5 -> net 95: reserves (1, 100), votes 105
+        vm.stakePro(debate, _BOB, parent, 10000); // fee 5 -> net 95: reserves (1, 100), votes 105
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -87,10 +93,10 @@ contract DeliberateTallyTest is Test {
         // Child (leaf, untouched all window), centered: floor(MAX * (9-1)/10) = 3435973836, subtree
         // stake 10. Parent: its corrected price floor(MAX * (100-1)/101) = 4209918437 time-weights to
         // floor(4209918437 * 179 / 180) = 4186530001, and its stake to floor((10*1 + 105*179)/180)
-        // = 104. Blend: (4186530001 * 104 - 3435973836 * 10) / 114 = 3517889313 ~ 81.9%.
-        assertEq(vm.argumentOf(debate, child).subtreeVotes, 10);
-        assertEq(vm.argumentOf(debate, parent).subtreeVotes, 114);
-        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3517889313);
+        // = 104. Blend: (4186530001 * 104 - 3435973836 * 10) / 114 = 3578381189 ~ 81.9%.
+        assertEq(vm.argumentOf(debate, child).subtreeVotes, 1000);
+        assertEq(vm.argumentOf(debate, parent).subtreeVotes, 11447);
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3578381189);
         assertTrue(vm.outcome(debate));
     }
 
@@ -105,14 +111,19 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 90,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         uint16 b = vm.addArgument({
-            debate: debate, author: _BOB, parentId: DebateGen.ROOT, isSupporting: true, initialApproval: 50, deposit: 10
+            debate: debate,
+            author: _BOB,
+            parentId: DebateGen.ROOT,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpWindows(debate, 1);
         vm.addArgument({
-            debate: debate, author: _CAROL, parentId: b, isSupporting: true, initialApproval: 90, deposit: 40
+            debate: debate, author: _CAROL, parentId: b, isSupporting: true, initialApproval: 90, deposit: 4000
         });
 
         vm.warpToTallying(debate);
@@ -123,7 +134,7 @@ contract DeliberateTallyTest is Test {
         // (0 * 10 + 3435973836 * 40) / 50 = 2748779068, subtree 50.
         // Thesis: (3435973836 * 10 + 2748779068 * 50) / 60 = 2863311529 - the subtree-weighted mean,
         // not the own-votes mean (3092376452).
-        assertEq(vm.argumentOf(debate, b).subtreeVotes, 50);
+        assertEq(vm.argumentOf(debate, b).subtreeVotes, 5000);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2863311529);
 
         // The thesis' accumulated weight is the whole debate's stake - every market counted once.
@@ -144,7 +155,7 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 90,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         uint16 attack = vm.addArgument({
             debate: debate,
@@ -152,11 +163,11 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: false,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpWindows(debate, 1);
         vm.addArgument({
-            debate: debate, author: _CAROL, parentId: attack, isSupporting: false, initialApproval: 90, deposit: 30
+            debate: debate, author: _CAROL, parentId: attack, isSupporting: false, initialApproval: 90, deposit: 3000
         });
 
         vm.warpToTallying(debate);
@@ -167,7 +178,7 @@ contract DeliberateTallyTest is Test {
         // Thesis: (3435973836 * 10 + 0 * 40) / 50 = 687194767 - diluted by the refuted subtree's
         // kept weight, not raised by it (unclamped it would read (34359738360 + 2576980377 * 40)
         // / 50, the attack aiding the thesis), and not the supporter's lone voice either.
-        assertEq(vm.argumentOf(debate, attack).subtreeVotes, 40);
+        assertEq(vm.argumentOf(debate, attack).subtreeVotes, 4000);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 687194767);
         assertTrue(vm.outcome(debate));
         assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
@@ -185,19 +196,19 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         (,, uint48 ratingEndTime,) = _deliberate.phases(debate.id);
         vm.warp(ratingEndTime);
-        vm.stakePro(debate, _BOB, argumentId, 100); // fee 5 -> net 95: reserves (1, 100)
+        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 5 -> net 95: reserves (1, 100)
 
         vm.warpToTallying(debate);
         vm.tally(debate);
 
         // The market closed at 100/101 ~ 99%, yet the tally saw a neutral market all window.
-        assertEq(vm.approvalBps(debate, argumentId), 9900);
+        assertEq(vm.approvalBps(debate, argumentId), 9975);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 0);
-        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 10);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 1000);
         assertFalse(vm.outcome(debate));
     }
 
@@ -211,20 +222,20 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         (, uint48 editingEndTime,,) = _deliberate.phases(debate.id);
         vm.warp(editingEndTime + 90);
-        vm.stakePro(debate, _BOB, argumentId, 100); // fee 5 -> net 95: reserves (1, 100), votes 105
+        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 500 -> net 9500: reserves (25, 10000), votes 10500
 
         vm.warpToTallying(debate);
         vm.tally(debate);
 
-        // Price: floor(floor(MAX * (100-1)/101) * 90 / 180) = floor(4209918437 / 2) = 2104959218.
-        // Weight: floor((10 * 90 + 105 * 90) / 180) = 57 - the seed's 10 in full, the stake's 95
-        // at half.
-        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2104959218);
-        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 57);
+        // Price: floor(floor(MAX * (10000-25)/10025) * 90 / 180) = floor(4273546011 / 2) =
+        // 2136773005. Weight: floor((1000 * 90 + 10500 * 90) / 180) = 5750 - the seed's 1000 in
+        // full, the stake's 9500 at half.
+        assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2136773005);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 5750);
         assertTrue(vm.outcome(debate));
     }
 
@@ -239,7 +250,7 @@ contract DeliberateTallyTest is Test {
             parentId: DebateGen.ROOT,
             isSupporting: true,
             initialApproval: 50,
-            deposit: 10
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
 
         vm.warpToTallying(debate);

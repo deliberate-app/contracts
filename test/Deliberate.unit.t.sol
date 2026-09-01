@@ -504,9 +504,9 @@ contract DeliberateTest is Test {
         Argument.Data memory proArgument = _deliberate.getArgument(debateId, proArgumentId);
         assertEq(proArgument.contentURI, _PRO_ARGUMENT_CONTENT);
 
-        assertEq(proArgument.pro, 5);
-        assertEq(proArgument.con, 5);
-        assertEq(proArgument.votes, 10);
+        assertEq(proArgument.pro, 500);
+        assertEq(proArgument.con, 500);
+        assertEq(proArgument.votes, 1000);
         assertEq(proArgument.fees, 0);
 
         assertEq(proArgument.creator, address(this));
@@ -531,9 +531,9 @@ contract DeliberateTest is Test {
         Argument.Data memory conArgument = _deliberate.getArgument(debateId, conArgumentId);
         assertEq(conArgument.contentURI, _PRO_ARGUMENT_CONTENT);
 
-        assertEq(conArgument.pro, 5);
-        assertEq(conArgument.con, 5);
-        assertEq(conArgument.votes, 10);
+        assertEq(conArgument.pro, 500);
+        assertEq(conArgument.con, 500);
+        assertEq(conArgument.votes, 1000);
         assertEq(conArgument.fees, 0);
 
         assertEq(conArgument.creator, address(this));
@@ -577,9 +577,9 @@ contract DeliberateTest is Test {
         _join(debateId);
 
         Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 50));
-        assertEq(argument.pro, 5);
-        assertEq(argument.con, 5);
-        assertEq(argument.votes, 10);
+        assertEq(argument.pro, 500);
+        assertEq(argument.con, 500);
+        assertEq(argument.votes, 1000);
         assertEq(argument.fees, 0);
     }
 
@@ -589,9 +589,9 @@ contract DeliberateTest is Test {
 
         // Approval is the pro-share price: 80% approval means a scarce pro reserve.
         Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 80));
-        assertEq(argument.pro, 2);
-        assertEq(argument.con, 8);
-        assertEq(argument.votes, 10);
+        assertEq(argument.pro, 200);
+        assertEq(argument.con, 800);
+        assertEq(argument.votes, 1000);
         assertEq(argument.fees, 0);
     }
 
@@ -599,10 +599,12 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
+        // Seeding is exact at the scale the deposit carries: 5% of 1000 to pro, 95% to con - where a
+        // hundred-unit budget could only reach 90%, ten points off what the creator asked for.
         Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 95));
-        assertEq(argument.pro, 1);
-        assertEq(argument.con, 9);
-        assertEq(argument.votes, 10);
+        assertEq(argument.pro, 50);
+        assertEq(argument.con, 950);
+        assertEq(argument.votes, 1000);
         assertEq(argument.fees, 0);
     }
 
@@ -617,24 +619,24 @@ contract DeliberateTest is Test {
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, 0);
 
         (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(totalVotes, 20);
+        assertEq(totalVotes, 2000);
     }
 
     function test_addArgument_stakesTheChosenDeposit() public {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        // The creator stakes 40 (above the minimum) at 50% approval: the deposit splits evenly
+        // The creator stakes 4000 (above the minimum) at 50% approval: the deposit splits evenly
         // into the reserves, seeds the votes, and counts in full toward the parent and debate totals.
-        uint16 argumentId = _addArgument(debateId, true, 50, 40);
+        uint16 argumentId = _addArgument(debateId, true, 50, 4000);
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
-        assertEq(argument.pro, 20);
-        assertEq(argument.con, 20);
-        assertEq(argument.votes, 40);
+        assertEq(argument.pro, 2000);
+        assertEq(argument.con, 2000);
+        assertEq(argument.votes, 4000);
 
         (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(totalVotes, 40);
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 40);
+        assertEq(totalVotes, 4000);
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 4000);
     }
 
     function test_addArgument_revertsForADepositBelowTheMinimum() public {
@@ -652,7 +654,7 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint32 deposit = Parameters.INITIAL_TOKENS + 1;
+        uint32 deposit = Parameters.INITIAL_TOKENS + 100;
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.InsufficientVoteTokens.selector, deposit, Parameters.INITIAL_TOKENS)
         );
@@ -775,17 +777,17 @@ contract DeliberateTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         // A draft seeded at 50% approval: reserves split the deposit evenly.
         uint16 childArgumentId = _addArgument(debateId, true, 50);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 5);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 5);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 500);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 500);
 
         // Moving it re-seeds the market at 80%: con takes 80% of the (unchanged) deposit.
         _deliberate.moveArgument({
             debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
         });
 
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 2);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 8);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 10); // the deposit is unchanged
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 200);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 800);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 1000); // the deposit is unchanged
     }
 
     function test_moveArgument_reseedsFromTheArgumentDeposit() public {
@@ -795,17 +797,17 @@ contract DeliberateTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        // A draft seeded with a 40-token deposit at 50%: reserves 20/20.
-        uint16 childArgumentId = _addArgument(debateId, true, 50, 40);
+        // A draft seeded with a 4000-token deposit at 50%: reserves 2000/2000.
+        uint16 childArgumentId = _addArgument(debateId, true, 50, 4000);
 
-        // Moving it re-seeds at 80% from the 40-token deposit: con takes 80% (32), pro the rest (8).
+        // Moving it re-seeds at 80% from the 4000-token deposit: con takes 80% (3200), pro the rest (800).
         _deliberate.moveArgument({
             debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
         });
 
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 8);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 32);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 40);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 800);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 3200);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 4000);
     }
 
     function test_moveArgument_revertsForAnApprovalOutOfBounds() public {
@@ -911,21 +913,21 @@ contract DeliberateTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
 
         // 100 initial - 10 deposit - 20 staked
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 70);
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 7000);
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
         User.Shares memory shares = _deliberate.getUserShares(debateId, argumentId, address(this));
-        assertEq(shares.pro, 22);
+        assertEq(shares.pro, 2295);
         assertEq(shares.con, 0);
 
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
-        assertEq(argument.pro, 2);
-        assertEq(argument.con, 24); // approval con/(pro+con) rose from 50% to 24/26 = 92.3%
-        assertEq(argument.votes, 29); // 10 deposit + 20 staked - 1 fee
-        assertEq(argument.fees, 1); // 5% of 20
+        assertEq(argument.pro, 105);
+        assertEq(argument.con, 2400); // approval con/(pro+con) rose from 50% to 2400/2505 = 95.8%
+        assertEq(argument.votes, 2900); // 1000 deposit + 2000 staked - 100 fee
+        assertEq(argument.fees, 100); // 5% of 2000
     }
 
     function test_stakeCon_buysConSharesAndLowersTheApproval() public {
@@ -936,16 +938,16 @@ contract DeliberateTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
-        _deliberate.stakeCon(debateId, argumentId, 20);
+        _deliberate.stakeCon(debateId, argumentId, 2000);
 
         // fee 1, net 19: pro 5+19=24, con ceil(25/24)=2, shares out 22
         User.Shares memory shares = _deliberate.getUserShares(debateId, argumentId, address(this));
-        assertEq(shares.con, 22);
+        assertEq(shares.con, 2295);
         assertEq(shares.pro, 0);
 
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
-        assertEq(argument.pro, 24);
-        assertEq(argument.con, 2); // approval fell from 50% to 2/26 = 7.7% - rated as bad
+        assertEq(argument.pro, 2400);
+        assertEq(argument.con, 105); // approval fell from 50% to 105/12105 - rated as bad
     }
 
     /// @dev Pins the market's defining behavior: buying a side always moves the approval - the
@@ -955,7 +957,7 @@ contract DeliberateTest is Test {
         public
     {
         initialApproval = uint8(bound(initialApproval, 50, 99));
-        amount = uint32(bound(amount, 1, 100));
+        amount = uint32(bound(amount, 1, 10000));
 
         uint256 debateId = _createDebate();
         _join(debateId);
@@ -1006,8 +1008,8 @@ contract DeliberateTest is Test {
         uint8 childApproval
     ) public {
         initialApproval = uint8(bound(initialApproval, 50, 99));
-        firstAmount = uint32(bound(firstAmount, 1, 100));
-        secondAmount = uint32(bound(secondAmount, 1, 100));
+        firstAmount = uint32(bound(firstAmount, 1, 10000));
+        secondAmount = uint32(bound(secondAmount, 1, 10000));
         // The rating window is three locking durations; the second stake lands anywhere inside it.
         secondDelay = uint48(bound(secondDelay, 0, 3 * _LOCKING_DURATION - 1));
         childApproval = uint8(bound(childApproval, 50, 99));
@@ -1078,7 +1080,7 @@ contract DeliberateTest is Test {
 
         // The thesis is Final from creation but has no market of its own.
         vm.expectRevert(Deliberate.ThesisHasNoMarket.selector);
-        _deliberate.stakePro(debateId, _ROOT_ARGUMENT_ID, 10);
+        _deliberate.stakePro(debateId, _ROOT_ARGUMENT_ID, 1000);
     }
 
     function test_stakePro_revertsForANonFinalArgument() public {
@@ -1093,7 +1095,7 @@ contract DeliberateTest is Test {
         _endEditing(debateId); // now in rating, but the argument's window has not closed yet
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, argumentId));
-        _deliberate.stakePro(debateId, argumentId, 10);
+        _deliberate.stakePro(debateId, argumentId, 1000);
     }
 
     function test_stakeCon_revertsForANonexistentArgument() public {
@@ -1102,7 +1104,7 @@ contract DeliberateTest is Test {
         _endEditing(debateId);
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, uint16(42)));
-        _deliberate.stakeCon(debateId, 42, 10);
+        _deliberate.stakeCon(debateId, 42, 1000);
     }
 
     // --- tallyTree ---
@@ -1320,13 +1322,13 @@ contract DeliberateTest is Test {
         // The early staker buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
         vm.startPrank(earlyStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 10);
+        _deliberate.stakePro(debateId, argumentId, 1000);
         vm.stopPrank();
 
         // The crowd confirms the rating later, at a higher price: 20 shares for 20 tokens (-> 97.1%).
         vm.startPrank(lateStaker);
         _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
         vm.stopPrank();
 
         _endRating(debateId);
@@ -1337,10 +1339,10 @@ contract DeliberateTest is Test {
 
         // Early: 13 shares settling at the tallied rating (~96.9% on the price scale) = 12 tokens
         // back on 10 staked - correcting the rating early pays.
-        assertEq(_deliberate.getUserTokens(debateId, earlyStaker), 102);
+        assertEq(_deliberate.getUserTokens(debateId, earlyStaker), 10245);
         // Late: 20 shares at the same settlement = 19 tokens back on 20 staked - fee and slippage
         // eat the late trade.
-        assertEq(_deliberate.getUserTokens(debateId, lateStaker), 99);
+        assertEq(_deliberate.getUserTokens(debateId, lateStaker), 9948);
         // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
     }
 
@@ -1359,10 +1361,10 @@ contract DeliberateTest is Test {
         address staker = makeAddr("staker");
         vm.startPrank(staker);
         _deliberate.join(debateId);
-        _deliberate.stakeCon(debateId, argument1, 20);
-        _deliberate.stakeCon(debateId, argument2, 20);
+        _deliberate.stakeCon(debateId, argument1, 2000);
+        _deliberate.stakeCon(debateId, argument2, 2000);
         vm.stopPrank();
-        assertEq(_deliberate.getUserTokens(debateId, staker), 60); // 100 - 20 - 20
+        assertEq(_deliberate.getUserTokens(debateId, staker), 6000); // 100 - 20 - 20
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1375,7 +1377,7 @@ contract DeliberateTest is Test {
         // Both positions redeemed in one call: 20 tokens back per argument.
         assertEq(_deliberate.getUserShares(debateId, argument1, staker).con, 0);
         assertEq(_deliberate.getUserShares(debateId, argument2, staker).con, 0);
-        assertEq(_deliberate.getUserTokens(debateId, staker), 100); // 60 + 20 + 20
+        assertEq(_deliberate.getUserTokens(debateId, staker), 10384);
     }
 
     function test_redeemArgumentSharesBatch_skipsArgumentsWithoutShares() public {
@@ -1391,7 +1393,7 @@ contract DeliberateTest is Test {
         address staker = makeAddr("staker");
         vm.startPrank(staker);
         _deliberate.join(debateId);
-        _deliberate.stakeCon(debateId, argument1, 20);
+        _deliberate.stakeCon(debateId, argument1, 2000);
         vm.stopPrank();
 
         _endRating(debateId);
@@ -1404,7 +1406,7 @@ contract DeliberateTest is Test {
         _deliberate.redeemArgumentSharesBatch(debateId, argumentIds, staker);
 
         assertEq(_deliberate.getUserShares(debateId, argument1, staker).con, 0);
-        assertEq(_deliberate.getUserTokens(debateId, staker), 100); // 100 - 20 + 20; argument2 a no-op
+        assertEq(_deliberate.getUserTokens(debateId, staker), 10192); // argument2 a no-op
     }
 
     function test_redeemArgumentSharesBatch_revertsBeforeTheTallyHasRun() public {
@@ -1434,21 +1436,21 @@ contract DeliberateTest is Test {
         vm.prank(staker);
         _deliberate.join(debateId);
         vm.prank(staker);
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 90); // 100 - 10 deposit
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9000); // 100 - 10 deposit
 
         _deliberate.claimFees(debateId, argumentId);
 
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 91); // + 1 fee
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9100); // + 1 fee
         assertEq(_deliberate.getArgument(debateId, argumentId).fees, 0);
 
         // A second claim is a no-op.
         _deliberate.claimFees(debateId, argumentId);
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 91);
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9100);
     }
 
     function test_claimFees_revertsWhileTheDebateIsNotFinished() public {
@@ -1506,8 +1508,8 @@ contract DeliberateTest is Test {
             creator: address(this),
             isSupporting: true,
             contentURI: _PRO_ARGUMENT_CONTENT,
-            pro: 2,
-            con: 8,
+            pro: 200,
+            con: 800,
             finalizationTime: uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION
         });
         _addArgument(debateId, true, 80);
@@ -1527,8 +1529,8 @@ contract DeliberateTest is Test {
             argumentId: movedArgumentId,
             newParentArgumentId: newParentArgumentId,
             oldParentArgumentId: _ROOT_ARGUMENT_ID,
-            pro: 2,
-            con: 8
+            pro: 200,
+            con: 800
         });
         _deliberate.moveArgument({
             debateId: debateId,
@@ -1569,9 +1571,9 @@ contract DeliberateTest is Test {
             debateId: debateId,
             argumentId: argumentId,
             staker: address(this),
-            data: Argument.Stake({isPro: true, voteTokensStaked: 20, fee: 1, sharesOut: 22})
+            data: Argument.Stake({isPro: true, voteTokensStaked: 2000, fee: 100, sharesOut: 2295})
         });
-        _deliberate.stakePro(debateId, argumentId, 20);
+        _deliberate.stakePro(debateId, argumentId, 2000);
     }
 
     function test_tallyTree_emitsDebateFinishedWithTheOutcome() public {
@@ -1595,7 +1597,7 @@ contract DeliberateTest is Test {
         _endEditing(debateId);
 
         // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
-        _deliberate.stakeCon(debateId, argumentId, 20);
+        _deliberate.stakeCon(debateId, argumentId, 2000);
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1603,7 +1605,12 @@ contract DeliberateTest is Test {
         // 26 con shares x 21/22 of the market, rounded down: 24 tokens.
         vm.expectEmit();
         emit IDeliberate.SharesRedeemed({
-            debateId: debateId, argumentId: argumentId, account: address(this), proShares: 0, conShares: 26, payout: 24
+            debateId: debateId,
+            argumentId: argumentId,
+            account: address(this),
+            proShares: 0,
+            conShares: 2623,
+            payout: 2519
         });
         _deliberate.redeemArgumentShares(debateId, argumentId, address(this));
     }
