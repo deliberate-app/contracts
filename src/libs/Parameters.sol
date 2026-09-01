@@ -22,8 +22,8 @@ library Parameters {
 
     /// @notice The window after a debate finishes during which bounty claims are open; afterwards the
     /// creator may sweep the remainder.
-    /// @dev A constant, not a creator knob: an unfloored creator-chosen window would allow sweeping
-    /// before anyone can claim (see ADR-0009).
+    /// @dev A constant, not a creator knob: a creator-chosen window with no floor could close before
+    /// anyone had a chance to claim, letting the creator sweep the whole pool.
     uint48 public constant CLAIM_WINDOW = 7 days;
 
     /// @notice The maximum number of arguments per debate, the thesis included.
