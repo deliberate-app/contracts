@@ -57,23 +57,6 @@ library Utils {
         result = SafeCast.toInt64(int256(value) * int256(numerator) / int256(denominator));
     }
 
-    /// @notice Calculates `value * numerator / denominator`, rounded toward zero, for a signed value and unsigned
-    /// weights.
-    /// @dev Absorbs the `uint32` -> `int256` widening (Solidity has no implicit signed/unsigned conversion) so callers
-    /// can pass `uint32` amounts without casting at the call site. The `int256` arithmetic also keeps the intermediate
-    /// product overflow-free.
-    /// @param value The value.
-    /// @param numerator The numerator.
-    /// @param denominator The denominator.
-    /// @return result The result of `value * numerator / denominator`, rounded toward zero.
-    function multiplyByFraction(int64 value, uint32 numerator, uint32 denominator)
-        internal
-        pure
-        returns (int64 result)
-    {
-        result = SafeCast.toInt64(int256(value) * int256(uint256(numerator)) / int256(uint256(denominator)));
-    }
-
     /// @notice Calculates the weighted mean of two signed values, `(a * weightA + b * weightB) / (weightA + weightB)`,
     /// rounded toward zero.
     /// @dev The `int256` intermediates keep the products overflow-free; the result is bounded by the larger
