@@ -83,7 +83,7 @@ library DebateGen {
         address author,
         uint16 parentId,
         bool isSupporting,
-        uint32 initialApproval,
+        uint8 initialApproval,
         uint32 deposit
     ) internal returns (uint16 argumentId) {
         join(vm, debate, author);
@@ -101,7 +101,7 @@ library DebateGen {
             });
     }
 
-    function addPro(Vm vm, Debate memory debate, address author, uint16 parentId, uint32 initialApproval)
+    function addPro(Vm vm, Debate memory debate, address author, uint16 parentId, uint8 initialApproval)
         internal
         returns (uint16 argumentId)
     {
@@ -116,7 +116,7 @@ library DebateGen {
         });
     }
 
-    function addCon(Vm vm, Debate memory debate, address author, uint16 parentId, uint32 initialApproval)
+    function addCon(Vm vm, Debate memory debate, address author, uint16 parentId, uint8 initialApproval)
         internal
         returns (uint16 argumentId)
     {

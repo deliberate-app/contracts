@@ -218,7 +218,7 @@ interface IDeliberate {
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval,
+        uint8 initialApproval,
         uint32 deposit
     ) external returns (uint16 newArgumentId);
 
@@ -230,7 +230,7 @@ interface IDeliberate {
     /// @param argumentId The ID of the argument to be moved.
     /// @param newParentArgumentId The ID of the new parent argument.
     /// @param initialApproval The initial approval to re-seed the argument's market at.
-    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint32 initialApproval)
+    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint8 initialApproval)
         external;
 
     /// @notice Alters the content of an argument.

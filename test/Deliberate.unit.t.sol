@@ -77,14 +77,14 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
     }
 
-    function _addArgument(uint256 debateId, bool isSupporting, uint32 initialApproval)
+    function _addArgument(uint256 debateId, bool isSupporting, uint8 initialApproval)
         internal
         returns (uint16 argumentId)
     {
         argumentId = _addArgument(debateId, isSupporting, initialApproval, Parameters._MIN_DEBATE_DEPOSIT);
     }
 
-    function _addArgument(uint256 debateId, bool isSupporting, uint32 initialApproval, uint32 deposit)
+    function _addArgument(uint256 debateId, bool isSupporting, uint8 initialApproval, uint32 deposit)
         internal
         returns (uint16 argumentId)
     {
@@ -553,7 +553,7 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _join(debateId);
 
-        uint32 initialApproval = 49;
+        uint8 initialApproval = 49;
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(50), initialApproval)
         );
@@ -565,7 +565,7 @@ contract DeliberateTest is Test {
         _join(debateId);
 
         // 100 would empty the pro reserve and freeze the market.
-        uint32 initialApproval = 100;
+        uint8 initialApproval = 100;
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(99), initialApproval)
         );
@@ -951,10 +951,10 @@ contract DeliberateTest is Test {
     /// @dev Pins the market's defining behavior: buying a side always moves the approval - the
     /// price of belief, con/(pro+con) - toward that side, never away from it. Compared through
     /// cross-multiplication to avoid integer division.
-    function testFuzz_stake_movesTheApprovalTowardTheBoughtSide(uint32 initialApproval, bool isPro, uint32 amount)
+    function testFuzz_stake_movesTheApprovalTowardTheBoughtSide(uint8 initialApproval, bool isPro, uint32 amount)
         public
     {
-        initialApproval = uint32(bound(initialApproval, 50, 99));
+        initialApproval = uint8(bound(initialApproval, 50, 99));
         amount = uint32(bound(amount, 1, 100));
 
         uint256 debateId = _createDebate();
@@ -996,21 +996,21 @@ contract DeliberateTest is Test {
     /// market's own price: any rating in [-MAX, MAX] pays at most one full side's shares, covered
     /// by the deposit and net stakes.
     function testFuzz_redeem_staysWithinTheMarketCollateral(
-        uint32 initialApproval,
+        uint8 initialApproval,
         bool firstIsPro,
         uint32 firstAmount,
         bool secondIsPro,
         uint32 secondAmount,
         uint48 secondDelay,
         bool childIsSupporting,
-        uint32 childApproval
+        uint8 childApproval
     ) public {
-        initialApproval = uint32(bound(initialApproval, 50, 99));
+        initialApproval = uint8(bound(initialApproval, 50, 99));
         firstAmount = uint32(bound(firstAmount, 1, 100));
         secondAmount = uint32(bound(secondAmount, 1, 100));
         // The rating window is three locking durations; the second stake lands anywhere inside it.
         secondDelay = uint48(bound(secondDelay, 0, 3 * _LOCKING_DURATION - 1));
-        childApproval = uint32(bound(childApproval, 50, 99));
+        childApproval = uint8(bound(childApproval, 50, 99));
 
         uint256 debateId = _createDebate();
         _join(debateId);

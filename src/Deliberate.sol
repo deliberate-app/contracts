@@ -101,7 +101,7 @@ contract Deliberate is IDeliberate {
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
     /// @param actual The actual initial approval value.
-    error InitialApprovalOutOfBounds(uint32 limit, uint32 actual);
+    error InitialApprovalOutOfBounds(uint8 limit, uint8 actual);
 
     /// @notice Thrown if the vote token balance is too low.
     /// @param required The required vote tokens.
@@ -326,7 +326,7 @@ contract Deliberate is IDeliberate {
     /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
     /// attach beneath final arguments while only drafts (still inside their editing window) can move, so a draft is
     /// always childless - its subtree is itself alone - and it is not final.
-    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint32 initialApproval)
+    function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint8 initialApproval)
         external
         override
         onlyPhase(debateId, Phase.Status.Editing)
@@ -653,7 +653,7 @@ contract Deliberate is IDeliberate {
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval,
+        uint8 initialApproval,
         uint32 deposit
     )
         public
@@ -757,7 +757,7 @@ contract Deliberate is IDeliberate {
         uint16 parentArgumentId,
         bytes32 contentURI,
         bool isSupporting,
-        uint32 initialApproval,
+        uint8 initialApproval,
         uint32 deposit
     ) internal returns (uint16 newArgumentId) {
         Debate.Data storage debate = _debates[debateId];
@@ -1223,7 +1223,7 @@ contract Deliberate is IDeliberate {
 
     /// @notice An internal function reverting if an initial approval is outside the seedable range.
     /// @param initialApproval The initial approval to validate.
-    function _checkInitialApproval(uint32 initialApproval) internal pure {
+    function _checkInitialApproval(uint8 initialApproval) internal pure {
         if (initialApproval < 50) {
             revert InitialApprovalOutOfBounds({limit: 50, actual: initialApproval});
         }
