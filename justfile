@@ -113,6 +113,12 @@ verify-custom address chain verifier-url *args:
     forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
+# Verify the any-Circles-human registry the deploy script puts beside Deliberate (constructor: hub, no anchor, humans only)
+verify-circles-registry address chain *args:
+    forge verify-contract {{ address }} src/adapters/CirclesIdentityRegistry.sol:CirclesIdentityRegistry \
+        --constructor-args $(cast abi-encode "constructor(address,address,bool)" 0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8 0x0000000000000000000000000000000000000000 true) \
+        --chain {{ chain }} --watch {{ args }}
+
 # Publish contracts to the Soldeer registry
 publish version *args:
     forge soldeer push deliberate-contracts~{{ version }} {{ args }}
