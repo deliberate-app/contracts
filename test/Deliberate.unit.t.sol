@@ -23,6 +23,8 @@ contract DeliberateTest is Test {
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
     bytes32 internal constant _PRO_ARGUMENT_CONTENT = "This is a good idea.";
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
+    /// @dev Gnosis is the tightest block gas limit the protocol targets; Base Sepolia's is ~70x larger.
+    uint256 internal constant _GNOSIS_BLOCK_GAS_LIMIT = 17_000_000;
 
     function setUp() public {
         _mockIdentityRegistry = new MockIdentityRegistry();
@@ -1151,8 +1153,68 @@ contract DeliberateTest is Test {
         _deliberate.tallyTree(debateId);
         uint256 gasUsed = gasBefore - gasleft();
 
-        // The tally is atomic, so the maximally-sized tree must fit within a mainnet block (~36M today).
-        assertLt(gasUsed, 30_000_000);
+        // The tally is atomic and is the only route to a finished debate, so a tree it cannot settle is a tree
+        // whose deposits and bounty are locked for ever. The bound is the tightest chain the protocol targets,
+        // not the most generous: half a Gnosis block, so a full tally is comfortably includable there.
+        assertLt(gasUsed, _GNOSIS_BLOCK_GAS_LIMIT / 2);
+    }
+
+    function test_tallyTree_settlesAMaximallyDeepChain() public {
+        // The cap bounds the tree's size, not its shape, and the deepest reachable shape is a single chain:
+        // depth costs only one locking window per level, which a creator sets. The gas benchmark above builds
+        // the opposite extreme - every argument a child of the thesis - so without this the tally is only ever
+        // exercised one level deep.
+        uint256 debateId = _deliberate.createDebate({
+            contentURI: _THESIS_CONTENT,
+            lockingDuration: 1,
+            editingDuration: 4 * uint48(Parameters.MAX_ARGUMENTS),
+            ratingDuration: 100,
+            feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
+        });
+
+        uint16 parent = _ROOT_ARGUMENT_ID;
+        uint16 depth = 0;
+        uint256 participantIndex = 0;
+        while (depth < Parameters.MAX_ARGUMENTS - 1) {
+            address participant = makeAddr(string.concat("deep", vm.toString(participantIndex)));
+            vm.prank(participant);
+            _deliberate.join(debateId);
+            // Each participant's budget affords ten argument deposits.
+            for (uint256 i = 0; i < 10 && depth < Parameters.MAX_ARGUMENTS - 1; i++) {
+                vm.prank(participant);
+                parent = _deliberate.addArgument({
+                    debateId: debateId,
+                    parentArgumentId: parent,
+                    contentURI: _PRO_ARGUMENT_CONTENT,
+                    isSupporting: true,
+                    initialApproval: 50,
+                    deposit: Parameters._MIN_DEBATE_DEPOSIT
+                });
+                depth++;
+                // The next level can only attach once its parent's locking window has elapsed.
+                skip(2);
+            }
+            participantIndex++;
+        }
+        assertEq(depth, Parameters.MAX_ARGUMENTS - 1, "the chain must reach the cap to bound the deepest tally");
+
+        _endRating(debateId);
+
+        uint256 gasBefore = gasleft();
+        _deliberate.tallyTree(debateId);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // The tally walks from the single leaf to the root, one level per step, and must finish inside the
+        // same budget the flat tree does - the shape may not decide whether a debate can be settled.
+        assertLt(gasUsed, _GNOSIS_BLOCK_GAS_LIMIT / 2);
+
+        // Settled to the root: every level folded into its parent, and the debate reached its terminal phase.
+        (Phase.Status currentPhase,,,) = _deliberate.phases(debateId);
+        assertEq(uint8(currentPhase), uint8(Phase.Status.Finished));
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);
     }
 
     function test_tallyTree_finalizesArgumentsByTime() public {

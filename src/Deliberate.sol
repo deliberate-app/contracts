@@ -957,56 +957,64 @@ contract Deliberate is IDeliberate {
         emit Staked({debateId: debateId, argumentId: argumentId, staker: msg.sender, data: stakeData});
     }
 
-    /// @notice Internal function to tally an argument in a debate.
+    /// @notice Internal function to tally an argument in a debate, and then every ancestor the tally completes.
+    /// @dev Walks up the tree in a loop rather than recursing into the parent. The parent step is a tail call, so
+    /// the two are equivalent in effect - but each recursive frame consumes EVM stack, and a chain approaching the
+    /// argument cap exhausted it, reverting with no error on the one transaction that can finish a debate and
+    /// release its deposits.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     function _tallyNode(uint256 debateId, uint16 argumentId) internal {
-        Argument.Data storage argument = _debates[debateId].arguments[argumentId];
-        uint16 parentArgumentId = argument.parentArgumentId;
-        Argument.Data storage parentArgument = _debates[debateId].arguments[parentArgumentId];
+        uint16 parentArgumentId;
+        for (;; argumentId = parentArgumentId) {
+            Argument.Data storage argument = _debates[debateId].arguments[argumentId];
+            parentArgumentId = argument.parentArgumentId;
+            Argument.Data storage parentArgument = _debates[debateId].arguments[parentArgumentId];
 
-        if (argument.untalliedChilds > 0) {
-            revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
-        }
+            if (argument.untalliedChilds > 0) {
+                revert ChildsUntallied({untalliedChilds: argument.untalliedChilds});
+            }
 
-        // Only final arguments carry sway - those whose editing window elapsed. By the Tallying phase every
-        // argument is final (its window ends before rating does), so this guards a case the phase clock rules out.
+            // Only final arguments carry sway - those whose editing window elapsed. By the Tallying phase every
+            // argument is final (its window ends before rating does), so this guards a case the phase clock rules
+            // out.
+            if (_isFinal(argument)) {
+                // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
+                // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
+                // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
+                // included), the weight it folds in with.
+                int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
+                uint32 subtreeVotes =
+                    _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
+                argument.subtreeVotes = subtreeVotes;
+                // Stored for redemption to settle against: `subtreeVotes` is repurposed above, so the
+                // rating could not be re-derived later without double-counting the argument's own stake.
+                argument.rating = rating;
 
-        if (_isFinal(argument)) {
-            // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
-            // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
-            // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
-            // included), the weight it folds in with.
-            int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
-            uint32 subtreeVotes = _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
-            argument.subtreeVotes = subtreeVotes;
-            // Stored for redemption to settle against: `subtreeVotes` is repurposed above, so the
-            // rating could not be re-derived later without double-counting the argument's own stake.
-            argument.rating = rating;
+                emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
 
-            emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
+                // A refuted argument is silenced, not inverted.
+                int64 strength = rating > 0 ? rating : int64(0);
 
-            // A refuted argument is silenced, not inverted.
-            int64 strength = rating > 0 ? rating : int64(0);
+                // Fold the stance-signed strength into the parent's running mean, weighted by the
+                // subtree stake.
+                parentArgument.descendantsAggregate = parentArgument.descendantsAggregate
+                    .weightedMean({
+                        weightA: parentArgument.subtreeVotes,
+                        b: argument.isSupporting ? strength : -strength,
+                        weightB: subtreeVotes
+                    });
+                parentArgument.subtreeVotes += subtreeVotes;
+            }
 
-            // Fold the stance-signed strength into the parent's running mean, weighted by the
-            // subtree stake.
-            parentArgument.descendantsAggregate = parentArgument.descendantsAggregate
-                .weightedMean({
-                    weightA: parentArgument.subtreeVotes,
-                    b: argument.isSupporting ? strength : -strength,
-                    weightB: subtreeVotes
-                });
-            parentArgument.subtreeVotes += subtreeVotes;
-        }
+            parentArgument.untalliedChilds--;
 
-        parentArgument.untalliedChilds--;
-
-        // If all children of the parent are tallied, tally the parent - unless the parent is the root: the root
-        // (the thesis) has no market and no parent of its own, and its `descendantsAggregate` - which `outcome` reads -
-        // is complete once all of its children have been tallied.
-        if (parentArgument.untalliedChilds == 0 && parentArgumentId != 0) {
-            _tallyNode({debateId: debateId, argumentId: parentArgumentId});
+            // Continue into the parent only once all of its children are tallied, and never into the root: the
+            // root (the thesis) has no market and no parent of its own, and its `descendantsAggregate` - which
+            // `outcome` reads - is complete once all of its children have been tallied.
+            if (parentArgument.untalliedChilds != 0 || parentArgumentId == 0) {
+                return;
+            }
         }
     }
 

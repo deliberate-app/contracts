@@ -27,10 +27,12 @@ library Parameters {
     uint48 public constant CLAIM_WINDOW = 7 days;
 
     /// @notice The maximum number of arguments per debate, the thesis included.
-    /// @dev Bounds the atomic tally: the whole tree must be tallyable within one block's gas (asserted by the gas
-    /// benchmark test). Depth needs no bound of its own - each tree level takes one locking window of
-    /// finalization latency inside the editing phase - so the cap effectively governs breadth.
-    uint16 public constant MAX_ARGUMENTS = 1024;
+    /// @dev Bounds the atomic tally, which settles the whole tree in one transaction and is the only route to a
+    /// finished debate - so a tree too large to tally is a tree whose deposits and bounty can never be released.
+    /// The cap is therefore set against the tightest chain the protocol targets rather than the most generous:
+    /// a full tree must settle in well under one Gnosis block (~17M gas). The cap governs breadth and depth
+    /// alike, depth additionally costing one locking window of finalization latency per level.
+    uint16 public constant MAX_ARGUMENTS = 512;
 
     /// @notice The fixed-point scale of approvals and tallied ratings (the full scale equals `type(uint32).max`).
     int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
