@@ -19,18 +19,11 @@ contract DeployDeliberate is Script {
     /// @return deliberate The address of the deployed contract.
     /// @return circlesRegistry The address of the deployed any-Circles-human registry.
     function run() public returns (address deliberate, address circlesRegistry) {
-        return runWithHub(GNOSIS_CIRCLES_HUB);
-    }
-
-    /// @notice Deploys against a given Circles Hub - a mock, on a chain that has none.
-    /// @param hub The Circles Hub the registry reads.
-    /// @return deliberate The address of the deployed contract.
-    /// @return circlesRegistry The address of the deployed any-Circles-human registry.
-    function runWithHub(ICirclesHub hub) public returns (address deliberate, address circlesRegistry) {
         vm.startBroadcast();
 
         deliberate = address(new Deliberate());
-        circlesRegistry = address(new CirclesIdentityRegistry({hub: hub, anchor: address(0), requireHuman: true}));
+        circlesRegistry =
+            address(new CirclesIdentityRegistry({hub: GNOSIS_CIRCLES_HUB, anchor: address(0), requireHuman: true}));
 
         vm.stopBroadcast();
     }
