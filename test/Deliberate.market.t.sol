@@ -10,13 +10,14 @@ import {Argument} from "../src/libs/Argument.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 
-// Forensic replay of production debate 4 (Base Sepolia, Deliberate 0xFb21…4A5b) and the isolated
+// Forensic replay of production debate 4's trades (Base Sepolia, Deliberate 0xFb21…4A5b) and the isolated
 // causes behind its counterintuitive numbers: the whole budget staked, end balances short of it, "total
-// stake" shown as 191. Every figure is re-derived from the mechanism alone, so a failing assert
-// here would be an actual math bug - a passing suite pins each surprise on market economics
-// instead. Since ADR-0013/0014 a share settles at the tallied rating built from time-weighted
-// prices, not at the closing price the production era paid; where the mechanisms disagree the
-// comments say so, and it happens the replay's integer payouts survive to the token.
+// stake" shown as 191. Every figure is re-derived from the mechanism alone, so a failing assert here would
+// be an actual math bug - a passing suite pins each surprise on market economics instead. The era held
+// whole vote tokens; the contract now holds hundredths, so the trades replay at a hundred times the scale
+// with the finer rounding the extra digits allow. And a share now settles at the tallied rating built from
+// time-weighted prices, not at the closing price the era paid; where the mechanisms disagree the comments
+// say so.
 contract DeliberateMarketTest is Test {
     using DebateGen for Vm;
 
@@ -34,15 +35,15 @@ contract DeliberateMarketTest is Test {
         _deliberate = new Deliberate();
     }
 
-    // The seed shared by every scenario: the production argument - a 10-token deposit at 50%
-    // approval, splitting into 5/5 market reserves - warped into the rating phase.
+    // The seed shared by every scenario: the production argument - the minimum deposit of 1000 at 50%
+    // approval, splitting into (500, 500) market reserves - warped into the rating phase.
     function _productionArgument() internal returns (DebateGen.Debate memory debate, uint16 argumentId) {
         debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpToRating(debate);
     }
 
-    function test_replaysProductionDebate4ToTheToken() public {
+    function test_replaysProductionDebate4sTrades() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 
         // 0x990c staked their whole budget UNDERRATED (the on-chain Staked event says isPro - not
@@ -73,13 +74,13 @@ contract DeliberateMarketTest is Test {
         assertTrue(vm.outcome(debate));
 
         // A pro share settles at the tallied rating - for this childless argument its own
-        // time-weighted price, a hair under the closing 186/187 (the neutral seed stood the
-        // window's first second) - below one token per share by construction, never a multiplier.
+        // time-weighted price, a hair under the closing 18550/18564 (the neutral seed stood the
+        // window's first second) - below one per share by construction, never a multiplier.
         vm.redeem(debate, _BOB, argumentId);
         vm.redeem(debate, _ALICE, argumentId);
         vm.claimFees(debate, argumentId);
 
-        // The end state, still to the token: 9939 for 0x990c, and 8530 plus the 950 creator fees
+        // The end state: 9939 for 0x990c, and 8530 plus the 950 creator fees
         // = 9480 for 0x4161.
         assertEq(vm.tokensOf(debate, _BOB), 9939);
         assertEq(vm.tokensOf(debate, _ALICE), 9480);
@@ -92,7 +93,7 @@ contract DeliberateMarketTest is Test {
     function test_aLoneCorrectorPaysForTheirOwnPriceMove() public {
         (DebateGen.Debate memory debate, uint16 argumentId) = _productionArgument();
 
-        // Bob's 9500-net trade against the 1000-token 50/50 seed IS the whole correction: it moves
+        // Bob's 9500-net trade against the 50/50 seed of 1000 IS the whole correction: it moves
         // the approval from 50% to 10000/10025 ~ 99.8% and he pays the average price along that curve.
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
@@ -102,7 +103,7 @@ contract DeliberateMarketTest is Test {
 
         // 9922 back on 10000 staked: his shares settle at the time-weighted price he set, below the
         // closing price alone. An AMM pays for moves OTHERS make after you; his own move cost the
-        // curve's average price, and the 500-token fee ate more than the curve gain.
+        // curve's average price, and the fee of 500 ate more than the curve gain.
         assertEq(vm.tokensOf(debate, _BOB), 9922);
     }
 
@@ -130,7 +131,7 @@ contract DeliberateMarketTest is Test {
         // The outcome the intuition expected, reconstructed: Carol calls the argument overrated
         // and is wrong - her 9500 net crashes the approval ((500, 500) -> (10000, 25), 9975 con
         // shares). Bob then buys the pro side cheap: (10000, 25) -> (27, 9525), 10000 + 9500 - 27 =
-        // 19473 pro shares for the same 10000-token stake that bought only 9975 in the replay.
+        // 19473 pro shares for the same stake of 10000 that bought only 9975 in the replay.
         vm.stakeCon(debate, _CAROL, argumentId, Parameters.INITIAL_TOKENS);
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
@@ -148,9 +149,9 @@ contract DeliberateMarketTest is Test {
 
     function test_refutationByChildrenSettlesTheParentsShares() public {
         // The trade price settlement could never pay: Bob calls a 90%-seeded argument overrated
-        // with a tiny early con stake that barely moves its market - and a 30-token
-        // counter-argument demolishes the argument from below. Under price settlement the lazy
-        // market shielded the argument (Bob's 5 con shares paid floor(5 * 2/7) = 1); settling at
+        // with a tiny early con stake that barely moves its market - and a counter-argument
+        // backed by 3000 demolishes the argument from below. Under price settlement the lazy
+        // market shielded the argument (Bob's 533 con shares would pay floor(533 * 195/657) = 158); settling at
         // the tallied rating, the sub-debate corrects what his shares are worth.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         uint16 parent = vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
@@ -159,7 +160,7 @@ contract DeliberateMarketTest is Test {
             debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 3000
         });
         vm.warpToRating(debate);
-        vm.stakeCon(debate, _BOB, parent, 100); // fee 0 -> net 1: reserves (2, 5), 5 con shares
+        vm.stakeCon(debate, _BOB, parent, 100); // fee 5 -> net 95: reserves (195, 462), 533 con shares
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -167,8 +168,9 @@ contract DeliberateMarketTest is Test {
 
         // The parent's own market closed pro-leaning, yet its rating - its time-weighted price at
         // stake 1000 against the counter-argument's 90% conviction at subtree stake 3000 - lands
-        // refuted at -2048884181 ~ -48%. Bob's con shares settle against that rating rather than
-        // against the lazy market that shielded the argument.
+        // refuted at -2048884181 ~ -48%. Bob's con shares settle against that rating rather than against
+        // the lazy market that shielded the argument: floor(533 * 6343851476 / 8589934590) = 393, so
+        // 10000 - 100 + 393.
         assertEq(vm.argumentOf(debate, parent).rating, -2048884181);
         assertEq(vm.tokensOf(debate, _BOB), 10293);
         // And toward the thesis the refuted parent is silenced, not inverted: silence objects.

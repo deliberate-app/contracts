@@ -16,6 +16,7 @@ import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 
+// Amounts are in the contract's unit, a hundredth of a vote token.
 contract DeliberateTest is Test {
     using DebateGen for Vm;
 
@@ -268,7 +269,7 @@ contract DeliberateTest is Test {
     }
 
     function test_quoteStake_usesTheDebatesFee() public {
-        // A 1% debate charges 1 on a 100-token stake; the standing 5% helper charges 5.
+        // A 1% debate charges 1 on a stake of 100; the standing 5% helper charges 5.
         uint256 onePercentId = _createDebateWithFee(1);
         assertEq(
             _deliberate.quoteStake({debateId: onePercentId, argumentId: 1, isPro: true, voteTokenAmount: 100}).fee, 1
@@ -736,7 +737,7 @@ contract DeliberateTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         skip(_LOCKING_DURATION + 1);
-        // A draft seeded with a 4000-token deposit at 50%: reserves 2000/2000.
+        // A draft seeded with a deposit of 4000 at 50%: reserves (2000, 2000).
         uint16 childArgumentId = _addArgument({
             debateId: debateId,
             parentArgumentId: _ROOT_ARGUMENT_ID,
@@ -745,7 +746,7 @@ contract DeliberateTest is Test {
             deposit: 4000
         });
 
-        // Moving it re-seeds at 80% from the 4000-token deposit: con takes 80% (3200), pro the rest (800).
+        // Moving it re-seeds at 80% from the argument's deposit of 4000: con takes 80% (3200), pro the rest (800).
         _deliberate.moveArgument({
             debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
         });
@@ -855,10 +856,11 @@ contract DeliberateTest is Test {
 
         _deliberate.stakePro(debateId, argumentId, 2000);
 
-        // 100 initial - 10 deposit - 20 staked
+        // 10000 granted - 1000 deposit - 2000 staked
         assertEq(_deliberate.getUserTokens(debateId, address(this)), 7000);
 
-        // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
+        // fee 5% of 2000 = 100, net 1900 into con: 500 + 1900 = 2400; pro restored to the invariant rounded up,
+        // ceil(500 * 500 / 2400) = 105; shares out 500 + 1900 - 105 = 2295
         User.Shares memory shares = _deliberate.getUserShares(debateId, argumentId, address(this));
         assertEq(shares.pro, 2295);
         assertEq(shares.con, 0);
@@ -875,14 +877,14 @@ contract DeliberateTest is Test {
 
         _deliberate.stakeCon(debateId, argumentId, 2000);
 
-        // fee 1, net 19: pro 5+19=24, con ceil(25/24)=2, shares out 22
+        // Mirrored: net 1900 into pro, con restored to ceil(500 * 500 / 2400) = 105, shares out 2295
         User.Shares memory shares = _deliberate.getUserShares(debateId, argumentId, address(this));
         assertEq(shares.con, 2295);
         assertEq(shares.pro, 0);
 
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
         assertEq(argument.pro, 2400);
-        assertEq(argument.con, 105); // approval fell from 50% to 105/12105 - rated as bad
+        assertEq(argument.con, 105); // approval con/(pro+con) fell from 50% to 105/2505 = 4.2%
     }
 
     /// @dev Pins the market's defining behavior: buying a side always moves the approval - the
@@ -1160,10 +1162,12 @@ contract DeliberateTest is Test {
         address earlyStaker = makeAddr("earlyStaker");
         address lateStaker = makeAddr("lateStaker");
 
-        // The early staker buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
+        // The early staker buys pro cheap at 50% approval: fee 50, net 950 into con, pro restored to
+        // ceil(500 * 500 / 1450) = 173, so 500 + 950 - 173 = 1277 shares for 1000 (approval -> 1450/1623 = 89.3%).
         _stake({debateId: debateId, argumentId: argumentId, staker: earlyStaker, isPro: true, amount: 1000});
 
-        // The crowd confirms the rating later, at a higher price: 20 shares for 20 tokens (-> 97.1%).
+        // The crowd confirms the rating at that higher price: fee 100, net 1900, pro ceil(173 * 1450 / 3350) = 75,
+        // so 173 + 1900 - 75 = 1998 shares for 2000 (approval -> 3350/3425 = 97.8%).
         _stake({debateId: debateId, argumentId: argumentId, staker: lateStaker, isPro: true, amount: 2000});
 
         _endRating(debateId);
@@ -1172,13 +1176,14 @@ contract DeliberateTest is Test {
         _deliberate.redeemArgumentShares(debateId, argumentId, earlyStaker);
         _deliberate.redeemArgumentShares(debateId, argumentId, lateStaker);
 
-        // Early: 13 shares settling at the tallied rating (~96.9% on the price scale) = 12 tokens
-        // back on 10 staked - correcting the rating early pays.
+        // The rating is the final centered price floor(MAX * (3350 - 75) / 3425) = 4106866537, standing 179 of the
+        // window's 180 seconds after the neutral seed: floor(4106866537 * 179 / 180) = 4084050611. A pro share pays
+        // (MAX + rating) / (2 * MAX) = 8379017906 / 8589934590 ~ 97.5%, rounded down per holder.
+        // Early: floor(1277 * 8379017906 / 8589934590) = 1245 back on 1000 staked - correcting the rating early pays.
         assertEq(_deliberate.getUserTokens(debateId, earlyStaker), 10245);
-        // Late: 20 shares at the same settlement = 19 tokens back on 20 staked - fee and slippage
-        // eat the late trade.
+        // Late: floor(1998 * 8379017906 / 8589934590) = 1948 back on 2000 staked - fee and slippage eat the late trade.
         assertEq(_deliberate.getUserTokens(debateId, lateStaker), 9948);
-        // Solvency: 12 + 19 paid out of the market's 39 collateral tokens.
+        // Solvency: 1245 + 1948 paid out of the market's 3850 collateral (1000 deposit + 2850 net stakes).
     }
 
     // --- redeemArgumentSharesBatch ---
@@ -1187,15 +1192,16 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
-        uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
-        uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
+        uint16 argument1 = _addArgument(debateId, true, 50); // reserves (500, 500)
+        uint16 argument2 = _addArgument(debateId, true, 50); // reserves (500, 500)
         _endEditing(debateId);
 
-        // One staker takes a con position in both arguments (22 con shares each).
+        // One staker takes a con position in both arguments: fee 100, net 1900 into pro, con restored to
+        // ceil(500 * 500 / 2400) = 105, so 2295 con shares each.
         address staker = makeAddr("staker");
         _stake({debateId: debateId, argumentId: argument1, staker: staker, isPro: false, amount: 2000});
         _stake({debateId: debateId, argumentId: argument2, staker: staker, isPro: false, amount: 2000});
-        assertEq(_deliberate.getUserTokens(debateId, staker), 6000); // 100 - 20 - 20
+        assertEq(_deliberate.getUserTokens(debateId, staker), 6000); // 10000 - 2000 - 2000
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1205,7 +1211,9 @@ contract DeliberateTest is Test {
         argumentIds[1] = argument2;
         _deliberate.redeemArgumentSharesBatch(debateId, argumentIds, staker);
 
-        // Both positions redeemed in one call: 20 tokens back per argument.
+        // Both positions redeemed in one call. Each market's rating is its final centered price
+        // floor(MAX * (105 - 2400) / 2505) = -3934910156 standing 179 of 180 seconds: -3913049544; a con share pays
+        // (MAX - rating) / (2 * MAX), so floor(2295 * 8208016839 / 8589934590) = 2192 per argument.
         assertEq(_deliberate.getUserShares(debateId, argument1, staker).con, 0);
         assertEq(_deliberate.getUserShares(debateId, argument2, staker).con, 0);
         assertEq(_deliberate.getUserTokens(debateId, staker), 10384);
@@ -1233,7 +1241,7 @@ contract DeliberateTest is Test {
         _deliberate.redeemArgumentSharesBatch(debateId, argumentIds, staker);
 
         assertEq(_deliberate.getUserShares(debateId, argument1, staker).con, 0);
-        assertEq(_deliberate.getUserTokens(debateId, staker), 10192); // argument2 a no-op
+        assertEq(_deliberate.getUserTokens(debateId, staker), 10192); // 8000 + 2192, argument2 a no-op
     }
 
     function test_redeemArgumentSharesBatch_revertsBeforeTheTallyHasRun() public {
@@ -1253,18 +1261,18 @@ contract DeliberateTest is Test {
     function test_claimFees_creditsTheAccruedFeesToTheArgumentCreator() public {
         (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
-        // A second participant stakes 20; the 5% fee (1 token) accrues to the argument.
+        // A second participant stakes 2000; the 5% fee, 100, accrues to the argument.
         address staker = makeAddr("staker");
         _stake({debateId: debateId, argumentId: argumentId, staker: staker, isPro: true, amount: 2000});
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9000); // 100 - 10 deposit
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9000); // 10000 - 1000 deposit
 
         _deliberate.claimFees(debateId, argumentId);
 
-        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9100); // + 1 fee
+        assertEq(_deliberate.getUserTokens(debateId, address(this)), 9100); // + 100 fee
         assertEq(_deliberate.getArgument(debateId, argumentId).fees, 0);
 
         // A second claim is a no-op.
@@ -1318,7 +1326,7 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
-        // An 80% initial approval seeds a scarce pro reserve: 2 pro / 8 con.
+        // An 80% initial approval seeds a scarce pro reserve: 200 pro / 800 con.
         vm.expectEmit();
         emit IDeliberate.ArgumentAdded({
             debateId: debateId,
@@ -1379,7 +1387,8 @@ contract DeliberateTest is Test {
     function test_stakePro_emitsStaked() public {
         (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
-        // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
+        // fee 5% of 2000 = 100, net 1900 into con: 500 + 1900 = 2400; pro restored to the invariant rounded up,
+        // ceil(500 * 500 / 2400) = 105; shares out 500 + 1900 - 105 = 2295
         vm.expectEmit();
         emit IDeliberate.Staked({
             debateId: debateId,
@@ -1405,13 +1414,18 @@ contract DeliberateTest is Test {
     function test_redeemArgumentShares_emitsSharesRedeemed() public {
         (uint256 debateId, uint16 argumentId) = _debateInRating(80);
 
-        // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
+        // fee 100, net 1900 into pro: 200 + 1900 = 2100; con restored to ceil(800 * 200 / 2100) = 77; shares out
+        // 800 + 1900 - 77 = 2623
         _deliberate.stakeCon(debateId, argumentId, 2000);
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        // 26 con shares x 21/22 of the market, rounded down: 24 tokens.
+        // The rating is the time-weighted centered price: the 80% seed floor(MAX * 600 / 1000) = 2576980377 stood the
+        // window's first second, the corrected floor(MAX * (77 - 2100) / 2177) = -3991143241 the remaining 179:
+        // (2576980377 + -3991143241 * 179) / 180 = -3954653665, rounded toward zero. The con shares pay (MAX - rating)
+        // / (2 * MAX),
+        // rounded down: floor(2623 * 8249620960 / 8589934590) = 2519.
         vm.expectEmit();
         emit IDeliberate.SharesRedeemed({
             debateId: debateId,

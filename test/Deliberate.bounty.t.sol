@@ -12,6 +12,7 @@ import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {MockERC20, MockERC20FeeOnTransfer} from "./mocks/MockERC20.m.sol";
 
+// Vote amounts are in the contract's unit, a hundredth of a vote token; the bounty is an ERC-20 in wei.
 contract DeliberateBountyTest is Test {
     Deliberate internal _deliberate;
     MockERC20 internal _token;
@@ -62,9 +63,9 @@ contract DeliberateBountyTest is Test {
         vm.warp(ratingEndTime + 1);
     }
 
-    /// @dev The profitable-early-staker choreography from the market tests: after the tally the early
-    /// staker sits at 102 vote tokens (excess 2, still unredeemed), the late one at 99 (a loser), and
-    /// three participants have joined (`100 * N = 300`).
+    // The profitable-early-staker choreography from the unit tests: after the tally the early staker sits at
+    // 10245 once redeemed (excess 245), the late one at 9948 (a loser), and three participants have joined,
+    // so the initial supply the excess is measured against is 3 * 10000 = 30000.
     function _finishedBountyDebate() internal returns (uint256 debateId, uint16 argumentId) {
         (debateId, argumentId) = _finishedBountyDebate(_POOL);
     }
@@ -207,14 +208,13 @@ contract DeliberateBountyTest is Test {
     function test_claimBounty_settlesAndPaysTheNetWinner() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
 
-        // Early staker: 102 vote tokens once redeemed -> excess 2 of the 300 initial supply.
-
+        // Early staker: 10245 once redeemed -> excess 245 of the 30000 initial supply.
         vm.expectEmit();
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 2.45 ether});
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, _settling(argumentId));
 
-        // The claim settled the shares (102 tokens) and paid pool * 2/300.
+        // The claim settled the shares (10245) and paid pool * 245 / 30000.
         assertEq(_deliberate.getUserTokens(debateId, _earlyStaker), 10245);
         assertEq(_token.balanceOf(_earlyStaker), 2.45 ether);
         (, uint256 pool, uint256 claimed,,) = _deliberate.bounty(debateId);
@@ -245,7 +245,7 @@ contract DeliberateBountyTest is Test {
     function test_claimBounty_revertsForAParticipantWithoutExcess() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
 
-        // The late staker redeemed 19 on 20 staked: 99 tokens is no win.
+        // The late staker redeemed 1948 on 2000 staked: 9948 is no win.
         vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 9948));
         vm.prank(_lateStaker);
         _deliberate.claimBounty(debateId, _settling(argumentId));
@@ -279,7 +279,7 @@ contract DeliberateBountyTest is Test {
     }
 
     function test_claimBounty_marksAClaimEvenWhenItRoundsToZero() public {
-        // A dust pool: 100 wei * 2/300 rounds to zero - the claim is still consumed and emits.
+        // A dust pool: 100 wei * 245 / 30000 rounds to zero - the claim is still consumed and emits.
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate(100);
         vm.expectEmit();
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 0});

@@ -49,7 +49,7 @@ contract DebateGenExampleTest is Test {
 
     function test_stakingConLowersTheApproval() public {
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50); // reserves 5/5 at the min deposit
+        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50); // reserves (500, 500) at the minimum deposit
 
         vm.warpToRating(debate);
         vm.stakeCon(debate, _BOB, argumentId, 2000);
