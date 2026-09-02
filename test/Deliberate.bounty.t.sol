@@ -80,7 +80,6 @@ contract DeliberateBountyTest is Test {
             initialApproval: 50,
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         vm.startPrank(_earlyStaker);
@@ -109,7 +108,7 @@ contract DeliberateBountyTest is Test {
     // --- createDebate ---
 
     function test_createDebate_attachesTheBountyAtCreation() public {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IDeliberate.BountyFunded({debateId: 0, funder: address(this), token: _token, amount: _POOL, pool: _POOL});
         uint256 debateId = _createBountyDebate(_POOL);
 
@@ -144,7 +143,7 @@ contract DeliberateBountyTest is Test {
         _token.mint(donor, 50 ether);
         vm.startPrank(donor);
         _token.approve(address(_deliberate), 50 ether);
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IDeliberate.BountyFunded({
             debateId: debateId, funder: donor, token: _token, amount: 50 ether, pool: _POOL + 50 ether
         });
@@ -210,7 +209,7 @@ contract DeliberateBountyTest is Test {
 
         // Early staker: 102 vote tokens once redeemed -> excess 2 of the 300 initial supply.
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 2.45 ether});
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, _settling(argumentId));
@@ -282,7 +281,7 @@ contract DeliberateBountyTest is Test {
     function test_claimBounty_marksAClaimEvenWhenItRoundsToZero() public {
         // A dust pool: 100 wei * 2/300 rounds to zero - the claim is still consumed and emits.
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate(100);
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 0});
         vm.prank(_earlyStaker);
         _deliberate.claimBounty(debateId, _settling(argumentId));
@@ -300,7 +299,7 @@ contract DeliberateBountyTest is Test {
         vm.warp(_claimWindowEnd(debateId) + 1);
         uint256 balanceBefore = _token.balanceOf(address(this));
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit IDeliberate.BountySwept({debateId: debateId, creator: address(this), amount: _POOL - 2.45 ether});
         _deliberate.sweepBounty(debateId);
 

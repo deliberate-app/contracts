@@ -94,7 +94,7 @@ contract EASIdentityRegistryTest is Test {
 
         assertTrue(_registry.isRegistered(_ACCOUNT));
 
-        vm.warp(vm.getBlockTimestamp() + 1 days);
+        skip(1 days);
         assertFalse(_registry.isRegistered(_ACCOUNT));
     }
 

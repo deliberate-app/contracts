@@ -59,7 +59,7 @@ contract DeliberateHarnessTest is Test {
         (uint256 debateId, uint16 parentId) = _debateWithADraft();
 
         // Give the argument a child of its own, once it has locked in and can be replied to.
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
+        skip(_LOCKING_DURATION);
         _deliberate.addArgument({
             debateId: debateId,
             parentArgumentId: parentId,

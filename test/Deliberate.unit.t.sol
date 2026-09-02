@@ -723,7 +723,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         uint16 argumentB = _addArgument(debateId, false, 50);
         uint16 argumentC = _addChild(debateId, argumentA, true, 50);
         uint16 argumentD = _addChild(debateId, argumentA, false, 50);
@@ -744,7 +744,7 @@ contract DeliberateTest is Test {
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
 
         uint16 argumentC = _addChild(debateId, argumentA, true, 50);
 
@@ -763,7 +763,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         uint16 childArgumentId = _addChild(debateId, parentArgumentId, true, 50);
         assertEq(_deliberate.getArgument(debateId, childArgumentId).parentArgumentId, parentArgumentId);
 
@@ -779,7 +779,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         // A draft seeded at 50% approval: reserves split the deposit evenly.
         uint16 childArgumentId = _addArgument(debateId, true, 50);
         assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 500);
@@ -801,7 +801,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         // A draft seeded with a 4000-token deposit at 50%: reserves 2000/2000.
         uint16 childArgumentId = _addArgument({
             debateId: debateId,
@@ -826,7 +826,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         uint16 childArgumentId = _addArgument(debateId, true, 50);
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, 99, 100));
@@ -894,7 +894,7 @@ contract DeliberateTest is Test {
         uint16 argumentId = _addArgument(debateId, true, 50);
 
         // The draft locks in exactly when its editing window elapses.
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION);
+        skip(_LOCKING_DURATION);
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotDraft.selector, argumentId));
         _deliberate.alterArgument(debateId, argumentId, "Too late.");
     }
@@ -1006,7 +1006,7 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
 
         // A sub-debate beneath the argument corrects its settlement away from its own price.
         _addChild(debateId, argumentId, childIsSupporting, childApproval);
@@ -1019,7 +1019,7 @@ contract DeliberateTest is Test {
             debateId: debateId, argumentId: argumentId, staker: firstStaker, isPro: firstIsPro, amount: firstAmount
         });
 
-        vm.warp(vm.getBlockTimestamp() + secondDelay);
+        skip(secondDelay);
         _stake({
             debateId: debateId, argumentId: argumentId, staker: secondStaker, isPro: secondIsPro, amount: secondAmount
         });
@@ -1170,9 +1170,8 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 80);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         _addChild(debateId, argumentId, false, 95);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
@@ -1267,7 +1266,6 @@ contract DeliberateTest is Test {
 
         uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
         uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // One staker takes a con position in both arguments (22 con shares each).
@@ -1296,7 +1294,6 @@ contract DeliberateTest is Test {
 
         uint16 argument1 = _addArgument(debateId, true, 50);
         uint16 argument2 = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endEditing(debateId);
 
         // The staker only holds shares in argument1.
@@ -1419,7 +1416,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 newParentArgumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
+        skip(_LOCKING_DURATION + 1);
         uint16 movedArgumentId = _addArgument(debateId, false, 50);
 
         vm.expectEmit();
