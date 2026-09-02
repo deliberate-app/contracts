@@ -42,18 +42,18 @@ library Argument {
     /// @param fees The fees accrued by the argument for its creator. Packed with the accrual state its writes
     /// coincide with (both move on stakes), leaving the tally's slot to the tally's own outputs.
     struct Data {
-        bytes32 contentURI; //      ]  32
-        address creator; //         ┐  20
-        bool isSupporting; //       | + 1
-        uint16 parentArgumentId; // | + 2
-        uint16 untalliedChilds; //  | + 2
-        uint48 finalizationTime; // ┘ + 6 = 31
-        uint32 pro; //              ┐   4
-        uint32 con; //              | + 4
-        uint32 votes; //            | + 4
-        uint32 subtreeVotes; //     | + 4
-        int64 descendantsAggregate; // | + 8
-        int64 rating; //            ┘ + 8 = 32
+        bytes32 contentURI; //            ]  32
+        address creator; //               ┐  20
+        bool isSupporting; //             | + 1
+        uint16 parentArgumentId; //       | + 2
+        uint16 untalliedChilds; //        | + 2
+        uint48 finalizationTime; //       ┘ + 6 = 31
+        uint32 pro; //                    ┐   4
+        uint32 con; //                    | + 4
+        uint32 votes; //                  | + 4
+        uint32 subtreeVotes; //           | + 4
+        int64 descendantsAggregate; //    | + 8
+        int64 rating; //                  ┘ + 8 = 32
         int88 centeredApprovalSeconds; // ┐  11
         uint80 votesSeconds; //           | +10
         uint48 lastAccrualTime; //        | + 6
