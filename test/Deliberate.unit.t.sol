@@ -575,39 +575,30 @@ contract DeliberateTest is Test {
         _addArgument(debateId, true, initialApproval);
     }
 
-    function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf50() public {
+    function testFuzz_addArgument_seedsEveryWholePercentExactly(uint8 initialApproval, uint32 hundreds) public {
+        // The minimum deposit is a multiple of 100 so that any whole-percent approval splits any permitted deposit
+        // of that shape exactly: the con reserve takes the approval's share of the deposit to the unit (approval is
+        // the pro-share price, so a high approval means a scarce pro reserve), the pro reserve the rest, and neither
+        // is ever empty.
+        initialApproval = uint8(bound(initialApproval, 50, 99));
+        uint32 deposit =
+            uint32(bound(hundreds, Parameters._MIN_DEBATE_DEPOSIT / 100, Parameters.INITIAL_TOKENS / 100)) * 100;
+
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
+        uint16 argumentId = _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: true,
+            initialApproval: initialApproval,
+            deposit: deposit
+        });
 
-        Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 50));
-        assertEq(argument.pro, 500);
-        assertEq(argument.con, 500);
-        assertEq(argument.votes, 1000);
-        assertEq(argument.fees, 0);
-    }
-
-    function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf80() public {
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
-
-        // Approval is the pro-share price: 80% approval means a scarce pro reserve.
-        Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 80));
-        assertEq(argument.pro, 200);
-        assertEq(argument.con, 800);
-        assertEq(argument.votes, 1000);
-        assertEq(argument.fees, 0);
-    }
-
-    function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf95() public {
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
-
-        // Seeding is exact at the scale the deposit carries: 5% of 1000 to pro, 95% to con - where a
-        // hundred-unit budget could only reach 90%, ten points off what the creator asked for.
-        Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 95));
-        assertEq(argument.pro, 50);
-        assertEq(argument.con, 950);
-        assertEq(argument.votes, 1000);
+        Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
+        assertEq(argument.con, deposit * initialApproval / 100);
+        assertEq(argument.pro, deposit - argument.con);
+        assertGe(argument.pro, 1);
+        assertEq(argument.votes, deposit);
         assertEq(argument.fees, 0);
     }
 
@@ -760,27 +751,6 @@ contract DeliberateTest is Test {
         });
 
         assertEq(_deliberate.getArgument(debateId, childArgumentId).parentArgumentId, _ROOT_ARGUMENT_ID);
-    }
-
-    function test_moveArgument_reseedsTheMarketAtTheNewApproval() public {
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
-
-        uint16 parentArgumentId = _addArgument(debateId, true, 50);
-        skip(_LOCKING_DURATION + 1);
-        // A draft seeded at 50% approval: reserves split the deposit evenly.
-        uint16 childArgumentId = _addArgument(debateId, true, 50);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 500);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 500);
-
-        // Moving it re-seeds the market at 80%: con takes 80% of the (unchanged) deposit.
-        _deliberate.moveArgument({
-            debateId: debateId, argumentId: childArgumentId, newParentArgumentId: parentArgumentId, initialApproval: 80
-        });
-
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 200);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 800);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 1000); // the deposit is unchanged
     }
 
     function test_moveArgument_reseedsFromTheArgumentDeposit() public {
