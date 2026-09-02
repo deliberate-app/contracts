@@ -1134,7 +1134,7 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
+        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsNumerator, 0);
         assertTrue(_deliberate.outcome(debateId));
     }
 
@@ -1146,7 +1146,7 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        assertLt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
+        assertLt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsNumerator, 0);
         assertFalse(_deliberate.outcome(debateId));
     }
 
@@ -1192,7 +1192,7 @@ contract DeliberateTest is Test {
         _deliberate.tallyTree(debateId);
 
         // The fully-approved opposing child weakens its parent from below ...
-        assertLt(_deliberate.getArgument(debateId, argumentId).descendantsAggregate, 0);
+        assertLt(_deliberate.getArgument(debateId, argumentId).descendantsNumerator, 0);
         // ... and every market's stake folds up to the thesis, counted once.
         (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
         assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, totalVotes);

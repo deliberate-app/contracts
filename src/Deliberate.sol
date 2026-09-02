@@ -434,7 +434,8 @@ contract Deliberate is IDeliberate {
         _phases[debateId].finished = true;
         _phases[debateId].finishTime = Time.timestamp();
 
-        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsAggregate > 0});
+        // The denominator is positive, so the numerator's sign is the aggregate's.
+        emit DebateFinished({debateId: debateId, approved: _debates[debateId].arguments[0].descendantsNumerator > 0});
     }
 
     /// @inheritdoc IDeliberate
@@ -654,7 +655,7 @@ contract Deliberate is IDeliberate {
             revert PhaseInvalid({expected: Phase.Status.Finished, actual: currentPhase});
         }
 
-        approved = _debates[debateId].arguments[0].descendantsAggregate > 0;
+        approved = _debates[debateId].arguments[0].descendantsNumerator > 0;
     }
 
     /// @inheritdoc IDeliberate
@@ -990,7 +991,7 @@ contract Deliberate is IDeliberate {
                 // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
                 // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
                 // included), the weight it folds in with.
-                int64 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
+                int40 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
                 uint32 subtreeVotes =
                     _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
                 argument.subtreeVotes = subtreeVotes;
@@ -1001,16 +1002,14 @@ contract Deliberate is IDeliberate {
                 emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
 
                 // A refuted argument is silenced, not inverted.
-                int64 strength = rating > 0 ? rating : int64(0);
+                int72 strength = rating > 0 ? int72(rating) : int72(0);
 
-                // Fold the stance-signed strength into the parent's running mean, weighted by the
-                // subtree stake.
-                parentArgument.descendantsAggregate = parentArgument.descendantsAggregate
-                    .weightedMean({
-                        weightA: parentArgument.subtreeVotes,
-                        b: argument.isSupporting ? strength : -strength,
-                        weightB: subtreeVotes
-                    });
+                // Add the stance-signed strength to the parent's numerator, weighted by the subtree stake.
+                // Adding rather than averaging is what keeps the tally independent of the order the children
+                // happen to be walked in: a sum is commutative where a mean rounded at every step is not.
+                // The mean this is the numerator of is taken once, in `_calculateRating`.
+                parentArgument.descendantsNumerator += (argument.isSupporting ? strength : -strength)
+                    * int72(uint72(subtreeVotes));
                 parentArgument.subtreeVotes += subtreeVotes;
             }
 
@@ -1148,7 +1147,7 @@ contract Deliberate is IDeliberate {
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @return rating The tallied rating of the argument - signed, negative meaning refuted.
-    function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int64 rating) {
+    function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int40 rating) {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         // The own approval, centered so the market's undecided price is zero and time-weighted over the
@@ -1158,17 +1157,21 @@ contract Deliberate is IDeliberate {
         uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
         int64 centeredApproval = SafeCast.toInt64(int256(centeredApprovalSeconds) / int256(uint256(window)));
 
-        // Blend own approval and the descendants' aggregate by the stake behind each: the argument's own
+        // Blend own approval and the descendants' sways by the stake behind each: the argument's own
         // time-weighted market stake against its subtree's (accumulated by the tallied children). A childless
         // argument keeps its full own centered approval; a heavily debated one is corrected in proportion
         // to the stake that debate attracted. The denominator is at least the argument's deposit - which
         // stands the whole window, so its time-weighted stake is itself - never zero. Negative means
         // refuted: the debate rates this argument as standing against itself.
-        rating = centeredApproval.weightedMean({
-            weightA: _timeWeightedVotes({debateId: debateId, argument: argument}),
-            b: argument.descendantsAggregate,
-            weightB: argument.subtreeVotes
-        });
+        //
+        // One division, over the summed numerator: the descendants enter as
+        // `Σ sway * subtreeStake` rather than as a mean already rounded once per child, so nothing is lost
+        // between the children and here and the result cannot depend on the order they were folded in.
+        uint32 ownVotes = _timeWeightedVotes({debateId: debateId, argument: argument});
+        rating = SafeCast.toInt40(
+            (int256(centeredApproval) * int256(uint256(ownVotes)) + int256(argument.descendantsNumerator))
+                / int256(uint256(ownVotes) + uint256(argument.subtreeVotes))
+        );
     }
 
     /// @notice An internal function reading an argument market's current approval, centered so the undecided
