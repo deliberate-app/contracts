@@ -131,10 +131,10 @@ contract DeliberateTest is Test {
         _endEditing(debateId);
     }
 
-    function _admit(address account) internal {
+    function _setMembership(address account, bool member) internal {
         address[] memory accounts = new address[](1);
         accounts[0] = account;
-        _registry.setMembership(accounts, true);
+        _registry.setMembership(accounts, member);
     }
 
     function _assertLeafSet(uint256 debateId, uint16[] memory expectedIds) internal view {
@@ -382,6 +382,17 @@ contract DeliberateTest is Test {
         assertEq(_deliberate.getLeafArgumentIds(debateId).length, 0);
     }
 
+    function test_createDebate_recordsTheGateItWasGiven() public {
+        uint256 openDebateId = _createDebate();
+        uint256 gatedDebateId = _createGatedDebate(_registry);
+
+        (,,,, IIdentityRegistry openGate) = _deliberate.debates(openDebateId);
+        (,,,, IIdentityRegistry namedGate) = _deliberate.debates(gatedDebateId);
+
+        assertEq(address(openGate), address(0));
+        assertEq(address(namedGate), address(_registry));
+    }
+
     // --- join ---
 
     function test_join_joinsADebate() public {
@@ -404,13 +415,6 @@ contract DeliberateTest is Test {
         assertEq(shares.con, 0);
     }
 
-    function test_join_revertsIfTheUserHasNoValidIdentityProof() public {
-        uint256 debateId = _createGatedDebate(_registry);
-
-        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
-        _deliberate.join(debateId);
-    }
-
     function test_join_admitsAnyoneWhenTheDebateNamesNoRegistry() public {
         // The open mode, and the reason it is the zero address rather than a registry that answers yes to
         // everything: there is nothing to deploy, and nothing that could later answer differently.
@@ -422,43 +426,27 @@ contract DeliberateTest is Test {
         assertEq(uint8(_deliberate.getUserRole(debateId, makeAddr("a stranger"))), uint8(User.Role.Participant));
     }
 
-    function test_join_admitsOnlyTheRegistrysMembersWhenTheDebateNamesOne() public {
-        uint256 debateId = _createGatedDebate(_registry);
-        address barred = makeAddr("barred");
-        address admitted = makeAddr("admitted");
-        _admit(admitted);
-
-        vm.prank(admitted);
-        _deliberate.join(debateId);
-
-        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
-        vm.prank(barred);
-        _deliberate.join(debateId);
-    }
-
-    function test_createDebate_recordsTheGateItWasGiven() public {
-        uint256 openDebateId = _createDebate();
-        uint256 gatedDebateId = _createGatedDebate(_registry);
-
-        (,,,, IIdentityRegistry openGate) = _deliberate.debates(openDebateId);
-        (,,,, IIdentityRegistry namedGate) = _deliberate.debates(gatedDebateId);
-
-        assertEq(address(openGate), address(0));
-        assertEq(address(namedGate), address(_registry));
-    }
-
-    function test_createDebate_letsOneRegistryGateSeveralDebates() public {
-        // The property that makes a curated group worth maintaining: it is deployed once and named by every
-        // debate it should decide.
+    function test_join_readsTheRegistryOnlyAtJoinTime() public {
+        // Membership decides admission and nothing after it: a debate keeps the participant it admitted when the
+        // group later drops them, and it is the next join that the loss bars. That is what lets one curated group
+        // serve every debate that names it, each reading it once.
         uint256 firstDebateId = _createGatedDebate(_registry);
         uint256 secondDebateId = _createGatedDebate(_registry);
-        address barred = makeAddr("barred");
+        address member = makeAddr("member");
+        _setMembership(member, true);
 
-        for (uint256 i = 0; i < 2; i++) {
-            vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
-            vm.prank(barred);
-            _deliberate.join(i == 0 ? firstDebateId : secondDebateId);
-        }
+        vm.prank(member);
+        _deliberate.join(firstDebateId);
+
+        _setMembership(member, false);
+
+        vm.prank(member);
+        uint16 argumentId = _addArgument(firstDebateId, true, 50);
+        assertEq(_deliberate.getArgument(firstDebateId, argumentId).creator, member);
+
+        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
+        vm.prank(member);
+        _deliberate.join(secondDebateId);
     }
 
     function test_join_succeedsDuringTheRatingPhase() public {
