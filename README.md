@@ -98,8 +98,8 @@ Sourcify and Gnosisscan:
 
 | Gnosis Chain (100) | address | block |
 |---|---|---|
-| `Deliberate` | [`0xCA2449a3849B2a6dDc673613F24760ff366d6b09`](https://gnosisscan.io/address/0xCA2449a3849B2a6dDc673613F24760ff366d6b09) | 48046147 |
-| `CirclesIdentityRegistry` (any Circles human) | [`0xF91B944D63351FFA2Af89f49D0D03717Dd6608C7`](https://gnosisscan.io/address/0xF91B944D63351FFA2Af89f49D0D03717Dd6608C7) | 48046147 |
+| `Deliberate` | [`0x45b256D21335a2Fa61F6060eA32bA2Ac95dEaC4d`](https://gnosisscan.io/address/0x45b256D21335a2Fa61F6060eA32bA2Ac95dEaC4d) | 48049355 |
+| `CirclesIdentityRegistry` (any Circles human) | [`0x4F1aA6ff415317dd397b11bFd00D0d651547eAB3`](https://gnosisscan.io/address/0x4F1aA6ff415317dd397b11bFd00D0d651547eAB3) | 48049355 |
 
 ## Layout
 
