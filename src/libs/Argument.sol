@@ -19,26 +19,26 @@ library Argument {
     /// @param finalizationTime The time from which the argument is final.
     /// @param pro The pro share reserve of the rating market (scarce pro = high approval).
     /// @param con The con share reserve of the rating market.
-    /// @param votes The vote tokens collateralizing the rating market (deposit and net stakes).
-    /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
+    /// @param stake The vote tokens collateralizing the rating market (deposit and net stakes).
+    /// @param subtreeStake Tally-time state: accumulates the tallied children's subtree stakes, and holds the
     /// argument's full subtree stake (own time-weighted stake included) once the argument itself is tallied.
     /// Zero until the tally.
     /// @param descendantsNumerator The tallied children's sways summed, each multiplied by its subtree stake -
     /// a sway is the child's rating clamped at zero, negated if it attacks, so the sum moves toward a side only
     /// on positive conviction. It is the numerator of the descendants' mean, whose denominator is
-    /// `subtreeVotes`; kept unreduced so the tally divides once, at the end, instead of once per child. A mean
+    /// `subtreeStake`; kept unreduced so the tally divides once, at the end, instead of once per child. A mean
     /// rounded per child would depend on the order the children were tallied in, which is the leaf set's order
     /// and no part of what the debate said.
     /// @param rating The tallied rating, written by the tally: signed, negative meaning refuted, and the value
     /// the argument's shares settle against at redemption. Zero until the tally. Stored beside the tally-time
-    /// state it shares a slot with - `subtreeVotes` is repurposed by the tally, so re-deriving the rating
+    /// state it shares a slot with - `subtreeStake` is repurposed by the tally, so re-deriving the rating
     /// later would double-count the argument's own stake. Narrow because the value is an approval on the
     /// `_MAX_APPROVAL` scale and needs 33 bits, which is what buys the numerator its width.
     /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
     /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
     /// bought by holding it, not by having the last word. Its magnitude is bounded by the full-scale approval
     /// (2^32) times a uint48 window, so it needs 80 bits and a sign - one more than an int80 carries, hence 88.
-    /// @param votesSeconds The market stake multiplied by the seconds it was held, accumulated over the rating
+    /// @param stakeSeconds The market stake multiplied by the seconds it was held, accumulated over the rating
     /// window. The tally divides by the window to read the time-weighted stake: weight is earned by exposure,
     /// so the deposit (standing the whole window) counts in full while late stakes count in proportion.
     /// Bounded by a uint32 stake times a uint48 window, which is exactly what 80 unsigned bits hold.
@@ -54,12 +54,12 @@ library Argument {
         uint48 finalizationTime; //       ┘ + 6 = 31
         uint32 pro; //                    ┐   4
         uint32 con; //                    | + 4
-        uint32 votes; //                  | + 4
-        uint32 subtreeVotes; //           | + 4
+        uint32 stake; //                  | + 4
+        uint32 subtreeStake; //           | + 4
         int72 descendantsNumerator; //    | + 9
         int40 rating; //                  ┘ + 5 = 30
         int88 centeredApprovalSeconds; // ┐  11
-        uint80 votesSeconds; //           | +10
+        uint80 stakeSeconds; //           | +10
         uint48 lastAccrualTime; //        | + 6
         uint32 fees; //                   ┘ + 4 = 31
     }

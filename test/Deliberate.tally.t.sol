@@ -43,7 +43,7 @@ contract DeliberateTallyTest is Test {
         DebateGen.Debate memory debate = vm.createDebateWithFee(_deliberate, _ALICE, _LOCKING_DURATION, 1);
         uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpToRating(debate);
-        // fee 100 -> net 9900: reserves (25, 10400), votes 10900
+        // fee 100 -> net 9900: reserves (25, 10400), stake 10900
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
@@ -66,7 +66,7 @@ contract DeliberateTallyTest is Test {
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
         uint16 child = vm.addCon(debate, _CAROL, parent, 90);
         vm.warpToRating(debate);
-        // fee 500 -> net 9500: reserves (25, 10000), votes 10500
+        // fee 500 -> net 9500: reserves (25, 10000), stake 10500
         vm.stakePro(debate, _BOB, parent, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
@@ -76,8 +76,8 @@ contract DeliberateTallyTest is Test {
         // stake 1000. Parent: its corrected price floor(MAX * (10000-25)/10025) = 4273546011 time-weights to
         // floor(4273546011 * 179 / 180) = 4249804088, and its stake to floor((1000*1 + 10500*179)/180)
         // = 10447. Blend: (4249804088 * 10447 - 3435973836 * 1000) / 11447 = 3578381189 ~ 83.3%.
-        assertEq(vm.argumentOf(debate, child).subtreeVotes, 1000);
-        assertEq(vm.argumentOf(debate, parent).subtreeVotes, 11447);
+        assertEq(vm.argumentOf(debate, child).subtreeStake, 1000);
+        assertEq(vm.argumentOf(debate, parent).subtreeStake, 11447);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 3578381189);
         assertTrue(vm.outcome(debate));
     }
@@ -85,7 +85,7 @@ contract DeliberateTallyTest is Test {
     function test_siblingsWeighWithTheirWholeSubtreesStake() public {
         // Two pro siblings with equal own markets (1000 each): A a plain leaf at 90%, B seeded
         // neutral but carrying a sub-debate of 4000 at 90%. B's subtree (5000) outweighs A (1000)
-        // at the thesis - under own-votes weighting they would count equally.
+        // at the thesis - under own-stake weighting they would count equally.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         uint16 b = vm.addPro(debate, _BOB, DebateGen.ROOT, 50);
@@ -101,12 +101,12 @@ contract DeliberateTallyTest is Test {
         // subtree 4000. B, seeded neutral, contributes zero of its own: blend
         // (0 * 1000 + 3435973836 * 4000) / 5000 = 2748779068, subtree 5000.
         // Thesis: (3435973836 * 1000 + 2748779068 * 5000) / 6000 = 2863311529 - the subtree-weighted mean,
-        // not the own-votes mean (3092376452).
-        assertEq(vm.argumentOf(debate, b).subtreeVotes, 5000);
+        // not the own-stake mean (3092376452).
+        assertEq(vm.argumentOf(debate, b).subtreeStake, 5000);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2863311529);
 
         // The thesis' accumulated weight is the whole debate's stake - every market counted once.
-        assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
+        assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeStake, vm.totalVotesOf(debate));
     }
 
     function test_aRefutedArgumentSwaysNothingButKeepsItsWeight() public {
@@ -132,10 +132,10 @@ contract DeliberateTallyTest is Test {
         // Thesis: (3435973836 * 1000 + 0 * 4000) / 5000 = 687194767 - diluted by the refuted subtree's
         // kept weight, not raised by it (unclamped it would read (3435973836 * 1000 + 2576980377 * 4000)
         // / 5000 = 2748779068, the attack aiding the thesis), and not the supporter's lone voice either.
-        assertEq(vm.argumentOf(debate, attack).subtreeVotes, 4000);
+        assertEq(vm.argumentOf(debate, attack).subtreeStake, 4000);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 687194767);
         assertTrue(vm.outcome(debate));
-        assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeVotes, vm.totalVotesOf(debate));
+        assertEq(vm.argumentOf(debate, DebateGen.ROOT).subtreeStake, vm.totalVotesOf(debate));
     }
 
     function test_aLastSecondSnipeBuysNeitherRatingNorWeight() public {
@@ -155,7 +155,7 @@ contract DeliberateTallyTest is Test {
         // The market closed at 10000/10025 ~ 99.8%, yet the tally saw a neutral market all window.
         assertEq(vm.approvalBps(debate, argumentId), 9975);
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 0);
-        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 1000);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeStake, 1000);
         assertFalse(vm.outcome(debate));
     }
 
@@ -166,7 +166,7 @@ contract DeliberateTallyTest is Test {
         uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         (, uint48 editingEndTime,,) = _deliberate.phases(debate.id);
         vm.warp(editingEndTime + 90);
-        // fee 500 -> net 9500: reserves (25, 10000), votes 10500
+        // fee 500 -> net 9500: reserves (25, 10000), stake 10500
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
@@ -176,7 +176,7 @@ contract DeliberateTallyTest is Test {
         // 2136773005. Weight: floor((1000 * 90 + 10500 * 90) / 180) = 5750 - the seed's 1000 in
         // full, the stake's 9500 at half.
         assertEq(vm.descendantsAggregate(debate, DebateGen.ROOT), 2136773005);
-        assertEq(vm.argumentOf(debate, argumentId).subtreeVotes, 5750);
+        assertEq(vm.argumentOf(debate, argumentId).subtreeStake, 5750);
         assertTrue(vm.outcome(debate));
     }
 

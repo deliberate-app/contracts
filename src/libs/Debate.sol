@@ -13,7 +13,7 @@ import {Argument} from "./Argument.sol";
 library Debate {
     /// @notice The data associated with a debate.
     /// @param arguments The arguments of the debate by their ID.
-    /// @param totalVotes The total votes cast in the debate.
+    /// @param totalStake The vote tokens committed to the debate's markets: every deposit plus every net stake.
     /// @param argumentsCount The number of arguments in the debate.
     /// @param participantsCount The number of accounts that joined the debate - the `N` in the bounty payout.
     /// @param feePercentage The market fee in percent, chosen by the debate creator at creation and accrued
@@ -23,7 +23,7 @@ library Debate {
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {
         mapping(uint16 argumentId => Argument.Data) arguments;
-        uint32 totalVotes; //                       ┐   4
+        uint32 totalStake; //                       ┐   4
         uint16 argumentsCount; //                   | + 2
         uint32 participantsCount; //                | + 4
         uint8 feePercentage; //                     | + 1

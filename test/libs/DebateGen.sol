@@ -247,13 +247,13 @@ library DebateGen {
         bps = total == 0 ? 5000 : (uint256(argument.con) * 10000) / total;
     }
 
-    // The chain keeps the descendants' sways as an undivided numerator over `subtreeVotes`; the mean
+    // The chain keeps the descendants' sways as an undivided numerator over `subtreeStake`; the mean
     // the tally blends is that quotient, taken here so the assertions read in approval units.
     function descendantsAggregate(Vm, Debate memory debate, uint16 argumentId) internal view returns (int64 aggregate) {
         Argument.Data memory argument = debate.deliberate.getArgument(debate.id, argumentId);
-        aggregate = argument.subtreeVotes == 0
+        aggregate = argument.subtreeStake == 0
             ? int64(0)
-            : int64(argument.descendantsNumerator / int72(uint72(argument.subtreeVotes)));
+            : int64(argument.descendantsNumerator / int72(uint72(argument.subtreeStake)));
     }
 
     function tokensOf(Vm, Debate memory debate, address account) internal view returns (uint32 tokens) {
@@ -268,8 +268,8 @@ library DebateGen {
         shares = debate.deliberate.getUserShares(debate.id, argumentId, account);
     }
 
-    function totalVotesOf(Vm, Debate memory debate) internal view returns (uint32 totalVotes) {
-        (totalVotes,,,,) = debate.deliberate.debates(debate.id);
+    function totalVotesOf(Vm, Debate memory debate) internal view returns (uint32 totalStake) {
+        (totalStake,,,,) = debate.deliberate.debates(debate.id);
     }
 
     function feeOf(Vm, Debate memory debate) internal view returns (uint8 feePercentage) {

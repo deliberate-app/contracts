@@ -358,9 +358,9 @@ contract Deliberate is IDeliberate {
 
         // Re-seed the market at the new approval. Only a draft can move and drafts cannot be
         // staked on, so the reserves are still the pristine deposit split - re-splitting the
-        // argument's own deposit (its unchanged votes) is lossless, whatever deposit the
+        // argument's own deposit (its unchanged stake) is lossless, whatever deposit the
         // creator chose.
-        (movedArgument.pro, movedArgument.con) = movedArgument.votes.split(100 - initialApproval, initialApproval);
+        (movedArgument.pro, movedArgument.con) = movedArgument.stake.split(100 - initialApproval, initialApproval);
 
         // change new parent argument state
         _updateParentAfterChildAttachment({debateId: debateId, parentArgumentId: newParentArgumentId});
@@ -596,7 +596,7 @@ contract Deliberate is IDeliberate {
         view
         override
         returns (
-            uint32 totalVotes,
+            uint32 totalStake,
             uint16 argumentsCount,
             uint32 participantsCount,
             uint8 feePercentage,
@@ -605,7 +605,7 @@ contract Deliberate is IDeliberate {
     {
         Debate.Data storage debate = _debates[debateId];
         return (
-            debate.totalVotes,
+            debate.totalStake,
             debate.argumentsCount,
             debate.participantsCount,
             debate.feePercentage,
@@ -710,7 +710,7 @@ contract Deliberate is IDeliberate {
         _updateParentAfterChildAttachment({debateId: debateId, parentArgumentId: parentArgumentId});
 
         // The deposit is committed to the new argument's market and counts toward the debate total.
-        debate.totalVotes += deposit;
+        debate.totalStake += deposit;
 
         // The new argument starts as a leaf.
         // slither-disable-next-line unused-return
@@ -781,7 +781,7 @@ contract Deliberate is IDeliberate {
         // pro-share PRICE, so a high approval means a scarce pro reserve: the con side receives
         // the initialApproval fraction of the deposit, the pro side the complement.
         (argument.pro, argument.con) = deposit.split(100 - initialApproval, initialApproval);
-        argument.votes = deposit;
+        argument.stake = deposit;
 
         // A fresh argument is a draft until its locking window elapses; existence and finality are
         // derived from the creator and this finalization time, so no state is stored.
@@ -958,9 +958,9 @@ contract Deliberate is IDeliberate {
             user.shares[argumentId].con += stakeData.sharesOut;
         }
 
-        argument.votes += net;
+        argument.stake += net;
         argument.fees += stakeData.fee;
-        debate.totalVotes += net;
+        debate.totalStake += net;
 
         emit Staked({debateId: debateId, argumentId: argumentId, staker: msg.sender, data: stakeData});
     }
@@ -988,19 +988,19 @@ contract Deliberate is IDeliberate {
             // out.
             if (_isFinal(argument)) {
                 // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
-                // by the stake behind it. At this point `subtreeVotes` holds the tallied children's subtree
+                // by the stake behind it. At this point `subtreeStake` holds the tallied children's subtree
                 // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
                 // included), the weight it folds in with.
                 int40 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
-                uint32 subtreeVotes =
-                    _timeWeightedVotes({debateId: debateId, argument: argument}) + argument.subtreeVotes;
-                argument.subtreeVotes = subtreeVotes;
-                // Stored for redemption to settle against: `subtreeVotes` is repurposed above, so the
+                uint32 subtreeStake =
+                    _timeWeightedStake({debateId: debateId, argument: argument}) + argument.subtreeStake;
+                argument.subtreeStake = subtreeStake;
+                // Stored for redemption to settle against: `subtreeStake` is repurposed above, so the
                 // rating could not be re-derived later without double-counting the argument's own stake.
                 argument.rating = rating;
 
                 emit ArgumentRated({
-                    debateId: debateId, argumentId: argumentId, rating: rating, subtreeVotes: subtreeVotes
+                    debateId: debateId, argumentId: argumentId, rating: rating, subtreeStake: subtreeStake
                 });
 
                 // A refuted argument is silenced, not inverted.
@@ -1011,8 +1011,8 @@ contract Deliberate is IDeliberate {
                 // happen to be walked in: a sum is commutative where a mean rounded at every step is not.
                 // The mean this is the numerator of is taken once, in `_calculateRating`.
                 parentArgument.descendantsNumerator += (argument.isSupporting ? strength : -strength)
-                    * int72(uint72(subtreeVotes));
-                parentArgument.subtreeVotes += subtreeVotes;
+                    * int72(uint72(subtreeStake));
+                parentArgument.subtreeStake += subtreeStake;
             }
 
             parentArgument.untalliedChilds--;
@@ -1047,7 +1047,7 @@ contract Deliberate is IDeliberate {
         argument.centeredApprovalSeconds += SafeCast.toInt88(
             int256(_centeredApproval(argument)) * int256(uint256(elapsed))
         );
-        argument.votesSeconds += SafeCast.toUint80(uint256(argument.votes) * uint256(elapsed));
+        argument.stakeSeconds += SafeCast.toUint80(uint256(argument.stake) * uint256(elapsed));
         argument.lastAccrualTime = until;
     }
 
@@ -1169,10 +1169,10 @@ contract Deliberate is IDeliberate {
         // One division, over the summed numerator: the descendants enter as
         // `Σ sway * subtreeStake` rather than as a mean already rounded once per child, so nothing is lost
         // between the children and here and the result cannot depend on the order they were folded in.
-        uint32 ownVotes = _timeWeightedVotes({debateId: debateId, argument: argument});
+        uint32 ownStake = _timeWeightedStake({debateId: debateId, argument: argument});
         rating = SafeCast.toInt40(
-            (int256(centeredApproval) * int256(uint256(ownVotes)) + int256(argument.descendantsNumerator))
-                / int256(uint256(ownVotes) + uint256(argument.subtreeVotes))
+            (int256(centeredApproval) * int256(uint256(ownStake)) + int256(argument.descendantsNumerator))
+                / int256(uint256(ownStake) + uint256(argument.subtreeStake))
         );
     }
 
@@ -1197,11 +1197,11 @@ contract Deliberate is IDeliberate {
     /// @param debateId The ID of the debate.
     /// @param argument The argument whose accumulators are completed.
     /// @return centeredApprovalSeconds The completed centered-approval accumulator.
-    /// @return votesSeconds The completed stake accumulator.
+    /// @return stakeSeconds The completed stake accumulator.
     function _completedTallyInputs(uint256 debateId, Argument.Data storage argument)
         internal
         view
-        returns (int88 centeredApprovalSeconds, uint80 votesSeconds)
+        returns (int88 centeredApprovalSeconds, uint80 stakeSeconds)
     {
         Phase.Data storage phaseData = _phases[debateId];
 
@@ -1211,7 +1211,7 @@ contract Deliberate is IDeliberate {
 
         centeredApprovalSeconds = argument.centeredApprovalSeconds
             + SafeCast.toInt88(int256(_centeredApproval(argument)) * int256(uint256(elapsed)));
-        votesSeconds = argument.votesSeconds + SafeCast.toUint80(uint256(argument.votes) * uint256(elapsed));
+        stakeSeconds = argument.stakeSeconds + SafeCast.toUint80(uint256(argument.stake) * uint256(elapsed));
     }
 
     /// @notice An internal function reading an argument's time-weighted stake: the vote tokens held in its
@@ -1220,17 +1220,17 @@ contract Deliberate is IDeliberate {
     /// has ended.
     /// @param debateId The ID of the debate.
     /// @param argument The argument whose stake is read.
-    /// @return timeWeightedVotes The time-weighted stake.
-    function _timeWeightedVotes(uint256 debateId, Argument.Data storage argument)
+    /// @return timeWeightedStake The time-weighted stake.
+    function _timeWeightedStake(uint256 debateId, Argument.Data storage argument)
         internal
         view
-        returns (uint32 timeWeightedVotes)
+        returns (uint32 timeWeightedStake)
     {
-        (, uint80 votesSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
+        (, uint80 stakeSeconds) = _completedTallyInputs({debateId: debateId, argument: argument});
         uint48 window = _phases[debateId].ratingEndTime - _phases[debateId].editingEndTime;
 
         // An average of uint32 stake levels stays within uint32.
-        timeWeightedVotes = SafeCast.toUint32(uint256(votesSeconds) / window);
+        timeWeightedStake = SafeCast.toUint32(uint256(stakeSeconds) / window);
     }
 
     /// @notice An internal function reverting if an initial approval is outside the seedable range.

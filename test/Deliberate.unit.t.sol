@@ -415,7 +415,7 @@ contract DeliberateTest is Test {
         Argument.Data memory rootArgument = _deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID);
         assertEq(rootArgument.pro, 0);
         assertEq(rootArgument.con, 0);
-        assertEq(rootArgument.votes, 0);
+        assertEq(rootArgument.stake, 0);
         assertEq(rootArgument.fees, 0);
 
         assertEq(rootArgument.creator, address(this));
@@ -424,7 +424,7 @@ contract DeliberateTest is Test {
 
         assertEq(rootArgument.isSupporting, false);
         assertEq(rootArgument.parentArgumentId, 0);
-        assertEq(rootArgument.subtreeVotes, 0);
+        assertEq(rootArgument.subtreeStake, 0);
 
         assertEq(_deliberate.getLeafArgumentIds(debateId).length, 0);
     }
@@ -588,7 +588,7 @@ contract DeliberateTest is Test {
             Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
             assertEq(argument.pro, 500);
             assertEq(argument.con, 500);
-            assertEq(argument.votes, 1000);
+            assertEq(argument.stake, 1000);
             assertEq(argument.fees, 0);
 
             assertEq(argument.creator, address(this));
@@ -597,7 +597,7 @@ contract DeliberateTest is Test {
 
             assertEq(argument.isSupporting, stances[i]);
             assertEq(argument.parentArgumentId, _ROOT_ARGUMENT_ID);
-            assertEq(argument.subtreeVotes, 0);
+            assertEq(argument.subtreeStake, 0);
 
             uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
             assertEq(leafArgumentIds.length, 1);
@@ -647,7 +647,7 @@ contract DeliberateTest is Test {
         assertEq(argument.con, deposit * initialApproval / 100);
         assertEq(argument.pro, deposit - argument.con);
         assertGe(argument.pro, 1);
-        assertEq(argument.votes, deposit);
+        assertEq(argument.stake, deposit);
         assertEq(argument.fees, 0);
     }
 
@@ -659,10 +659,10 @@ contract DeliberateTest is Test {
         _createArgument(debateId, false, 50);
 
         // Stake weights are tally-time state; only the debate total is maintained on the way in.
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, 0);
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeStake, 0);
 
-        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(totalVotes, 2000);
+        (uint32 totalStake,,,,) = _deliberate.debates(debateId);
+        assertEq(totalStake, 2000);
     }
 
     function test_createArgument_stakesTheChosenDeposit() public {
@@ -670,7 +670,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         // The creator stakes 4000 (above the minimum) at 50% approval: the deposit splits evenly
-        // into the reserves, seeds the votes, and counts in full toward the parent and debate totals.
+        // into the reserves, seeds the stake, and counts in full toward the parent and debate totals.
         uint16 argumentId = _createArgument({
             debateId: debateId,
             parentArgumentId: _ROOT_ARGUMENT_ID,
@@ -681,10 +681,10 @@ contract DeliberateTest is Test {
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
         assertEq(argument.pro, 2000);
         assertEq(argument.con, 2000);
-        assertEq(argument.votes, 4000);
+        assertEq(argument.stake, 4000);
 
-        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(totalVotes, 4000);
+        (uint32 totalStake,,,,) = _deliberate.debates(debateId);
+        assertEq(totalStake, 4000);
         assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS - 4000);
     }
 
@@ -803,7 +803,7 @@ contract DeliberateTest is Test {
     }
 
     function test_moveArgument_reseedsFromTheArgumentDeposit() public {
-        // A non-default deposit must re-seed from the argument's own votes, not a fixed constant.
+        // A non-default deposit must re-seed from the argument's own stake, not a fixed constant.
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
@@ -825,7 +825,7 @@ contract DeliberateTest is Test {
 
         assertEq(_deliberate.getArgument(debateId, childArgumentId).pro, 800);
         assertEq(_deliberate.getArgument(debateId, childArgumentId).con, 3200);
-        assertEq(_deliberate.getArgument(debateId, childArgumentId).votes, 4000);
+        assertEq(_deliberate.getArgument(debateId, childArgumentId).stake, 4000);
     }
 
     function test_moveArgument_revertsForAnApprovalOutOfBounds() public {
@@ -959,7 +959,7 @@ contract DeliberateTest is Test {
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
         assertEq(argument.pro, 105);
         assertEq(argument.con, 2400); // approval con/(pro+con) rose from 50% to 2400/2505 = 95.8%
-        assertEq(argument.votes, 2900); // 1000 deposit + 2000 staked - 100 fee
+        assertEq(argument.stake, 2900); // 1000 deposit + 2000 staked - 100 fee
         assertEq(argument.fees, 100); // 5% of 2000
     }
 
@@ -1054,7 +1054,7 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        uint32 collateral = _deliberate.getArgument(debateId, argumentId).votes;
+        uint32 collateral = _deliberate.getArgument(debateId, argumentId).stake;
         uint32 firstBefore = _deliberate.getUserTokens(debateId, firstStaker);
         uint32 secondBefore = _deliberate.getUserTokens(debateId, secondStaker);
 
@@ -1177,8 +1177,8 @@ contract DeliberateTest is Test {
         // debate's stake, and the debate reached its terminal phase.
         (Phase.Status currentPhase,,,) = _deliberate.phases(debateId);
         assertEq(uint8(currentPhase), uint8(Phase.Status.Finished));
-        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, totalVotes);
+        (uint32 totalStake,,,,) = _deliberate.debates(debateId);
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeStake, totalStake);
     }
 
     function test_tallyTree_talliesRecursivelyUpTheTree() public {
@@ -1194,8 +1194,8 @@ contract DeliberateTest is Test {
         // The fully-approved opposing child weakens its parent from below ...
         assertLt(_deliberate.getArgument(debateId, argumentId).descendantsNumerator, 0);
         // ... and every market's stake folds up to the thesis, counted once.
-        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, totalVotes);
+        (uint32 totalStake,,,,) = _deliberate.debates(debateId);
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeStake, totalStake);
     }
 
     // --- outcome ---

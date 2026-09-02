@@ -119,11 +119,11 @@ interface IDeliberate {
     /// blended by the stake behind each, on the signed `_MAX_APPROVAL` fixed point whose zero is the market's
     /// undecided price - negative means refuted. Its sway on the parent is the rating clamped at zero, negated
     /// if it attacks, weighted by its subtree stake among its siblings'.
-    /// @param subtreeVotes The stake the rating folds into its parent with: the argument's own time-weighted
+    /// @param subtreeStake The stake the rating folds into its parent with: the argument's own time-weighted
     /// stake plus its whole subtree's. Emitted because it is the weight and cannot be derived from the other
     /// events - without it a reader has the sways but not what each one counts for, and can only guess at the
     /// aggregate the tally computed.
-    event ArgumentRated(uint256 indexed debateId, uint16 indexed argumentId, int64 rating, uint32 subtreeVotes);
+    event ArgumentRated(uint256 indexed debateId, uint16 indexed argumentId, int64 rating, uint32 subtreeStake);
 
     /// @notice Emitted when the market fees accrued by an argument are claimed for its creator.
     /// @param debateId The ID of the debate.
@@ -316,7 +316,7 @@ interface IDeliberate {
 
     /// @notice Returns the aggregate data of a debate.
     /// @param debateId The ID of the debate.
-    /// @return totalVotes The total votes cast in the debate.
+    /// @return totalStake The vote tokens committed to the debate's markets: every deposit plus every net stake.
     /// @return argumentsCount The number of arguments in the debate.
     /// @return participantsCount The number of accounts that joined the debate.
     /// @return feePercentage The debate's market fee in percent, chosen by its creator at creation.
@@ -325,7 +325,7 @@ interface IDeliberate {
         external
         view
         returns (
-            uint32 totalVotes,
+            uint32 totalStake,
             uint16 argumentsCount,
             uint32 participantsCount,
             uint8 feePercentage,
