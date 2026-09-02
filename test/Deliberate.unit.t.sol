@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
+import {AllowlistIdentityRegistry} from "../src/adapters/AllowlistIdentityRegistry.sol";
 import {Deliberate} from "../src/Deliberate.sol";
 import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
 import {IIdentityRegistry} from "../src/interfaces/IIdentityRegistry.sol";
@@ -14,14 +15,14 @@ import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
-import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DeliberateTest is Test {
     using DebateGen for Vm;
 
     Deliberate internal _deliberate;
 
-    MockIdentityRegistry internal _mockIdentityRegistry;
+    // A curated group, maintained by this contract: the gate the gated-mode tests point their debates at.
+    AllowlistIdentityRegistry internal _registry;
 
     uint48 internal constant _LOCKING_DURATION = 1 minutes;
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
@@ -29,7 +30,7 @@ contract DeliberateTest is Test {
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
 
     function setUp() public {
-        _mockIdentityRegistry = new MockIdentityRegistry();
+        _registry = new AllowlistIdentityRegistry(address(this));
         _deliberate = new Deliberate();
     }
 
@@ -128,6 +129,12 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
         argumentId = _addArgument(debateId, true, initialApproval);
         _endEditing(debateId);
+    }
+
+    function _admit(address account) internal {
+        address[] memory accounts = new address[](1);
+        accounts[0] = account;
+        _registry.setMembership(accounts, true);
     }
 
     function _assertLeafSet(uint256 debateId, uint16[] memory expectedIds) internal view {
@@ -398,9 +405,7 @@ contract DeliberateTest is Test {
     }
 
     function test_join_revertsIfTheUserHasNoValidIdentityProof() public {
-        uint256 debateId = _createGatedDebate(_mockIdentityRegistry);
-
-        _mockIdentityRegistry.deny(address(this));
+        uint256 debateId = _createGatedDebate(_registry);
 
         vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
         _deliberate.join(debateId);
@@ -418,10 +423,10 @@ contract DeliberateTest is Test {
     }
 
     function test_join_admitsOnlyTheRegistrysMembersWhenTheDebateNamesOne() public {
-        uint256 debateId = _createGatedDebate(_mockIdentityRegistry);
+        uint256 debateId = _createGatedDebate(_registry);
         address barred = makeAddr("barred");
         address admitted = makeAddr("admitted");
-        _mockIdentityRegistry.deny(barred);
+        _admit(admitted);
 
         vm.prank(admitted);
         _deliberate.join(debateId);
@@ -433,22 +438,21 @@ contract DeliberateTest is Test {
 
     function test_createDebate_recordsTheGateItWasGiven() public {
         uint256 openDebateId = _createDebate();
-        uint256 gatedDebateId = _createGatedDebate(_mockIdentityRegistry);
+        uint256 gatedDebateId = _createGatedDebate(_registry);
 
         (,,,, IIdentityRegistry openGate) = _deliberate.debates(openDebateId);
         (,,,, IIdentityRegistry namedGate) = _deliberate.debates(gatedDebateId);
 
         assertEq(address(openGate), address(0));
-        assertEq(address(namedGate), address(_mockIdentityRegistry));
+        assertEq(address(namedGate), address(_registry));
     }
 
     function test_createDebate_letsOneRegistryGateSeveralDebates() public {
         // The property that makes a curated group worth maintaining: it is deployed once and named by every
         // debate it should decide.
-        uint256 firstDebateId = _createGatedDebate(_mockIdentityRegistry);
-        uint256 secondDebateId = _createGatedDebate(_mockIdentityRegistry);
+        uint256 firstDebateId = _createGatedDebate(_registry);
+        uint256 secondDebateId = _createGatedDebate(_registry);
         address barred = makeAddr("barred");
-        _mockIdentityRegistry.deny(barred);
 
         for (uint256 i = 0; i < 2; i++) {
             vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
