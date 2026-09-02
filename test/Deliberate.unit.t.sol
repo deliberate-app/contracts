@@ -23,7 +23,7 @@ contract DeliberateTest is Test {
 
     MockIdentityRegistry internal _mockIdentityRegistry;
 
-    uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
+    uint48 internal constant _LOCKING_DURATION = 1 minutes;
     bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
     bytes32 internal constant _PRO_ARGUMENT_CONTENT = "This is a good idea.";
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
@@ -569,9 +569,7 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint8 initialApproval = 49;
-        vm.expectRevert(
-            abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(50), initialApproval)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, 50, initialApproval));
         _addArgument(debateId, true, initialApproval);
     }
 
@@ -581,9 +579,7 @@ contract DeliberateTest is Test {
 
         // 100 would empty the pro reserve and freeze the market.
         uint8 initialApproval = 100;
-        vm.expectRevert(
-            abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, uint32(99), initialApproval)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.InitialApprovalOutOfBounds.selector, 99, initialApproval));
         _addArgument(debateId, true, initialApproval);
     }
 
@@ -958,7 +954,7 @@ contract DeliberateTest is Test {
         public
     {
         initialApproval = uint8(bound(initialApproval, 50, 99));
-        amount = uint32(bound(amount, 1, 10000));
+        amount = uint32(bound(amount, 1, Parameters.INITIAL_TOKENS));
 
         (uint256 debateId, uint16 argumentId) = _debateInRating(initialApproval);
 
@@ -997,8 +993,8 @@ contract DeliberateTest is Test {
         uint8 childApproval
     ) public {
         initialApproval = uint8(bound(initialApproval, 50, 99));
-        firstAmount = uint32(bound(firstAmount, 1, 10000));
-        secondAmount = uint32(bound(secondAmount, 1, 10000));
+        firstAmount = uint32(bound(firstAmount, 1, Parameters.INITIAL_TOKENS));
+        secondAmount = uint32(bound(secondAmount, 1, Parameters.INITIAL_TOKENS));
         // The rating window is three locking durations; the second stake lands anywhere inside it.
         secondDelay = uint48(bound(secondDelay, 0, 3 * _LOCKING_DURATION - 1));
         childApproval = uint8(bound(childApproval, 50, 99));

@@ -6,6 +6,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
+import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
 
@@ -54,7 +55,7 @@ contract DebateGenExampleTest is Test {
         vm.stakeCon(debate, _BOB, argumentId, 2000);
 
         assertLt(vm.approvalBps(debate, argumentId), 5000); // pushed below neutral
-        assertEq(vm.tokensOf(debate, _BOB), 8000); // 10000 granted on join, 2000 staked
+        assertEq(vm.tokensOf(debate, _BOB), Parameters.INITIAL_TOKENS - 2000);
     }
 
     function test_buildsADeeperTreeAcrossFinalizationWindows() public {

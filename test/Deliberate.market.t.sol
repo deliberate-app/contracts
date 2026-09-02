@@ -55,7 +55,7 @@ contract DeliberateMarketTest is Test {
         // 0x990c staked their whole budget UNDERRATED (the on-chain Staked event says isPro - not
         // overrated): 5% fee -> 9500 net into the con reserve, pro restored to the invariant rounded up:
         // (500, 500) -> (25, 10000), shares out 500 + 9500 - 25 = 9975.
-        vm.stakePro(debate, _BOB, argumentId, 10000);
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
         Argument.Data memory afterBob = vm.argumentOf(debate, argumentId);
         assertEq(afterBob.pro, 25);
         assertEq(afterBob.con, 10000);
@@ -63,7 +63,7 @@ contract DeliberateMarketTest is Test {
 
         // 0x4161 then staked their remaining nine tenths, also UNDERRATED: fee 450 -> 8550 net,
         // (25, 10000) -> (14, 18550), shares out 25 + 8550 - 14 = 8561.
-        vm.stakePro(debate, _ALICE, argumentId, 9000);
+        vm.stakePro(debate, _ALICE, argumentId, Parameters.INITIAL_TOKENS - Parameters._MIN_DEBATE_DEPOSIT);
         Argument.Data memory afterAlice = vm.argumentOf(debate, argumentId);
         assertEq(afterAlice.pro, 14);
         assertEq(afterAlice.con, 18550);
@@ -101,7 +101,7 @@ contract DeliberateMarketTest is Test {
 
         // Bob's 9500-net trade against the 1000-token 50/50 seed IS the whole correction: it moves
         // the approval from 50% to 10000/10025 ~ 99.8% and he pays the average price along that curve.
-        vm.stakePro(debate, _BOB, argumentId, 10000);
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -126,7 +126,7 @@ contract DeliberateMarketTest is Test {
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, argumentId, 10000);
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -145,8 +145,8 @@ contract DeliberateMarketTest is Test {
         // and is wrong - her 9500 net crashes the approval ((500, 500) -> (10000, 25), 9975 con
         // shares). Bob then buys the pro side cheap: (10000, 25) -> (27, 9525), 10000 + 9500 - 27 =
         // 19473 pro shares for the same 10000-token stake that bought only 9975 in the replay.
-        vm.stakeCon(debate, _CAROL, argumentId, 10000);
-        vm.stakePro(debate, _BOB, argumentId, 10000);
+        vm.stakeCon(debate, _CAROL, argumentId, Parameters.INITIAL_TOKENS);
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
         vm.warpToTallying(debate);
         vm.tally(debate);

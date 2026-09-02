@@ -49,7 +49,7 @@ contract DeliberateTallyTest is Test {
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 100 -> net 9900: reserves (25, 10400), votes 10900
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 100 -> net 9900: reserves (25, 10400), votes 10900
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -85,7 +85,7 @@ contract DeliberateTallyTest is Test {
             deposit: Parameters._MIN_DEBATE_DEPOSIT
         });
         vm.warpToRating(debate);
-        vm.stakePro(debate, _BOB, parent, 10000); // fee 5 -> net 95: reserves (1, 100), votes 105
+        vm.stakePro(debate, _BOB, parent, Parameters.INITIAL_TOKENS); // fee 5 -> net 95: reserves (1, 100), votes 105
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -200,7 +200,7 @@ contract DeliberateTallyTest is Test {
         });
         (,, uint48 ratingEndTime,) = _deliberate.phases(debate.id);
         vm.warp(ratingEndTime);
-        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 5 -> net 95: reserves (1, 100)
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 5 -> net 95: reserves (1, 100)
 
         vm.warpToTallying(debate);
         vm.tally(debate);
@@ -226,7 +226,7 @@ contract DeliberateTallyTest is Test {
         });
         (, uint48 editingEndTime,,) = _deliberate.phases(debate.id);
         vm.warp(editingEndTime + 90);
-        vm.stakePro(debate, _BOB, argumentId, 10000); // fee 500 -> net 9500: reserves (25, 10000), votes 10500
+        vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 500 -> net 9500: reserves (25, 10000), votes 10500
 
         vm.warpToTallying(debate);
         vm.tally(debate);

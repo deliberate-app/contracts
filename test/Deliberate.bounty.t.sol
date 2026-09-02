@@ -16,7 +16,7 @@ contract DeliberateBountyTest is Test {
     Deliberate internal _deliberate;
     MockERC20 internal _token;
 
-    uint48 internal constant _LOCKING_DURATION = 1 * 60;
+    uint48 internal constant _LOCKING_DURATION = 1 minutes;
     uint256 internal constant _POOL = 300 ether;
 
     address internal _earlyStaker = makeAddr("earlyStaker");

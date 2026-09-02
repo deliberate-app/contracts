@@ -22,7 +22,7 @@ contract DeliberateHarness is Deliberate {
 }
 
 contract DeliberateHarnessTest is Test {
-    uint48 internal constant _LOCKING_DURATION = 1 * 60; // 1 minute
+    uint48 internal constant _LOCKING_DURATION = 1 minutes;
 
     DeliberateHarness internal _deliberate;
 
