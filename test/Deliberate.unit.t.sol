@@ -72,16 +72,38 @@ contract DeliberateTest is Test {
         internal
         returns (uint16 argumentId)
     {
-        argumentId = _addArgument(debateId, isSupporting, initialApproval, Parameters._MIN_DEBATE_DEPOSIT);
+        argumentId = _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: isSupporting,
+            initialApproval: initialApproval,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
+        });
     }
 
-    function _addArgument(uint256 debateId, bool isSupporting, uint8 initialApproval, uint32 deposit)
+    function _addChild(uint256 debateId, uint16 parentArgumentId, bool isSupporting, uint8 initialApproval)
         internal
         returns (uint16 argumentId)
     {
+        argumentId = _addArgument({
+            debateId: debateId,
+            parentArgumentId: parentArgumentId,
+            isSupporting: isSupporting,
+            initialApproval: initialApproval,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
+        });
+    }
+
+    function _addArgument(
+        uint256 debateId,
+        uint16 parentArgumentId,
+        bool isSupporting,
+        uint8 initialApproval,
+        uint32 deposit
+    ) internal returns (uint16 argumentId) {
         argumentId = _deliberate.addArgument({
             debateId: debateId,
-            parentArgumentId: _ROOT_ARGUMENT_ID,
+            parentArgumentId: parentArgumentId,
             contentURI: _PRO_ARGUMENT_CONTENT,
             isSupporting: isSupporting,
             initialApproval: initialApproval,
@@ -602,7 +624,13 @@ contract DeliberateTest is Test {
 
         // The creator stakes 4000 (above the minimum) at 50% approval: the deposit splits evenly
         // into the reserves, seeds the votes, and counts in full toward the parent and debate totals.
-        uint16 argumentId = _addArgument(debateId, true, 50, 4000);
+        uint16 argumentId = _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: 4000
+        });
         Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
         assertEq(argument.pro, 2000);
         assertEq(argument.con, 2000);
@@ -621,7 +649,13 @@ contract DeliberateTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.DepositBelowMinimum.selector, Parameters._MIN_DEBATE_DEPOSIT, deposit)
         );
-        _addArgument(debateId, true, 50, deposit);
+        _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: deposit
+        });
     }
 
     function test_addArgument_revertsWhenTheDepositExceedsTheBalance() public {
@@ -632,7 +666,13 @@ contract DeliberateTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.InsufficientVoteTokens.selector, deposit, Parameters.INITIAL_TOKENS)
         );
-        _addArgument(debateId, true, 50, deposit);
+        _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: deposit
+        });
     }
 
     function test_addArgument_revertsOutsideTheEditingPhase() public {
@@ -666,22 +706,8 @@ contract DeliberateTest is Test {
         uint16 argumentA = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         uint16 argumentB = _addArgument(debateId, false, 50);
-        uint16 argumentC = _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: argumentA,
-            contentURI: _PRO_ARGUMENT_CONTENT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
-        uint16 argumentD = _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: argumentA,
-            contentURI: _PRO_ARGUMENT_CONTENT,
-            isSupporting: false,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentC = _addChild(debateId, argumentA, true, 50);
+        uint16 argumentD = _addChild(debateId, argumentA, false, 50);
 
         uint16[] memory expectedIds = new uint16[](3);
         expectedIds[0] = argumentB;
@@ -701,14 +727,7 @@ contract DeliberateTest is Test {
         uint16 argumentB = _addArgument(debateId, false, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
 
-        uint16 argumentC = _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: argumentA,
-            contentURI: _PRO_ARGUMENT_CONTENT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentC = _addChild(debateId, argumentA, true, 50);
 
         _deliberate.moveArgument({
             debateId: debateId, argumentId: argumentC, newParentArgumentId: argumentB, initialApproval: 50
@@ -726,14 +745,7 @@ contract DeliberateTest is Test {
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        uint16 childArgumentId = _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: parentArgumentId,
-            contentURI: _PRO_ARGUMENT_CONTENT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 childArgumentId = _addChild(debateId, parentArgumentId, true, 50);
         assertEq(_deliberate.getArgument(debateId, childArgumentId).parentArgumentId, parentArgumentId);
 
         _deliberate.moveArgument({
@@ -772,7 +784,13 @@ contract DeliberateTest is Test {
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         // A draft seeded with a 4000-token deposit at 50%: reserves 2000/2000.
-        uint16 childArgumentId = _addArgument(debateId, true, 50, 4000);
+        uint16 childArgumentId = _addArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: 4000
+        });
 
         // Moving it re-seeds at 80% from the 4000-token deposit: con takes 80% (3200), pro the rest (800).
         _deliberate.moveArgument({
@@ -994,14 +1012,7 @@ contract DeliberateTest is Test {
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
 
         // A sub-debate beneath the argument corrects its settlement away from its own price.
-        _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: argumentId,
-            contentURI: "A correction.",
-            isSupporting: childIsSupporting,
-            initialApproval: childApproval,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        _addChild(debateId, argumentId, childIsSupporting, childApproval);
         _endEditing(debateId);
 
         address firstStaker = makeAddr("firstStaker");
@@ -1167,14 +1178,7 @@ contract DeliberateTest is Test {
 
         uint16 argumentId = _addArgument(debateId, true, 80);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: argumentId,
-            contentURI: _PRO_ARGUMENT_CONTENT,
-            isSupporting: false,
-            initialApproval: 95,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        _addChild(debateId, argumentId, false, 95);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
