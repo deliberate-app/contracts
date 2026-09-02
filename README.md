@@ -93,6 +93,14 @@ The script prints both addresses. The `deliberate` address and its deployment bl
 `config.yaml` and the frontend's `VITE_DELIBERATE_ADDRESS`; the registry address feeds the frontend's
 `VITE_CIRCLES_REGISTRY` (deployment pipeline: contracts -> indexer -> frontend).
 
+The live deployment, recorded in `broadcast/DeployDeliberate.s.sol/100/run-latest.json` and verified on
+Sourcify and Gnosisscan:
+
+| Gnosis Chain (100) | address | block |
+|---|---|---|
+| `Deliberate` | [`0x260879778DE7A983565219c2C64f3b4cB927259a`](https://gnosisscan.io/address/0x260879778DE7A983565219c2C64f3b4cB927259a) | 48042054 |
+| `CirclesIdentityRegistry` (any Circles human) | [`0xF7421e860a9559a609963AbC4900394134e7AaCf`](https://gnosisscan.io/address/0xF7421e860a9559a609963AbC4900394134e7AaCf) | 48042054 |
+
 ## Layout
 
 ```
