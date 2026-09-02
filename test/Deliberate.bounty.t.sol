@@ -32,19 +32,14 @@ contract DeliberateBountyTest is Test {
     // --- helpers ---
 
     function _createBountyDebate(uint256 bountyAmount) internal returns (uint256 debateId) {
-        debateId = _deliberate.createDebate({
-            contentURI: "We should do XYZ",
-            lockingDuration: _LOCKING_DURATION,
-            editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION,
-            feePercentage: 5,
-            identityRegistry: IIdentityRegistry(address(0)),
-            bountyToken: _token,
-            bountyAmount: bountyAmount
-        });
+        debateId = _createDebate(_token, bountyAmount);
     }
 
     function _createBountylessDebate() internal returns (uint256 debateId) {
+        debateId = _createDebate(IERC20(address(0)), 0);
+    }
+
+    function _createDebate(IERC20 bountyToken, uint256 bountyAmount) internal returns (uint256 debateId) {
         debateId = _deliberate.createDebate({
             contentURI: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
@@ -52,8 +47,8 @@ contract DeliberateBountyTest is Test {
             ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: 5,
             identityRegistry: IIdentityRegistry(address(0)),
-            bountyToken: IERC20(address(0)),
-            bountyAmount: 0
+            bountyToken: bountyToken,
+            bountyAmount: bountyAmount
         });
     }
 
@@ -128,16 +123,7 @@ contract DeliberateBountyTest is Test {
 
     function test_createDebate_revertsForAnAmountWithoutAToken() public {
         vm.expectRevert(Deliberate.BountyTokenZero.selector);
-        _deliberate.createDebate({
-            contentURI: "We should do XYZ",
-            lockingDuration: _LOCKING_DURATION,
-            editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION,
-            feePercentage: 5,
-            identityRegistry: IIdentityRegistry(address(0)),
-            bountyToken: IERC20(address(0)),
-            bountyAmount: 1 ether
-        });
+        _createDebate(IERC20(address(0)), 1 ether);
     }
 
     // --- fundBounty ---
@@ -185,16 +171,7 @@ contract DeliberateBountyTest is Test {
         feeToken.mint(address(this), 100 ether);
         feeToken.approve(address(_deliberate), type(uint256).max);
 
-        uint256 debateId = _deliberate.createDebate({
-            contentURI: "We should do XYZ",
-            lockingDuration: _LOCKING_DURATION,
-            editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION,
-            feePercentage: 5,
-            identityRegistry: IIdentityRegistry(address(0)),
-            bountyToken: feeToken,
-            bountyAmount: 100 ether
-        });
+        uint256 debateId = _createDebate(feeToken, 100 ether);
 
         // 10% burned in transit: the pool records the 90 that arrived, staying payable.
         (, uint256 pool,,,) = _deliberate.bounty(debateId);

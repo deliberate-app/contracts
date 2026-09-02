@@ -36,40 +36,29 @@ contract DeliberateTest is Test {
     // --- helpers ---
 
     function _createDebate() internal returns (uint256 debateId) {
+        debateId = _createDebateWithFee(5);
+    }
+
+    function _createDebateWithFee(uint8 feePercentage) internal returns (uint256 debateId) {
+        debateId = _createDebate({feePercentage: feePercentage, identityRegistry: IIdentityRegistry(address(0))});
+    }
+
+    function _createGatedDebate(IIdentityRegistry identityRegistry) internal returns (uint256 debateId) {
+        debateId = _createDebate({feePercentage: 5, identityRegistry: identityRegistry});
+    }
+
+    function _createDebate(uint8 feePercentage, IIdentityRegistry identityRegistry)
+        internal
+        returns (uint256 debateId)
+    {
         // The classic 7/3 split: editing spans seven locking windows, rating three.
         debateId = _deliberate.createDebate({
             contentURI: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
-            feePercentage: 5,
-            identityRegistry: IIdentityRegistry(address(0)),
-            bountyToken: IERC20(address(0)),
-            bountyAmount: 0
-        });
-    }
-
-    function _createGatedDebate(IIdentityRegistry identityRegistry) internal returns (uint256 debateId) {
-        debateId = _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
-            lockingDuration: _LOCKING_DURATION,
-            editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION,
-            feePercentage: 5,
-            identityRegistry: identityRegistry,
-            bountyToken: IERC20(address(0)),
-            bountyAmount: 0
-        });
-    }
-
-    function _createDebateWithFee(uint8 feePercentage) internal returns (uint256 debateId) {
-        debateId = _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
-            lockingDuration: _LOCKING_DURATION,
-            editingDuration: 7 * _LOCKING_DURATION,
-            ratingDuration: 3 * _LOCKING_DURATION,
             feePercentage: feePercentage,
-            identityRegistry: IIdentityRegistry(address(0)),
+            identityRegistry: identityRegistry,
             bountyToken: IERC20(address(0)),
             bountyAmount: 0
         });
