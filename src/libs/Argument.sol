@@ -23,13 +23,17 @@ library Argument {
     /// @param subtreeVotes Tally-time state: accumulates the tallied children's subtree stakes, and holds the
     /// argument's full subtree stake (own time-weighted stake included) once the argument itself is tallied.
     /// Zero until the tally.
-    /// @param descendantsAggregate The tallied children's sways as a running mean, each child weighted by its
-    /// subtree stake - a sway is the child's rating clamped at zero, negated if it attacks, so the aggregate
-    /// moves toward a side only on positive conviction.
+    /// @param descendantsNumerator The tallied children's sways summed, each multiplied by its subtree stake -
+    /// a sway is the child's rating clamped at zero, negated if it attacks, so the sum moves toward a side only
+    /// on positive conviction. It is the numerator of the descendants' mean, whose denominator is
+    /// `subtreeVotes`; kept unreduced so the tally divides once, at the end, instead of once per child. A mean
+    /// rounded per child would depend on the order the children were tallied in, which is the leaf set's order
+    /// and no part of what the debate said.
     /// @param rating The tallied rating, written by the tally: signed, negative meaning refuted, and the value
     /// the argument's shares settle against at redemption. Zero until the tally. Stored beside the tally-time
     /// state it shares a slot with - `subtreeVotes` is repurposed by the tally, so re-deriving the rating
-    /// later would double-count the argument's own stake.
+    /// later would double-count the argument's own stake. Narrow because the value is an approval on the
+    /// `_MAX_APPROVAL` scale and needs 33 bits, which is what buys the numerator its width.
     /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
     /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
     /// bought by holding it, not by having the last word. Its magnitude is bounded by the full-scale approval
@@ -52,8 +56,8 @@ library Argument {
         uint32 con; //                    | + 4
         uint32 votes; //                  | + 4
         uint32 subtreeVotes; //           | + 4
-        int64 descendantsAggregate; //    | + 8
-        int64 rating; //                  ┘ + 8 = 32
+        int72 descendantsNumerator; //    | + 9
+        int40 rating; //                  ┘ + 5 = 30
         int88 centeredApprovalSeconds; // ┐  11
         uint80 votesSeconds; //           | +10
         uint48 lastAccrualTime; //        | + 6
