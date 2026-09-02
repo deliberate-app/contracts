@@ -80,7 +80,7 @@ library DebateGen {
 
     // --- arguments (content is the argument id) ---
 
-    function addArgument(
+    function createArgument(
         Vm vm,
         Debate memory debate,
         address author,
@@ -94,7 +94,7 @@ library DebateGen {
         (, uint16 nextId,,,) = debate.deliberate.debates(debate.id);
         vm.prank(author);
         argumentId = debate.deliberate
-            .addArgument({
+            .createArgument({
                 debateId: debate.id,
                 parentArgumentId: parentId,
                 contentURI: bytes32(uint256(nextId)),
@@ -108,7 +108,7 @@ library DebateGen {
         internal
         returns (uint16 argumentId)
     {
-        argumentId = addArgument({
+        argumentId = createArgument({
             vm: vm,
             debate: debate,
             author: author,
@@ -123,7 +123,7 @@ library DebateGen {
         internal
         returns (uint16 argumentId)
     {
-        argumentId = addArgument({
+        argumentId = createArgument({
             vm: vm,
             debate: debate,
             author: author,
@@ -139,7 +139,7 @@ library DebateGen {
     // Adds `count` minimum-deposit arguments straight below `parentId`, alternating stances: the widest tree.
     function fan(Vm vm, Debate memory debate, uint16 parentId, uint16 count) internal {
         for (uint16 i = 0; i < count; i++) {
-            addArgument({
+            createArgument({
                 vm: vm,
                 debate: debate,
                 author: authorOf(vm, i),
@@ -156,7 +156,7 @@ library DebateGen {
     function chain(Vm vm, Debate memory debate, uint16 parentId, uint16 depth) internal returns (uint16 leafId) {
         leafId = parentId;
         for (uint16 i = 0; i < depth; i++) {
-            leafId = addArgument({
+            leafId = createArgument({
                 vm: vm,
                 debate: debate,
                 author: authorOf(vm, i),

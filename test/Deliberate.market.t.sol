@@ -156,7 +156,7 @@ contract DeliberateMarketTest is Test {
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         uint16 parent = vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
-        vm.addArgument({
+        vm.createArgument({
             debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 3000
         });
         vm.warpToRating(debate);

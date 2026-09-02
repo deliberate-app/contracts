@@ -44,7 +44,7 @@ interface IDeliberate {
     /// @param approved Whether the debate approved the thesis.
     event DebateFinished(uint256 indexed debateId, bool approved);
 
-    /// @notice Emitted when an argument is added to a debate.
+    /// @notice Emitted when an argument is created in a debate.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @param parentArgumentId The ID of the parent argument.
@@ -54,7 +54,7 @@ interface IDeliberate {
     /// @param pro The pro reserve the argument's market is seeded with.
     /// @param con The con reserve the argument's market is seeded with.
     /// @param finalizationTime The time from which the argument can be finalized.
-    event ArgumentAdded(
+    event ArgumentCreated(
         uint256 indexed debateId,
         uint16 indexed argumentId,
         uint16 indexed parentArgumentId,
@@ -204,7 +204,7 @@ interface IDeliberate {
     /// @param debateId The ID of the debate.
     function join(uint256 debateId) external;
 
-    /// @notice Adds an argument below a parent argument with a certain initial approval, staking a
+    /// @notice Creates an argument below a parent argument with a certain initial approval, staking a
     /// creator-chosen deposit that seeds the argument's market and sets its starting weight.
     /// @param debateId The ID of the debate.
     /// @param parentArgumentId The ID of the parent argument.
@@ -213,7 +213,7 @@ interface IDeliberate {
     /// @param initialApproval The initial approval of the argument.
     /// @param deposit The vote token deposit to seed the argument's market with; at least the minimum.
     /// @return newArgumentId The ID of the created argument.
-    function addArgument(
+    function createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
         bytes32 contentURI,

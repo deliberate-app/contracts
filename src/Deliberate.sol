@@ -323,7 +323,7 @@ contract Deliberate is IDeliberate {
     }
 
     /// @inheritdoc IDeliberate
-    /// @dev The new parent must be final, mirroring `addArgument`. This also rules out cycles: children only ever
+    /// @dev The new parent must be final, mirroring `createArgument`. This also rules out cycles: children only ever
     /// attach beneath final arguments while only drafts (still inside their editing window) can move, so a draft is
     /// always childless - its subtree is itself alone - and it is not final.
     function moveArgument(uint256 debateId, uint16 argumentId, uint16 newParentArgumentId, uint8 initialApproval)
@@ -648,7 +648,7 @@ contract Deliberate is IDeliberate {
 
     /// @inheritdoc IDeliberate
     /// @dev This requires the parent argument to be final: its editing window must have elapsed.
-    function addArgument(
+    function createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
         bytes32 contentURI,
@@ -705,7 +705,7 @@ contract Deliberate is IDeliberate {
         debate.leafArgumentIds.add(newArgumentId);
 
         Argument.Data storage newArgument = debate.arguments[newArgumentId];
-        emit ArgumentAdded({
+        emit ArgumentCreated({
             debateId: debateId,
             argumentId: newArgumentId,
             parentArgumentId: parentArgumentId,

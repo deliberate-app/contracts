@@ -90,7 +90,7 @@ contract DeliberateTallyTest is Test {
         vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         uint16 b = vm.addPro(debate, _BOB, DebateGen.ROOT, 50);
         vm.warpWindows(debate, 1);
-        vm.addArgument({
+        vm.createArgument({
             debate: debate, author: _CAROL, parentId: b, isSupporting: true, initialApproval: 90, deposit: 4000
         });
 
@@ -120,7 +120,7 @@ contract DeliberateTallyTest is Test {
         vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         uint16 attack = vm.addCon(debate, _BOB, DebateGen.ROOT, 50);
         vm.warpWindows(debate, 1);
-        vm.addArgument({
+        vm.createArgument({
             debate: debate, author: _CAROL, parentId: attack, isSupporting: false, initialApproval: 90, deposit: 3000
         });
 

@@ -42,7 +42,7 @@ contract DeliberateHarnessTest is Test {
             bountyAmount: 0
         });
         _deliberate.join(debateId);
-        argumentId = _deliberate.addArgument({
+        argumentId = _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: 0,
             contentURI: "This is a good idea.",
@@ -60,7 +60,7 @@ contract DeliberateHarnessTest is Test {
 
         // Give the argument a child of its own, once it has locked in and can be replied to.
         skip(_LOCKING_DURATION);
-        _deliberate.addArgument({
+        _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: parentId,
             contentURI: "A supporting detail.",

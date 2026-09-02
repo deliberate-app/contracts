@@ -73,7 +73,7 @@ contract DeliberateBountyTest is Test {
     function _finishedBountyDebate(uint256 pool) internal returns (uint256 debateId, uint16 argumentId) {
         debateId = _createBountyDebate(pool);
         _deliberate.join(debateId);
-        argumentId = _deliberate.addArgument({
+        argumentId = _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: 0,
             contentURI: "This is a good idea.",
