@@ -26,8 +26,8 @@ contract DeliberateTest is Test {
     AllowlistIdentityRegistry internal _registry;
 
     uint48 internal constant _LOCKING_DURATION = 1 minutes;
-    bytes32 internal constant _THESIS_CONTENT = "We should do XYZ";
-    bytes32 internal constant _PRO_ARGUMENT_CONTENT = "This is a good idea.";
+    string internal constant _THESIS_CONTENT = "We should do XYZ";
+    string internal constant _PRO_ARGUMENT_CONTENT = "This is a good idea.";
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
 
     function setUp() public {
@@ -49,13 +49,26 @@ contract DeliberateTest is Test {
         debateId = _createDebate({feePercentage: 5, identityRegistry: identityRegistry});
     }
 
+    function _createDebateWithContent(string memory content) internal returns (uint256 debateId) {
+        debateId = _deliberate.createDebate({
+            content: content,
+            lockingDuration: _LOCKING_DURATION,
+            editingDuration: 7 * _LOCKING_DURATION,
+            ratingDuration: 3 * _LOCKING_DURATION,
+            feePercentage: 5,
+            identityRegistry: IIdentityRegistry(address(0)),
+            bountyToken: IERC20(address(0)),
+            bountyAmount: 0
+        });
+    }
+
     function _createDebate(uint8 feePercentage, IIdentityRegistry identityRegistry)
         internal
         returns (uint256 debateId)
     {
         // The classic 7/3 split: editing spans seven locking windows, rating three.
         debateId = _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
@@ -92,6 +105,26 @@ contract DeliberateTest is Test {
         });
     }
 
+    function _createArgumentWithContent(uint256 debateId, string memory content) internal returns (uint16 argumentId) {
+        argumentId = _deliberate.createArgument({
+            debateId: debateId,
+            parentArgumentId: _ROOT_ARGUMENT_ID,
+            content: content,
+            isSupporting: true,
+            initialApproval: 50,
+            deposit: Parameters._MIN_DEBATE_DEPOSIT
+        });
+    }
+
+    // Content made of `count` copies of `unit`: the cap is on bytes, so the tests spell their content out.
+    function _repeat(string memory unit, uint256 count) internal pure returns (string memory content) {
+        bytes memory buffer;
+        for (uint256 i = 0; i < count; i++) {
+            buffer = bytes.concat(buffer, bytes(unit));
+        }
+        content = string(buffer);
+    }
+
     function _createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
@@ -102,7 +135,7 @@ contract DeliberateTest is Test {
         argumentId = _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: parentArgumentId,
-            contentURI: _PRO_ARGUMENT_CONTENT,
+            content: _PRO_ARGUMENT_CONTENT,
             isSupporting: isSupporting,
             initialApproval: initialApproval,
             deposit: deposit
@@ -297,7 +330,7 @@ contract DeliberateTest is Test {
     function test_createDebate_revertsForAZeroLockingDuration() public {
         vm.expectRevert(Deliberate.LockingDurationZero.selector);
         _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: 0,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
@@ -308,10 +341,25 @@ contract DeliberateTest is Test {
         });
     }
 
+    function test_createDebate_revertsForEmptyContent() public {
+        vm.expectRevert(Deliberate.ContentEmpty.selector);
+        _createDebateWithContent("");
+    }
+
+    function test_createDebate_revertsForContentOverTheCap() public {
+        uint256 cap = Parameters.MAX_CONTENT_LENGTH;
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ContentTooLong.selector, cap, cap + 1));
+        _createDebateWithContent(_repeat("a", cap + 1));
+    }
+
+    function test_createDebate_acceptsContentAtTheCap() public {
+        assertEq(_createDebateWithContent(_repeat("a", Parameters.MAX_CONTENT_LENGTH)), 0);
+    }
+
     function test_createDebate_setsTheChosenDurations() public {
         // The three times are independent: a short locking window inside long, uneven phases.
         uint256 debateId = _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: 30 minutes,
             editingDuration: 3 days,
             ratingDuration: 1 days,
@@ -334,7 +382,7 @@ contract DeliberateTest is Test {
             abi.encodeWithSelector(Deliberate.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION)
         );
         _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
@@ -350,7 +398,7 @@ contract DeliberateTest is Test {
             abi.encodeWithSelector(Deliberate.DurationTooShort.selector, _LOCKING_DURATION, _LOCKING_DURATION - 1)
         );
         _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: _LOCKING_DURATION - 1,
@@ -365,8 +413,6 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
 
         Argument.Data memory rootArgument = _deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID);
-        assertEq(rootArgument.contentURI, _THESIS_CONTENT);
-
         assertEq(rootArgument.pro, 0);
         assertEq(rootArgument.con, 0);
         assertEq(rootArgument.votes, 0);
@@ -495,6 +541,34 @@ contract DeliberateTest is Test {
 
     // --- createArgument ---
 
+    function test_createArgument_revertsForEmptyContent() public {
+        uint256 debateId = _createDebate();
+        _deliberate.join(debateId);
+
+        vm.expectRevert(Deliberate.ContentEmpty.selector);
+        _createArgumentWithContent(debateId, "");
+    }
+
+    function test_createArgument_revertsForContentOverTheCap() public {
+        uint256 debateId = _createDebate();
+        _deliberate.join(debateId);
+
+        uint256 cap = Parameters.MAX_CONTENT_LENGTH;
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ContentTooLong.selector, cap, cap + 1));
+        _createArgumentWithContent(debateId, _repeat("a", cap + 1));
+    }
+
+    function test_createArgument_countsContentInBytesNotCharacters() public {
+        uint256 debateId = _createDebate();
+        _deliberate.join(debateId);
+
+        // A two-byte character: half the cap's worth fills it exactly, one more overflows it by two bytes.
+        uint256 cap = Parameters.MAX_CONTENT_LENGTH;
+        assertEq(_createArgumentWithContent(debateId, _repeat(unicode"ä", cap / 2)), 1);
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ContentTooLong.selector, cap, cap + 2));
+        _createArgumentWithContent(debateId, _repeat(unicode"ä", cap / 2 + 1));
+    }
+
     function test_createArgument_incrementsTheArgumentId() public {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
@@ -512,8 +586,6 @@ contract DeliberateTest is Test {
             uint16 argumentId = _createArgument(debateId, stances[i], 50);
 
             Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
-            assertEq(argument.contentURI, _PRO_ARGUMENT_CONTENT);
-
             assertEq(argument.pro, 500);
             assertEq(argument.con, 500);
             assertEq(argument.votes, 1000);
@@ -810,6 +882,25 @@ contract DeliberateTest is Test {
 
     // --- alterArgument ---
 
+    function test_alterArgument_revertsForEmptyContent() public {
+        uint256 debateId = _createDebate();
+        _deliberate.join(debateId);
+        uint16 argumentId = _createArgument(debateId, true, 50);
+
+        vm.expectRevert(Deliberate.ContentEmpty.selector);
+        _deliberate.alterArgument(debateId, argumentId, "");
+    }
+
+    function test_alterArgument_revertsForContentOverTheCap() public {
+        uint256 debateId = _createDebate();
+        _deliberate.join(debateId);
+        uint16 argumentId = _createArgument(debateId, true, 50);
+
+        uint256 cap = Parameters.MAX_CONTENT_LENGTH;
+        vm.expectRevert(abi.encodeWithSelector(Deliberate.ContentTooLong.selector, cap, cap + 1));
+        _deliberate.alterArgument(debateId, argumentId, _repeat("a", cap + 1));
+    }
+
     function test_alterArgument_revertsForANonCreator() public {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
@@ -1065,7 +1156,7 @@ contract DeliberateTest is Test {
         // this pins that the deepest one settles to the root at all, which no other test exercises beyond a
         // couple of levels.
         uint256 debateId = _deliberate.createDebate({
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: 1,
             editingDuration: 4 * uint48(Parameters.MAX_ARGUMENTS),
             ratingDuration: 100,
@@ -1304,7 +1395,7 @@ contract DeliberateTest is Test {
         emit IDeliberate.DebateCreated({
             debateId: 0,
             creator: address(this),
-            contentURI: _THESIS_CONTENT,
+            content: _THESIS_CONTENT,
             lockingDuration: _LOCKING_DURATION,
             editingEndTime: creationTime + 7 * _LOCKING_DURATION,
             ratingEndTime: creationTime + 10 * _LOCKING_DURATION,
@@ -1334,7 +1425,7 @@ contract DeliberateTest is Test {
             parentArgumentId: _ROOT_ARGUMENT_ID,
             creator: address(this),
             isSupporting: true,
-            contentURI: _PRO_ARGUMENT_CONTENT,
+            content: _PRO_ARGUMENT_CONTENT,
             pro: 200,
             con: 800,
             finalizationTime: uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION
@@ -1372,16 +1463,16 @@ contract DeliberateTest is Test {
         _deliberate.join(debateId);
 
         uint16 argumentId = _createArgument(debateId, true, 50);
-        bytes32 newContentURI = "An even better idea.";
+        string memory newContent = "An even better idea.";
 
         vm.expectEmit();
         emit IDeliberate.ArgumentAltered({
             debateId: debateId,
             argumentId: argumentId,
-            contentURI: newContentURI,
+            content: newContent,
             finalizationTime: uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION
         });
-        _deliberate.alterArgument(debateId, argumentId, newContentURI);
+        _deliberate.alterArgument(debateId, argumentId, newContent);
     }
 
     function test_stakePro_emitsStaked() public {

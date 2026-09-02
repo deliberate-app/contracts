@@ -16,7 +16,7 @@ interface IDeliberate {
     /// @notice Emitted when a debate is created. The thesis is the debate's root argument (ID 0).
     /// @param debateId The ID of the debate.
     /// @param creator The creator of the debate.
-    /// @param contentURI The URI pointing to the content of the debate thesis.
+    /// @param content The text of the thesis.
     /// @param lockingDuration How long a new or edited argument stays a draft before it locks in.
     /// @param editingEndTime The end time of the editing phase.
     /// @param ratingEndTime The end time of the rating phase.
@@ -25,7 +25,7 @@ interface IDeliberate {
     event DebateCreated(
         uint256 indexed debateId,
         address indexed creator,
-        bytes32 contentURI,
+        string content,
         uint48 lockingDuration,
         uint48 editingEndTime,
         uint48 ratingEndTime,
@@ -50,7 +50,7 @@ interface IDeliberate {
     /// @param parentArgumentId The ID of the parent argument.
     /// @param creator The creator of the argument.
     /// @param isSupporting Whether the argument supports or opposes the parent argument.
-    /// @param contentURI The URI pointing to the content of the argument.
+    /// @param content The text of the argument.
     /// @param pro The pro reserve the argument's market is seeded with.
     /// @param con The con reserve the argument's market is seeded with.
     /// @param finalizationTime The time from which the argument can be finalized.
@@ -60,7 +60,7 @@ interface IDeliberate {
         uint16 indexed parentArgumentId,
         address creator,
         bool isSupporting,
-        bytes32 contentURI,
+        string content,
         uint32 pro,
         uint32 con,
         uint48 finalizationTime
@@ -85,11 +85,9 @@ interface IDeliberate {
     /// @notice Emitted when an argument's content is altered, which restarts its editing window.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @param contentURI The URI pointing to the new content of the argument.
+    /// @param content The new text of the argument.
     /// @param finalizationTime The new time from which the argument can be finalized.
-    event ArgumentAltered(
-        uint256 indexed debateId, uint16 indexed argumentId, bytes32 contentURI, uint48 finalizationTime
-    );
+    event ArgumentAltered(uint256 indexed debateId, uint16 indexed argumentId, string content, uint48 finalizationTime);
 
     /// @notice Emitted when a debater stakes vote tokens on one side of an argument's market.
     /// @param debateId The ID of the debate.
@@ -154,7 +152,8 @@ interface IDeliberate {
     event BountySwept(uint256 indexed debateId, address indexed creator, uint256 amount);
 
     /// @notice Creates a new debate, optionally attaching an ERC-20 bounty for its net winners.
-    /// @param contentURI The URI pointing to the content of the debate thesis.
+    /// @param content The text of the thesis: between 1 and `Parameters.MAX_CONTENT_LENGTH` bytes of UTF-8,
+    /// published in `DebateCreated` and never stored.
     /// @param lockingDuration The time from an argument's creation (or last edit) until it locks in.
     /// @param editingDuration The length of the editing phase; longer than the locking duration, so arguments
     /// can lock in and be replied to.
@@ -172,7 +171,7 @@ interface IDeliberate {
     /// to name a token and leave the funding to top-ups.
     /// @return debateId The ID of the created debate.
     function createDebate(
-        bytes32 contentURI,
+        string calldata content,
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
@@ -208,7 +207,8 @@ interface IDeliberate {
     /// creator-chosen deposit that seeds the argument's market and sets its starting weight.
     /// @param debateId The ID of the debate.
     /// @param parentArgumentId The ID of the parent argument.
-    /// @param contentURI The URI pointing to the argument content.
+    /// @param content The text of the argument: between 1 and `Parameters.MAX_CONTENT_LENGTH` bytes of UTF-8,
+    /// published in `ArgumentCreated` and never stored.
     /// @param isSupporting Whether the argument supports or opposes the parent argument.
     /// @param initialApproval The initial approval of the argument.
     /// @param deposit The vote token deposit to seed the argument's market with; at least the minimum.
@@ -216,7 +216,7 @@ interface IDeliberate {
     function createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
-        bytes32 contentURI,
+        string calldata content,
         bool isSupporting,
         uint8 initialApproval,
         uint32 deposit
@@ -236,8 +236,8 @@ interface IDeliberate {
     /// @notice Alters the content of an argument.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument to be altered.
-    /// @param contentURI The URI pointing to the argument content.
-    function alterArgument(uint256 debateId, uint16 argumentId, bytes32 contentURI) external;
+    /// @param content The new text of the argument, within the bounds of creation, published in `ArgumentAltered`.
+    function alterArgument(uint256 debateId, uint16 argumentId, string calldata content) external;
 
     /// @notice Stakes an amount of vote tokens on the pro side, buying pro shares.
     /// @param debateId The ID of the debate.

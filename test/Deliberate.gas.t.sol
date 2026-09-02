@@ -33,7 +33,7 @@ contract DeliberateGasTest is Test {
         returns (DebateGen.Debate memory debate)
     {
         uint256 debateId = _deliberate.createDebate({
-            contentURI: "We should do XYZ",
+            content: "We should do XYZ",
             lockingDuration: lockingDuration,
             editingDuration: editingDuration,
             ratingDuration: ratingDuration,

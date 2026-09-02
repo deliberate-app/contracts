@@ -9,8 +9,9 @@ library Argument {
     /// @notice The data associated with an argument.
     /// @dev An argument's lifecycle is not stored: it exists once it has a `creator`, and it is final (locked
     /// in, tradeable, tallied) once its editing window (`finalizationTime`) has elapsed. The thesis sets its
-    /// finalization time to creation, so it is final from the start.
-    /// @param contentURI The URI pointing to the content of the argument.
+    /// finalization time to creation, so it is final from the start. Its content is not stored either: the
+    /// chain publishes it and never reads it, so it travels in the creation and alteration events, the latest
+    /// of which is the argument's text (the thesis' is in `DebateCreated`) - a slot saved on every argument.
     /// @param creator The creator of the argument; the zero address marks a nonexistent argument.
     /// @param isSupporting Whether the argument supports or opposes its parent.
     /// @param parentArgumentId The ID of the parent argument.
@@ -42,7 +43,6 @@ library Argument {
     /// @param fees The fees accrued by the argument for its creator. Packed with the accrual state its writes
     /// coincide with (both move on stakes), leaving the tally's slot to the tally's own outputs.
     struct Data {
-        bytes32 contentURI; //            ]  32
         address creator; //               ┐  20
         bool isSupporting; //             | + 1
         uint16 parentArgumentId; //       | + 2

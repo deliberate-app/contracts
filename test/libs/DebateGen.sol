@@ -54,10 +54,10 @@ library DebateGen {
         uint8 feePercentage
     ) internal returns (Debate memory debate) {
         vm.prank(creator);
-        // The thesis is argument 0, so its content is bytes32(0) under the "content is the id" convention.
+        // The thesis is argument 0, so its content is "0" under the "content is the id" convention.
         // One knob for tests: the classic 7/3 split derives both phases from the locking duration.
         uint256 id = deliberate.createDebate({
-            contentURI: bytes32(0),
+            content: "0",
             lockingDuration: lockingDuration,
             editingDuration: 7 * lockingDuration,
             ratingDuration: 3 * lockingDuration,
@@ -97,7 +97,7 @@ library DebateGen {
             .createArgument({
                 debateId: debate.id,
                 parentArgumentId: parentId,
-                contentURI: bytes32(uint256(nextId)),
+                content: vm.toString(nextId),
                 isSupporting: isSupporting,
                 initialApproval: initialApproval,
                 deposit: deposit

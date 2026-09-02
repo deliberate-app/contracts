@@ -6,6 +6,7 @@ import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
+import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {DebateGen} from "./libs/DebateGen.sol";
@@ -28,11 +29,34 @@ contract DebateGenExampleTest is Test {
     function test_everyArgumentsContentIsItsOwnId() public {
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
 
+        // Content is published, never stored: the creation event is the one place it can be read back.
+        vm.recordLogs();
         uint16 pro = vm.addPro(debate, _ALICE, DebateGen.ROOT, 80);
         uint16 con = vm.addCon(debate, _BOB, DebateGen.ROOT, 60);
 
-        assertEq(vm.argumentOf(debate, pro).contentURI, bytes32(uint256(pro)));
-        assertEq(vm.argumentOf(debate, con).contentURI, bytes32(uint256(con)));
+        string[] memory contents = _createdContents(vm.getRecordedLogs());
+        assertEq(contents.length, 2);
+        assertEq(contents[0], vm.toString(uint256(pro)));
+        assertEq(contents[1], vm.toString(uint256(con)));
+    }
+
+    // The content of every `ArgumentCreated` among the logs, in order.
+    function _createdContents(Vm.Log[] memory logs) internal pure returns (string[] memory contents) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == IDeliberate.ArgumentCreated.selector) {
+                count++;
+            }
+        }
+        contents = new string[](count);
+        uint256 next = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == IDeliberate.ArgumentCreated.selector) {
+                (,, string memory content,,,) =
+                    abi.decode(logs[i].data, (address, bool, string, uint32, uint32, uint48));
+                contents[next++] = content;
+            }
+        }
     }
 
     function test_talliesASupportingArgumentToApproval() public {

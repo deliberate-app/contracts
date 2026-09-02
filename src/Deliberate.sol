@@ -98,6 +98,14 @@ contract Deliberate is IDeliberate {
     /// @param actual The fee percentage passed.
     error FeePercentageExceeded(uint8 limit, uint8 actual);
 
+    /// @notice Thrown if a thesis or argument is created or altered with empty content.
+    error ContentEmpty();
+
+    /// @notice Thrown if a thesis or argument is created or altered with content above the permitted length.
+    /// @param limit The longest permitted content, in bytes.
+    /// @param actual The length of the content passed, in bytes.
+    error ContentTooLong(uint256 limit, uint256 actual);
+
     /// @notice Thrown if initial approval value is out of bounds.
     /// @param limit The limit initial approval value.
     /// @param actual The actual initial approval value.
@@ -195,7 +203,7 @@ contract Deliberate is IDeliberate {
 
     /// @inheritdoc IDeliberate
     function createDebate(
-        bytes32 contentURI,
+        string calldata content,
         uint48 lockingDuration,
         uint48 editingDuration,
         uint48 ratingDuration,
@@ -204,6 +212,8 @@ contract Deliberate is IDeliberate {
         IERC20 bountyToken,
         uint256 bountyAmount
     ) external override returns (uint256 debateId) {
+        _checkContent(content);
+
         // A zero locking duration would finalize every argument at creation, leaving nothing editable or movable.
         if (lockingDuration == 0) {
             revert LockingDurationZero();
@@ -232,7 +242,7 @@ contract Deliberate is IDeliberate {
 
         // Create the root argument of the tree - the thesis. Setting its finalization time to creation makes it
         // final from the start (finality is derived from the clock, not stored), so it can immediately parent.
-        rootArgument.contentURI = contentURI;
+        // Its text is published by the event below and kept nowhere.
         rootArgument.creator = msg.sender;
         rootArgument.finalizationTime = Time.timestamp();
 
@@ -256,7 +266,7 @@ contract Deliberate is IDeliberate {
         emit DebateCreated({
             debateId: debateId,
             creator: msg.sender,
-            contentURI: contentURI,
+            content: content,
             lockingDuration: lockingDuration,
             editingEndTime: phaseData.editingEndTime,
             ratingEndTime: phaseData.ratingEndTime,
@@ -366,26 +376,27 @@ contract Deliberate is IDeliberate {
     }
 
     /// @inheritdoc IDeliberate
-    function alterArgument(uint256 debateId, uint16 argumentId, bytes32 contentURI)
+    function alterArgument(uint256 debateId, uint16 argumentId, string calldata content)
         external
         override
         onlyPhase(debateId, Phase.Status.Editing)
         onlyCreator(debateId, argumentId)
         onlyDraftArgument(debateId, argumentId)
     {
-        uint48 newFinalizationTime =
-            Time.timestamp() + _phases[debateId].lockingDuration;
+        _checkContent(content);
+
+        uint48 newFinalizationTime = Time.timestamp() + _phases[debateId].lockingDuration;
 
         if (newFinalizationTime > _phases[debateId].editingEndTime) {
             revert TimeOutOfBounds({limit: _phases[debateId].editingEndTime, actual: newFinalizationTime});
         }
 
         Argument.Data storage alteredArgument = _debates[debateId].arguments[argumentId];
+        // Only the restarted window is state; the new text is published by the event alone.
         alteredArgument.finalizationTime = newFinalizationTime;
-        alteredArgument.contentURI = contentURI;
 
         emit ArgumentAltered({
-            debateId: debateId, argumentId: argumentId, contentURI: contentURI, finalizationTime: newFinalizationTime
+            debateId: debateId, argumentId: argumentId, content: content, finalizationTime: newFinalizationTime
         });
     }
 
@@ -651,7 +662,7 @@ contract Deliberate is IDeliberate {
     function createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
-        bytes32 contentURI,
+        string calldata content,
         bool isSupporting,
         uint8 initialApproval,
         uint32 deposit
@@ -665,6 +676,7 @@ contract Deliberate is IDeliberate {
     {
         User.Data storage user = _users[debateId][msg.sender];
 
+        _checkContent(content);
         _checkInitialApproval(initialApproval);
 
         // The creator picks the deposit seeding the market; a floor keeps both reserves non-empty.
@@ -689,7 +701,6 @@ contract Deliberate is IDeliberate {
         newArgumentId = _createArgument({
             debateId: debateId,
             parentArgumentId: parentArgumentId,
-            contentURI: contentURI,
             isSupporting: isSupporting,
             initialApproval: initialApproval,
             deposit: deposit
@@ -711,7 +722,7 @@ contract Deliberate is IDeliberate {
             parentArgumentId: parentArgumentId,
             creator: msg.sender,
             isSupporting: isSupporting,
-            contentURI: contentURI,
+            content: content,
             pro: newArgument.pro,
             con: newArgument.con,
             finalizationTime: newArgument.finalizationTime
@@ -747,7 +758,6 @@ contract Deliberate is IDeliberate {
     /// @notice Internal function to create an argument below a parent argument with a certain initial approval.
     /// @param debateId The ID of the debate.
     /// @param parentArgumentId The ID of the parent argument.
-    /// @param contentURI The URI pointing to the argument content.
     /// @param isSupporting Whether the argument supports or opposes the parent argument.
     /// @param initialApproval The initial approval of the argument.
     /// @param deposit The vote token deposit seeding the argument's market reserves.
@@ -755,7 +765,6 @@ contract Deliberate is IDeliberate {
     function _createArgument(
         uint256 debateId,
         uint16 parentArgumentId,
-        bytes32 contentURI,
         bool isSupporting,
         uint8 initialApproval,
         uint32 deposit
@@ -779,8 +788,6 @@ contract Deliberate is IDeliberate {
         argument.finalizationTime = Time.timestamp() + _phases[debateId].lockingDuration;
         argument.parentArgumentId = parentArgumentId;
         argument.isSupporting = isSupporting;
-
-        argument.contentURI = contentURI;
     }
 
     /// @notice Internal function to update a parent argument after a child argument attaches to it in a debate.
@@ -1230,6 +1237,20 @@ contract Deliberate is IDeliberate {
         // 100 is not seedable: it would empty the pro reserve and freeze the market.
         if (initialApproval > 99) {
             revert InitialApprovalOutOfBounds({limit: 99, actual: initialApproval});
+        }
+    }
+
+    /// @notice An internal function reverting if content is empty or longer than the permitted maximum.
+    /// @dev Content is published by the event that follows and never stored, so the bounds are on calldata and
+    /// log size - in bytes of UTF-8, which is all the chain can count.
+    /// @param content The content to validate.
+    function _checkContent(string calldata content) internal pure {
+        uint256 length = bytes(content).length;
+        if (length == 0) {
+            revert ContentEmpty();
+        }
+        if (length > Parameters.MAX_CONTENT_LENGTH) {
+            revert ContentTooLong({limit: Parameters.MAX_CONTENT_LENGTH, actual: length});
         }
     }
 }

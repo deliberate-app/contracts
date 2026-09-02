@@ -32,7 +32,7 @@ contract DeliberateHarnessTest is Test {
 
     function _debateWithADraft() internal returns (uint256 debateId, uint16 argumentId) {
         debateId = _deliberate.createDebate({
-            contentURI: "We should do XYZ",
+            content: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
@@ -45,7 +45,7 @@ contract DeliberateHarnessTest is Test {
         argumentId = _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: 0,
-            contentURI: "This is a good idea.",
+            content: "This is a good idea.",
             isSupporting: true,
             initialApproval: 50,
             deposit: Parameters._MIN_DEBATE_DEPOSIT
@@ -63,7 +63,7 @@ contract DeliberateHarnessTest is Test {
         _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: parentId,
-            contentURI: "A supporting detail.",
+            content: "A supporting detail.",
             isSupporting: true,
             initialApproval: 50,
             deposit: Parameters._MIN_DEBATE_DEPOSIT

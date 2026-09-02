@@ -42,6 +42,13 @@ library Parameters {
     /// alike, depth additionally costing one locking window of finalization latency per level.
     uint16 public constant MAX_ARGUMENTS = 512;
 
+    /// @notice The longest content, in bytes of UTF-8, a thesis or argument may carry.
+    /// @dev Content is calldata that the creation and alteration events publish; the contract keeps none of it
+    /// and never reads it back, so the cap bounds what every reader carries and what a transaction can smuggle
+    /// in, not storage. Bytes rather than characters, because the chain has no notion of the latter: 256 of
+    /// them hold one claim stated sharply in any script.
+    uint256 public constant MAX_CONTENT_LENGTH = 256;
+
     /// @notice The fixed-point scale of approvals and tallied ratings (the full scale equals `type(uint32).max`).
     int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
 }

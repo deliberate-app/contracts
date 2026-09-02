@@ -19,6 +19,10 @@ _Avoid_: root node, root argument, statement, proposition
 A node in the debate tree that supports (pro) or attacks (con) its parent; the only node type. Evidence and sources belong inside an argument's content.
 _Avoid_: node, fact node
 
+**Content**:
+The text of a thesis or argument: 1 to 256 bytes of UTF-8, passed to the call that creates or alters it, published by that call's event and never stored. Readers take it from the log, or from an indexer that folded the log.
+_Avoid_: contentURI, digest, CID, IPFS
+
 **Tally**:
 The on-chain, leaves-to-root aggregation of argument sway that produces the debate's outcome,
 reading time-weighted inputs: every price and every stake counts for the seconds it stood in the

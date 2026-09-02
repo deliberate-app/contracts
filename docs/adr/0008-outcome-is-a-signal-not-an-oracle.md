@@ -18,8 +18,10 @@ answer was.
 ## Consequences
 
 - Integrity guardrails live **consumer-side** and are documented in
-  [incentives.md §6](../incentives.md): bind to the thesis digest, require quorum and margin,
-  timelock past the claim window, keep a veto/challenge path. No in-protocol quorum parameters.
+  [incentives.md §6](../incentives.md): reference the debate by its id, which is unique and never
+  changes, and quote its thesis in the proposal (the text is in the `DebateCreated` log and nowhere
+  in state, ADR-0015); require quorum and margin, timelock past the claim window, keep a
+  veto/challenge path. No in-protocol quorum parameters.
 - The one designated in-protocol hardening is the **time-weighted tally** (incentives.md §5): the
   tally reads time-weighted approvals so a last-block snipe cannot flip the outcome for the cost of
   a fee, while redemption keeps paying final reserves and stays solvent.

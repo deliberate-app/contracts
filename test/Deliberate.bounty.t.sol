@@ -42,7 +42,7 @@ contract DeliberateBountyTest is Test {
 
     function _createDebate(IERC20 bountyToken, uint256 bountyAmount) internal returns (uint256 debateId) {
         debateId = _deliberate.createDebate({
-            contentURI: "We should do XYZ",
+            content: "We should do XYZ",
             lockingDuration: _LOCKING_DURATION,
             editingDuration: 7 * _LOCKING_DURATION,
             ratingDuration: 3 * _LOCKING_DURATION,
@@ -76,7 +76,7 @@ contract DeliberateBountyTest is Test {
         argumentId = _deliberate.createArgument({
             debateId: debateId,
             parentArgumentId: 0,
-            contentURI: "This is a good idea.",
+            content: "This is a good idea.",
             isSupporting: true,
             initialApproval: 50,
             deposit: Parameters._MIN_DEBATE_DEPOSIT
