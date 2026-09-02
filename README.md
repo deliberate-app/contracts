@@ -74,33 +74,24 @@ slither .
 
 #### Deployment
 
-`Deliberate` takes the address of an identity registry (`IIdentityRegistry`) as its only constructor
-argument — a personhood registry such as [Proof of Humanity](https://etherscan.io/address/0x1dAD862095d40d43c2109370121cf087632874dB),
-or an adapter like `EASIdentityRegistry` (attestation-based, e.g. Coinbase Verifications on Base).
-Against a real registry:
+Who may join is chosen per debate, so `Deliberate` takes no constructor arguments. A debate names an
+`IIdentityRegistry` at creation: the zero address admits everyone; an `AllowlistIdentityRegistry` is a group its
+owner curates and any number of debates can share; `CirclesIdentityRegistry` reads the Circles v2 Hub on
+Gnosis Chain, admitting any Circles human (or whoever a chosen avatar trusts); `EASIdentityRegistry` gates on an
+attestation. The deploy script puts the any-Circles-human registry beside `Deliberate`, so every deployment
+offers all three modes. With a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import)
+(`cast wallet import`) and the `gnosis` endpoint from `foundry.toml` (or any RPC URL in its place):
 
 ```sh
-forge script script/DeployDeliberate.s.sol:DeployDeliberate \
-  --sig "run(address)" <IDENTITY_REGISTRY> \
-  --rpc-url <network>
+just simulate gnosis                    # dry run
+just deploy <KEYSTORE_ACCOUNT> gnosis   # broadcast
+just verify <DELIBERATE_ADDRESS> gnosis # Sourcify and Etherscan; `verify-sourcify`, `verify-etherscan`, `verify-custom` singly
+just verify-circles-registry <REGISTRY_ADDRESS> gnosis
 ```
 
-On test networks without a registry, `runWithMockRegistry()` deploys a `MockIdentityRegistry`
-(everyone counts as registered) alongside. For Base Sepolia, verified on Blockscout (keyless),
-with a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`):
-
-```sh
-forge script script/DeployDeliberate.s.sol:DeployDeliberate \
-  --sig "runWithMockRegistry()" \
-  --rpc-url https://sepolia.base.org \
-  --account <KEYSTORE_ACCOUNT> \
-  --broadcast \
-  --verify --verifier blockscout --verifier-url https://base-sepolia.blockscout.com/api/
-```
-
-The script prints both addresses; the `deliberate` address and its deployment block feed the
-indexer's `config.base-sepolia.yaml` and the frontend's `VITE_DELIBERATE_ADDRESS`
-(deployment pipeline: contracts -> indexer -> frontend).
+The script prints both addresses. The `deliberate` address and its deployment block feed the indexer's
+`config.yaml` and the frontend's `VITE_DELIBERATE_ADDRESS`; the registry address feeds the frontend's
+`VITE_CIRCLES_REGISTRY` (deployment pipeline: contracts -> indexer -> frontend).
 
 ## Layout
 
