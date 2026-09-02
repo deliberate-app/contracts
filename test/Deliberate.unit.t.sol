@@ -64,10 +64,6 @@ contract DeliberateTest is Test {
         });
     }
 
-    function _join(uint256 debateId) internal {
-        _deliberate.join(debateId);
-    }
-
     function _addArgument(uint256 debateId, bool isSupporting, uint8 initialApproval)
         internal
         returns (uint16 argumentId)
@@ -109,6 +105,29 @@ contract DeliberateTest is Test {
             initialApproval: initialApproval,
             deposit: deposit
         });
+    }
+
+    // Stakes as `staker`, joining the debate first if they have not yet.
+    function _stake(uint256 debateId, uint16 argumentId, address staker, bool isPro, uint32 amount) internal {
+        if (_deliberate.getUserRole(debateId, staker) != User.Role.Participant) {
+            vm.prank(staker);
+            _deliberate.join(debateId);
+        }
+        vm.prank(staker);
+        if (isPro) {
+            _deliberate.stakePro(debateId, argumentId, amount);
+        } else {
+            _deliberate.stakeCon(debateId, argumentId, amount);
+        }
+    }
+
+    // A debate in its rating phase holding one final argument seeded at `initialApproval`, created and staked by
+    // this contract: where every staking and settlement scenario starts.
+    function _debateInRating(uint8 initialApproval) internal returns (uint256 debateId, uint16 argumentId) {
+        debateId = _createDebate();
+        _deliberate.join(debateId);
+        argumentId = _addArgument(debateId, true, initialApproval);
+        _endEditing(debateId);
     }
 
     function _assertLeafSet(uint256 debateId, uint16[] memory expectedIds) internal view {
@@ -368,7 +387,7 @@ contract DeliberateTest is Test {
         assertEq(shares.pro, 0);
         assertEq(shares.con, 0);
 
-        _join(debateId);
+        _deliberate.join(debateId);
 
         assertEq(uint256(_deliberate.getUserRole(debateId, address(this))), uint256(User.Role.Participant));
         assertEq(_deliberate.getUserTokens(debateId, address(this)), Parameters.INITIAL_TOKENS);
@@ -442,7 +461,7 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _endEditing(debateId);
 
-        _join(debateId);
+        _deliberate.join(debateId);
 
         assertEq(uint256(_deliberate.getUserRole(debateId, address(this))), uint256(User.Role.Participant));
     }
@@ -473,7 +492,7 @@ contract DeliberateTest is Test {
 
     function test_join_revertsForAnAlreadyJoinedAccount() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         vm.expectRevert(
             abi.encodeWithSelector(Deliberate.RoleInvalid.selector, User.Role.Unassigned, User.Role.Participant)
@@ -485,7 +504,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_incrementsTheArgumentId() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         assertEq(_addArgument(debateId, true, 50), 1);
         assertEq(_addArgument(debateId, true, 50), 2);
@@ -493,7 +512,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_addsAProArgument() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 proArgumentId = _addArgument(debateId, true, 50);
 
@@ -520,7 +539,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_addsAConArgument() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 conArgumentId = _addArgument(debateId, false, 50);
 
@@ -547,7 +566,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_revertsForInitialApprovalsBelow50() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint8 initialApproval = 49;
         vm.expectRevert(
@@ -558,7 +577,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_revertsForInitialApprovalsAbove99() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // 100 would empty the pro reserve and freeze the market.
         uint8 initialApproval = 100;
@@ -570,7 +589,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf50() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 50));
         assertEq(argument.pro, 500);
@@ -581,7 +600,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf80() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // Approval is the pro-share price: 80% approval means a scarce pro reserve.
         Argument.Data memory argument = _deliberate.getArgument(debateId, _addArgument(debateId, true, 80));
@@ -593,7 +612,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_initializesTheArgumentWithAnInitialApprovalOf95() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // Seeding is exact at the scale the deposit carries: 5% of 1000 to pro, 95% to con - where a
         // hundred-unit budget could only reach 90%, ten points off what the creator asked for.
@@ -606,7 +625,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_addsTheDepositToTheParentWeightAndDebateTotal() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _addArgument(debateId, true, 50);
         _addArgument(debateId, false, 50);
@@ -620,7 +639,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_stakesTheChosenDeposit() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // The creator stakes 4000 (above the minimum) at 50% approval: the deposit splits evenly
         // into the reserves, seeds the votes, and counts in full toward the parent and debate totals.
@@ -643,7 +662,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_revertsForADepositBelowTheMinimum() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint32 deposit = Parameters._MIN_DEBATE_DEPOSIT - 1;
         vm.expectRevert(
@@ -660,7 +679,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_revertsWhenTheDepositExceedsTheBalance() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint32 deposit = Parameters.INITIAL_TOKENS + 100;
         vm.expectRevert(
@@ -677,7 +696,7 @@ contract DeliberateTest is Test {
 
     function test_addArgument_revertsOutsideTheEditingPhase() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _endEditing(debateId);
 
@@ -690,7 +709,7 @@ contract DeliberateTest is Test {
     function test_addArgument_revertsWhenTheArgumentLimitIsReached() public {
         uint256 debateId = _createDebate();
         _fillDebateToTheArgumentCap(debateId);
-        _join(debateId);
+        _deliberate.join(debateId);
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentLimitReached.selector, Parameters.MAX_ARGUMENTS));
         _addArgument(debateId, true, 50);
@@ -701,7 +720,7 @@ contract DeliberateTest is Test {
         // on a miss, silently removed the last element - adding a second child to the same parent
         // dropped an unrelated leaf (and with it the subtree the tally would start from).
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -721,7 +740,7 @@ contract DeliberateTest is Test {
     function test_moveArgument_updatesTheLeaves() public {
         // The new parent must stop being a leaf, and the old parent - childless again - must return to being one.
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50);
@@ -741,7 +760,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_movesTheVoteWeightBetweenParents() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -757,7 +776,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_reseedsTheMarketAtTheNewApproval() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -779,7 +798,7 @@ contract DeliberateTest is Test {
     function test_moveArgument_reseedsFromTheArgumentDeposit() public {
         // A non-default deposit must re-seed from the argument's own votes, not a fixed constant.
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -804,7 +823,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_revertsForAnApprovalOutOfBounds() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 parentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -818,7 +837,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_revertsForANonFinalNewParent() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentA = _addArgument(debateId, true, 50);
         uint16 argumentB = _addArgument(debateId, false, 50); // a draft, so not a valid parent
@@ -831,7 +850,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_revertsWhenMovedUnderItself() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
@@ -844,7 +863,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_revertsForANonexistentNewParent() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
@@ -858,7 +877,7 @@ contract DeliberateTest is Test {
 
     function test_alterArgument_revertsForANonCreator() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
@@ -870,7 +889,7 @@ contract DeliberateTest is Test {
 
     function test_alterArgument_revertsOnceTheArgumentIsFinal() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
 
@@ -882,7 +901,7 @@ contract DeliberateTest is Test {
 
     function test_alterArgument_revertsWhenTheNewWindowWouldOutliveEditing() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // Added this late, the draft finalizes past the editing end - which adding allows, but
         // re-arming the window on an edit does not.
@@ -898,12 +917,7 @@ contract DeliberateTest is Test {
     // --- stakePro / stakeCon ---
 
     function test_stakePro_buysProSharesAndRaisesTheApproval() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
         _deliberate.stakePro(debateId, argumentId, 2000);
 
@@ -923,12 +937,7 @@ contract DeliberateTest is Test {
     }
 
     function test_stakeCon_buysConSharesAndLowersTheApproval() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
         _deliberate.stakeCon(debateId, argumentId, 2000);
 
@@ -951,23 +960,11 @@ contract DeliberateTest is Test {
         initialApproval = uint8(bound(initialApproval, 50, 99));
         amount = uint32(bound(amount, 1, 10000));
 
-        uint256 debateId = _createDebate();
-        _join(debateId);
-        uint16 argumentId = _addArgument(debateId, true, initialApproval);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(initialApproval);
 
         Argument.Data memory before = _deliberate.getArgument(debateId, argumentId);
 
-        address staker = makeAddr("staker");
-        vm.startPrank(staker);
-        _deliberate.join(debateId);
-        if (isPro) {
-            _deliberate.stakePro(debateId, argumentId, amount);
-        } else {
-            _deliberate.stakeCon(debateId, argumentId, amount);
-        }
-        vm.stopPrank();
+        _stake({debateId: debateId, argumentId: argumentId, staker: makeAddr("staker"), isPro: isPro, amount: amount});
 
         Argument.Data memory afterwards = _deliberate.getArgument(debateId, argumentId);
 
@@ -1007,7 +1004,7 @@ contract DeliberateTest is Test {
         childApproval = uint8(bound(childApproval, 50, 99));
 
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
         uint16 argumentId = _addArgument(debateId, true, initialApproval);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
 
@@ -1018,18 +1015,14 @@ contract DeliberateTest is Test {
         address firstStaker = makeAddr("firstStaker");
         address secondStaker = makeAddr("secondStaker");
 
-        vm.startPrank(firstStaker);
-        _deliberate.join(debateId);
-        if (firstIsPro) _deliberate.stakePro(debateId, argumentId, firstAmount);
-        else _deliberate.stakeCon(debateId, argumentId, firstAmount);
-        vm.stopPrank();
+        _stake({
+            debateId: debateId, argumentId: argumentId, staker: firstStaker, isPro: firstIsPro, amount: firstAmount
+        });
 
         vm.warp(vm.getBlockTimestamp() + secondDelay);
-        vm.startPrank(secondStaker);
-        _deliberate.join(debateId);
-        if (secondIsPro) _deliberate.stakePro(debateId, argumentId, secondAmount);
-        else _deliberate.stakeCon(debateId, argumentId, secondAmount);
-        vm.stopPrank();
+        _stake({
+            debateId: debateId, argumentId: argumentId, staker: secondStaker, isPro: secondIsPro, amount: secondAmount
+        });
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1048,7 +1041,7 @@ contract DeliberateTest is Test {
 
     function test_stakePro_revertsForInsufficientVoteTokens() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
         _endEditing(debateId);
@@ -1060,7 +1053,7 @@ contract DeliberateTest is Test {
 
     function test_stakePro_revertsForTheThesis() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
         _endEditing(debateId);
 
         // The thesis is Final from creation but has no market of its own.
@@ -1070,7 +1063,7 @@ contract DeliberateTest is Test {
 
     function test_stakePro_revertsForANonFinalArgument() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // Add an argument late in the editing window so it is still a draft once rating begins: its
         // finalization time (one locking window out) lands after the editing deadline.
@@ -1085,7 +1078,7 @@ contract DeliberateTest is Test {
 
     function test_stakeCon_revertsForANonexistentArgument() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
         _endEditing(debateId);
 
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ArgumentNotFinal.selector, uint16(42)));
@@ -1106,7 +1099,7 @@ contract DeliberateTest is Test {
 
     function test_tallyTree_talliesASupportingArgumentIntoAPositiveOutcome() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _addArgument(debateId, true, 80);
         _endRating(debateId);
@@ -1118,7 +1111,7 @@ contract DeliberateTest is Test {
 
     function test_tallyTree_talliesAnOpposingArgumentIntoANegativeOutcome() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _addArgument(debateId, false, 80);
         _endRating(debateId);
@@ -1161,7 +1154,7 @@ contract DeliberateTest is Test {
         // No explicit finalize step: an argument left untouched becomes final once its editing window elapses
         // (by the Tallying phase, always), so it is tallied automatically.
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _addArgument(debateId, true, 95); // supporting, seeded high; never touched again
         _endRating(debateId);
@@ -1174,7 +1167,7 @@ contract DeliberateTest is Test {
 
     function test_tallyTree_talliesRecursivelyUpTheTree() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 80);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -1240,27 +1233,16 @@ contract DeliberateTest is Test {
     }
 
     function test_redeemArgumentShares_paysTheEarlyCorrectStakerAProfit() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5, approval 50%
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
         address earlyStaker = makeAddr("earlyStaker");
         address lateStaker = makeAddr("lateStaker");
 
         // The early staker buys pro cheap at 50% approval: 13 shares for 10 tokens (-> 88.2%).
-        vm.startPrank(earlyStaker);
-        _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 1000);
-        vm.stopPrank();
+        _stake({debateId: debateId, argumentId: argumentId, staker: earlyStaker, isPro: true, amount: 1000});
 
         // The crowd confirms the rating later, at a higher price: 20 shares for 20 tokens (-> 97.1%).
-        vm.startPrank(lateStaker);
-        _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 2000);
-        vm.stopPrank();
+        _stake({debateId: debateId, argumentId: argumentId, staker: lateStaker, isPro: true, amount: 2000});
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1281,7 +1263,7 @@ contract DeliberateTest is Test {
 
     function test_redeemArgumentSharesBatch_redeemsAcrossArguments() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argument1 = _addArgument(debateId, true, 50); // reserves 5/5
         uint16 argument2 = _addArgument(debateId, true, 50); // reserves 5/5
@@ -1290,11 +1272,8 @@ contract DeliberateTest is Test {
 
         // One staker takes a con position in both arguments (22 con shares each).
         address staker = makeAddr("staker");
-        vm.startPrank(staker);
-        _deliberate.join(debateId);
-        _deliberate.stakeCon(debateId, argument1, 2000);
-        _deliberate.stakeCon(debateId, argument2, 2000);
-        vm.stopPrank();
+        _stake({debateId: debateId, argumentId: argument1, staker: staker, isPro: false, amount: 2000});
+        _stake({debateId: debateId, argumentId: argument2, staker: staker, isPro: false, amount: 2000});
         assertEq(_deliberate.getUserTokens(debateId, staker), 6000); // 100 - 20 - 20
 
         _endRating(debateId);
@@ -1313,7 +1292,7 @@ contract DeliberateTest is Test {
 
     function test_redeemArgumentSharesBatch_skipsArgumentsWithoutShares() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argument1 = _addArgument(debateId, true, 50);
         uint16 argument2 = _addArgument(debateId, true, 50);
@@ -1322,10 +1301,7 @@ contract DeliberateTest is Test {
 
         // The staker only holds shares in argument1.
         address staker = makeAddr("staker");
-        vm.startPrank(staker);
-        _deliberate.join(debateId);
-        _deliberate.stakeCon(debateId, argument1, 2000);
-        vm.stopPrank();
+        _stake({debateId: debateId, argumentId: argument1, staker: staker, isPro: false, amount: 2000});
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1355,19 +1331,11 @@ contract DeliberateTest is Test {
     // --- claimFees ---
 
     function test_claimFees_creditsTheAccruedFeesToTheArgumentCreator() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50);
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
         // A second participant stakes 20; the 5% fee (1 token) accrues to the argument.
         address staker = makeAddr("staker");
-        vm.prank(staker);
-        _deliberate.join(debateId);
-        vm.prank(staker);
-        _deliberate.stakePro(debateId, argumentId, 2000);
+        _stake({debateId: debateId, argumentId: argumentId, staker: staker, isPro: true, amount: 2000});
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1386,7 +1354,7 @@ contract DeliberateTest is Test {
 
     function test_claimFees_revertsWhileTheDebateIsNotFinished() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
         _endRating(debateId);
@@ -1423,12 +1391,12 @@ contract DeliberateTest is Test {
 
         vm.expectEmit();
         emit IDeliberate.Joined({debateId: debateId, account: address(this), tokens: Parameters.INITIAL_TOKENS});
-        _join(debateId);
+        _deliberate.join(debateId);
     }
 
     function test_addArgument_emitsArgumentAddedWithTheSeededMarket() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         // An 80% initial approval seeds a scarce pro reserve: 2 pro / 8 con.
         vm.expectEmit();
@@ -1448,7 +1416,7 @@ contract DeliberateTest is Test {
 
     function test_moveArgument_emitsArgumentMoved() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 newParentArgumentId = _addArgument(debateId, true, 50);
         vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
@@ -1473,7 +1441,7 @@ contract DeliberateTest is Test {
 
     function test_alterArgument_emitsArgumentAltered() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
         bytes32 newContentURI = "An even better idea.";
@@ -1489,12 +1457,7 @@ contract DeliberateTest is Test {
     }
 
     function test_stakePro_emitsStaked() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 50); // reserves 5/5
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(50);
 
         // fee 1, net 19: con 5+19=24, pro ceil(25/24)=2, shares out 5+19-2=22
         vm.expectEmit();
@@ -1509,7 +1472,7 @@ contract DeliberateTest is Test {
 
     function test_tallyTree_emitsDebateFinishedWithTheOutcome() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         _addArgument(debateId, true, 80); // a supporting argument rated well, finalized by time at the tally
         _endRating(debateId);
@@ -1520,12 +1483,7 @@ contract DeliberateTest is Test {
     }
 
     function test_redeemArgumentShares_emitsSharesRedeemed() public {
-        uint256 debateId = _createDebate();
-        _join(debateId);
-
-        uint16 argumentId = _addArgument(debateId, true, 80); // reserves 2/8
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
+        (uint256 debateId, uint16 argumentId) = _debateInRating(80);
 
         // fee 1, net 19: pro 2+19=21, con ceil(16/21)=1, shares out 8+19-1=26
         _deliberate.stakeCon(debateId, argumentId, 2000);
@@ -1548,7 +1506,7 @@ contract DeliberateTest is Test {
 
     function test_redeemArgumentShares_emitsNothingWithoutShares() public {
         uint256 debateId = _createDebate();
-        _join(debateId);
+        _deliberate.join(debateId);
 
         uint16 argumentId = _addArgument(debateId, true, 50);
         _endRating(debateId);

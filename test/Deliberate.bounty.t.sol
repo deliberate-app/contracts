@@ -66,7 +66,11 @@ contract DeliberateBountyTest is Test {
     /// staker sits at 102 vote tokens (excess 2, still unredeemed), the late one at 99 (a loser), and
     /// three participants have joined (`100 * N = 300`).
     function _finishedBountyDebate() internal returns (uint256 debateId, uint16 argumentId) {
-        debateId = _createBountyDebate(_POOL);
+        (debateId, argumentId) = _finishedBountyDebate(_POOL);
+    }
+
+    function _finishedBountyDebate(uint256 pool) internal returns (uint256 debateId, uint16 argumentId) {
+        debateId = _createBountyDebate(pool);
         _deliberate.join(debateId);
         argumentId = _deliberate.addArgument({
             debateId: debateId,
@@ -91,6 +95,11 @@ contract DeliberateBountyTest is Test {
 
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
+    }
+
+    function _settling(uint16 argumentId) internal pure returns (uint16[] memory argumentIds) {
+        argumentIds = new uint16[](1);
+        argumentIds[0] = argumentId;
     }
 
     function _claimWindowEnd(uint256 debateId) internal view returns (uint48 closesAt) {
@@ -200,13 +209,11 @@ contract DeliberateBountyTest is Test {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
 
         // Early staker: 102 vote tokens once redeemed -> excess 2 of the 300 initial supply.
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
 
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 2.45 ether});
         vm.prank(_earlyStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
 
         // The claim settled the shares (102 tokens) and paid pool * 2/300.
         assertEq(_deliberate.getUserTokens(debateId, _earlyStaker), 10245);
@@ -228,11 +235,9 @@ contract DeliberateBountyTest is Test {
 
     function test_claimBounty_isOneShot() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
 
         vm.startPrank(_earlyStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
         vm.expectRevert(Deliberate.BountyAlreadyClaimed.selector);
         _deliberate.claimBounty(debateId, new uint16[](0));
         vm.stopPrank();
@@ -240,13 +245,11 @@ contract DeliberateBountyTest is Test {
 
     function test_claimBounty_revertsForAParticipantWithoutExcess() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
 
         // The late staker redeemed 19 on 20 staked: 99 tokens is no win.
         vm.expectRevert(abi.encodeWithSelector(Deliberate.BountyNotWon.selector, 9948));
         vm.prank(_lateStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
     }
 
     function test_claimBounty_revertsWithoutABounty() public {
@@ -271,45 +274,18 @@ contract DeliberateBountyTest is Test {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
         uint48 closesAt = _claimWindowEnd(debateId);
         vm.warp(closesAt + 1);
-
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
         vm.expectRevert(abi.encodeWithSelector(Deliberate.ClaimWindowClosed.selector, closesAt));
         vm.prank(_earlyStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
     }
 
     function test_claimBounty_marksAClaimEvenWhenItRoundsToZero() public {
         // A dust pool: 100 wei * 2/300 rounds to zero - the claim is still consumed and emits.
-        uint256 debateId = _createBountyDebate(100);
-        _deliberate.join(debateId);
-        uint16 argumentId = _deliberate.addArgument({
-            debateId: debateId,
-            parentArgumentId: 0,
-            contentURI: "This is a good idea.",
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
-        vm.warp(vm.getBlockTimestamp() + _LOCKING_DURATION + 1);
-        _endEditing(debateId);
-        vm.startPrank(_earlyStaker);
-        _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 1000);
-        vm.stopPrank();
-        vm.startPrank(_lateStaker);
-        _deliberate.join(debateId);
-        _deliberate.stakePro(debateId, argumentId, 2000);
-        vm.stopPrank();
-        _endRating(debateId);
-        _deliberate.tallyTree(debateId);
-
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
+        (uint256 debateId, uint16 argumentId) = _finishedBountyDebate(100);
         vm.expectEmit(true, true, true, true);
         emit IDeliberate.BountyClaimed({debateId: debateId, account: _earlyStaker, excess: 245, amount: 0});
         vm.prank(_earlyStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
 
         assertEq(_token.balanceOf(_earlyStaker), 0);
     }
@@ -318,10 +294,8 @@ contract DeliberateBountyTest is Test {
 
     function test_sweepBounty_paysTheRemainderToTheCreator() public {
         (uint256 debateId, uint16 argumentId) = _finishedBountyDebate();
-        uint16[] memory toSettle = new uint16[](1);
-        toSettle[0] = argumentId;
         vm.prank(_earlyStaker);
-        _deliberate.claimBounty(debateId, toSettle);
+        _deliberate.claimBounty(debateId, _settling(argumentId));
 
         vm.warp(_claimWindowEnd(debateId) + 1);
         uint256 balanceBefore = _token.balanceOf(address(this));
