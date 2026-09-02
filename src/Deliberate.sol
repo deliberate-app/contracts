@@ -999,7 +999,9 @@ contract Deliberate is IDeliberate {
                 // rating could not be re-derived later without double-counting the argument's own stake.
                 argument.rating = rating;
 
-                emit ArgumentRated({debateId: debateId, argumentId: argumentId, rating: rating});
+                emit ArgumentRated({
+                    debateId: debateId, argumentId: argumentId, rating: rating, subtreeVotes: subtreeVotes
+                });
 
                 // A refuted argument is silenced, not inverted.
                 int72 strength = rating > 0 ? int72(rating) : int72(0);

@@ -119,7 +119,11 @@ interface IDeliberate {
     /// blended by the stake behind each, on the signed `_MAX_APPROVAL` fixed point whose zero is the market's
     /// undecided price - negative means refuted. Its sway on the parent is the rating clamped at zero, negated
     /// if it attacks, weighted by its subtree stake among its siblings'.
-    event ArgumentRated(uint256 indexed debateId, uint16 indexed argumentId, int64 rating);
+    /// @param subtreeVotes The stake the rating folds into its parent with: the argument's own time-weighted
+    /// stake plus its whole subtree's. Emitted because it is the weight and cannot be derived from the other
+    /// events - without it a reader has the sways but not what each one counts for, and can only guess at the
+    /// aggregate the tally computed.
+    event ArgumentRated(uint256 indexed debateId, uint16 indexed argumentId, int64 rating, uint32 subtreeVotes);
 
     /// @notice Emitted when the market fees accrued by an argument are claimed for its creator.
     /// @param debateId The ID of the debate.
