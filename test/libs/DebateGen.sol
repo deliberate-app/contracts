@@ -30,6 +30,9 @@ library DebateGen {
     // era) was computed with, so the library's arithmetic stays stable.
     uint8 internal constant FEE_PERCENTAGE = 5;
 
+    // The number of minimum-deposit arguments one participant's budget affords.
+    uint256 internal constant ARGUMENTS_PER_BUDGET = Parameters.INITIAL_TOKENS / Parameters._MIN_DEBATE_DEPOSIT;
+
     function createDebate(Vm vm, Deliberate deliberate, address creator, uint48 lockingDuration)
         internal
         returns (Debate memory debate)
@@ -131,6 +134,46 @@ library DebateGen {
         });
     }
 
+    // --- shapes (the extremes the argument cap allows, authored by fresh accounts as budgets run out) ---
+
+    // Adds `count` minimum-deposit arguments straight below `parentId`, alternating stances: the widest tree.
+    function fan(Vm vm, Debate memory debate, uint16 parentId, uint16 count) internal {
+        for (uint16 i = 0; i < count; i++) {
+            addArgument({
+                vm: vm,
+                debate: debate,
+                author: authorOf(vm, i),
+                parentId: parentId,
+                isSupporting: i % 2 == 0,
+                initialApproval: 50,
+                deposit: Parameters._MIN_DEBATE_DEPOSIT
+            });
+        }
+    }
+
+    // Adds `depth` supporting minimum-deposit arguments below `parentId`, each the child of the previous one and
+    // one locking window later, so that every level attaches beneath a final parent: the deepest tree.
+    function chain(Vm vm, Debate memory debate, uint16 parentId, uint16 depth) internal returns (uint16 leafId) {
+        leafId = parentId;
+        for (uint16 i = 0; i < depth; i++) {
+            leafId = addArgument({
+                vm: vm,
+                debate: debate,
+                author: authorOf(vm, i),
+                parentId: leafId,
+                isSupporting: true,
+                initialApproval: 50,
+                deposit: Parameters._MIN_DEBATE_DEPOSIT
+            });
+            warpWindows(vm, debate, 1);
+        }
+    }
+
+    // The author of the `index`th generated argument: a fresh account for every budget's worth of deposits.
+    function authorOf(Vm vm, uint256 index) internal pure returns (address account) {
+        account = vm.addr(1 + index / ARGUMENTS_PER_BUDGET);
+    }
+
     // --- staking ---
 
     function stakePro(Vm vm, Debate memory debate, address staker, uint16 argumentId, uint32 amount) internal {
@@ -160,12 +203,6 @@ library DebateGen {
     function warpToTallying(Vm vm, Debate memory debate) internal {
         (,, uint48 ratingEndTime,) = debate.deliberate.phases(debate.id);
         _warpAtLeast(vm, uint256(ratingEndTime) + 1);
-    }
-
-    function warpPastFinalization(Vm vm, Debate memory debate, uint16 argumentId) internal {
-        // An argument is final once the clock reaches its finalization time; jump exactly there.
-        uint48 finalizationTime = debate.deliberate.getArgument(debate.id, argumentId).finalizationTime;
-        _warpAtLeast(vm, uint256(finalizationTime));
     }
 
     // --- tally ---

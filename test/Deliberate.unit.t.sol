@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 
 import {Deliberate} from "../src/Deliberate.sol";
 import {IDeliberate} from "../src/interfaces/IDeliberate.sol";
@@ -12,9 +13,12 @@ import {Argument} from "../src/libs/Argument.sol";
 import {Parameters} from "../src/libs/Parameters.sol";
 import {Phase} from "../src/libs/Phase.sol";
 import {User} from "../src/libs/User.sol";
+import {DebateGen} from "./libs/DebateGen.sol";
 import {MockIdentityRegistry} from "./mocks/MockIdentityRegistry.m.sol";
 
 contract DeliberateTest is Test {
+    using DebateGen for Vm;
+
     Deliberate internal _deliberate;
 
     MockIdentityRegistry internal _mockIdentityRegistry;
@@ -113,29 +117,12 @@ contract DeliberateTest is Test {
         }
     }
 
+    function _debate(uint256 debateId) internal view returns (DebateGen.Debate memory debate) {
+        debate = DebateGen.Debate({deliberate: _deliberate, id: debateId});
+    }
+
     function _fillDebateToTheArgumentCap(uint256 debateId) internal {
-        uint16 maxArguments = Parameters.MAX_ARGUMENTS;
-        uint16 added = 0; // the thesis already counts toward the cap
-        uint256 participantIndex = 0;
-        while (added < maxArguments - 1) {
-            address participant = makeAddr(string.concat("participant", vm.toString(participantIndex)));
-            vm.startPrank(participant);
-            _deliberate.join(debateId);
-            // Each participant's budget affords ten argument deposits.
-            for (uint256 i = 0; i < 10 && added < maxArguments - 1; i++) {
-                _deliberate.addArgument({
-                    debateId: debateId,
-                    parentArgumentId: _ROOT_ARGUMENT_ID,
-                    contentURI: _PRO_ARGUMENT_CONTENT,
-                    isSupporting: added % 2 == 0,
-                    initialApproval: 50,
-                    deposit: Parameters._MIN_DEBATE_DEPOSIT
-                });
-                added++;
-            }
-            vm.stopPrank();
-            participantIndex++;
-        }
+        vm.fan(_debate(debateId), _ROOT_ARGUMENT_ID, Parameters.MAX_ARGUMENTS - 1);
     }
 
     function _endEditing(uint256 debateId) internal {
@@ -1177,31 +1164,9 @@ contract DeliberateTest is Test {
             bountyAmount: 0
         });
 
-        uint16 parent = _ROOT_ARGUMENT_ID;
-        uint16 depth = 0;
-        uint256 participantIndex = 0;
-        while (depth < Parameters.MAX_ARGUMENTS - 1) {
-            address participant = makeAddr(string.concat("deep", vm.toString(participantIndex)));
-            vm.prank(participant);
-            _deliberate.join(debateId);
-            // Each participant's budget affords ten argument deposits.
-            for (uint256 i = 0; i < 10 && depth < Parameters.MAX_ARGUMENTS - 1; i++) {
-                vm.prank(participant);
-                parent = _deliberate.addArgument({
-                    debateId: debateId,
-                    parentArgumentId: parent,
-                    contentURI: _PRO_ARGUMENT_CONTENT,
-                    isSupporting: true,
-                    initialApproval: 50,
-                    deposit: Parameters._MIN_DEBATE_DEPOSIT
-                });
-                depth++;
-                // The next level can only attach once its parent's locking window has elapsed.
-                skip(2);
-            }
-            participantIndex++;
-        }
-        assertEq(depth, Parameters.MAX_ARGUMENTS - 1, "the chain must reach the cap to bound the deepest tally");
+        vm.chain(_debate(debateId), _ROOT_ARGUMENT_ID, Parameters.MAX_ARGUMENTS - 1);
+        (, uint16 argumentsCount,,,) = _deliberate.debates(debateId);
+        assertEq(argumentsCount, Parameters.MAX_ARGUMENTS, "the chain must reach the cap to bound the deepest tally");
 
         _endRating(debateId);
 
