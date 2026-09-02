@@ -502,58 +502,34 @@ contract DeliberateTest is Test {
         assertEq(_addArgument(debateId, true, 50), 2);
     }
 
-    function test_addArgument_addsAProArgument() public {
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
+    function test_addArgument_addsAFreshDraftOfEitherStance() public {
+        bool[2] memory stances = [true, false];
+        for (uint256 i = 0; i < stances.length; i++) {
+            uint256 debateId = _createDebate();
+            _deliberate.join(debateId);
 
-        uint16 proArgumentId = _addArgument(debateId, true, 50);
+            uint16 argumentId = _addArgument(debateId, stances[i], 50);
 
-        Argument.Data memory proArgument = _deliberate.getArgument(debateId, proArgumentId);
-        assertEq(proArgument.contentURI, _PRO_ARGUMENT_CONTENT);
+            Argument.Data memory argument = _deliberate.getArgument(debateId, argumentId);
+            assertEq(argument.contentURI, _PRO_ARGUMENT_CONTENT);
 
-        assertEq(proArgument.pro, 500);
-        assertEq(proArgument.con, 500);
-        assertEq(proArgument.votes, 1000);
-        assertEq(proArgument.fees, 0);
+            assertEq(argument.pro, 500);
+            assertEq(argument.con, 500);
+            assertEq(argument.votes, 1000);
+            assertEq(argument.fees, 0);
 
-        assertEq(proArgument.creator, address(this));
-        // A fresh argument is a draft: its finalization time is one locking window out.
-        assertEq(proArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION);
+            assertEq(argument.creator, address(this));
+            // A fresh argument is a draft: its finalization time is one locking window out.
+            assertEq(argument.finalizationTime, uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION);
 
-        assertEq(proArgument.isSupporting, true);
-        assertEq(proArgument.parentArgumentId, 0);
-        assertEq(proArgument.subtreeVotes, 0);
+            assertEq(argument.isSupporting, stances[i]);
+            assertEq(argument.parentArgumentId, _ROOT_ARGUMENT_ID);
+            assertEq(argument.subtreeVotes, 0);
 
-        uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
-        assertEq(leafArgumentIds.length, 1);
-        assertEq(leafArgumentIds[0], proArgumentId);
-    }
-
-    function test_addArgument_addsAConArgument() public {
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
-
-        uint16 conArgumentId = _addArgument(debateId, false, 50);
-
-        Argument.Data memory conArgument = _deliberate.getArgument(debateId, conArgumentId);
-        assertEq(conArgument.contentURI, _PRO_ARGUMENT_CONTENT);
-
-        assertEq(conArgument.pro, 500);
-        assertEq(conArgument.con, 500);
-        assertEq(conArgument.votes, 1000);
-        assertEq(conArgument.fees, 0);
-
-        assertEq(conArgument.creator, address(this));
-        // A fresh argument is a draft: its finalization time is one locking window out.
-        assertEq(conArgument.finalizationTime, uint48(vm.getBlockTimestamp()) + _LOCKING_DURATION);
-
-        assertEq(conArgument.isSupporting, false);
-        assertEq(conArgument.parentArgumentId, 0);
-        assertEq(conArgument.subtreeVotes, 0);
-
-        uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
-        assertEq(leafArgumentIds.length, 1);
-        assertEq(leafArgumentIds[0], conArgumentId);
+            uint16[] memory leafArgumentIds = _deliberate.getLeafArgumentIds(debateId);
+            assertEq(leafArgumentIds.length, 1);
+            assertEq(leafArgumentIds[0], argumentId);
+        }
     }
 
     function test_addArgument_revertsForInitialApprovalsBelow50() public {
@@ -602,7 +578,7 @@ contract DeliberateTest is Test {
         assertEq(argument.fees, 0);
     }
 
-    function test_addArgument_addsTheDepositToTheParentWeightAndDebateTotal() public {
+    function test_addArgument_countsTheDepositInTheDebateTotalNotTheParentWeight() public {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
@@ -737,7 +713,7 @@ contract DeliberateTest is Test {
         _assertLeafSet(debateId, expectedIds);
     }
 
-    function test_moveArgument_movesTheVoteWeightBetweenParents() public {
+    function test_moveArgument_reparentsTheArgument() public {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
@@ -1059,6 +1035,8 @@ contract DeliberateTest is Test {
         uint256 debateId = _createDebate();
         _deliberate.join(debateId);
 
+        // No explicit finalize step: an argument left untouched becomes final once its editing window elapses (by
+        // the Tallying phase, always), so it is tallied automatically.
         _addArgument(debateId, true, 80);
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
@@ -1102,25 +1080,12 @@ contract DeliberateTest is Test {
         _endRating(debateId);
         _deliberate.tallyTree(debateId);
 
-        // Settled to the root: every level folded into its parent, and the debate reached its terminal phase.
+        // Settled to the root: every level's stake folded into its parent, so the thesis carries the whole
+        // debate's stake, and the debate reached its terminal phase.
         (Phase.Status currentPhase,,,) = _deliberate.phases(debateId);
         assertEq(uint8(currentPhase), uint8(Phase.Status.Finished));
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);
-    }
-
-    function test_tallyTree_finalizesArgumentsByTime() public {
-        // No explicit finalize step: an argument left untouched becomes final once its editing window elapses
-        // (by the Tallying phase, always), so it is tallied automatically.
-        uint256 debateId = _createDebate();
-        _deliberate.join(debateId);
-
-        _addArgument(debateId, true, 95); // supporting, seeded high; never touched again
-        _endRating(debateId);
-
-        _deliberate.tallyTree(debateId);
-
-        assertGt(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).descendantsAggregate, 0);
-        assertTrue(_deliberate.outcome(debateId));
+        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, totalVotes);
     }
 
     function test_tallyTree_talliesRecursivelyUpTheTree() public {
@@ -1135,9 +1100,9 @@ contract DeliberateTest is Test {
 
         // The fully-approved opposing child weakens its parent from below ...
         assertLt(_deliberate.getArgument(debateId, argumentId).descendantsAggregate, 0);
-        // ... and every argument ends up tallied.
-        assertEq(_deliberate.getArgument(debateId, argumentId).untalliedChilds, 0);
-        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).untalliedChilds, 0);
+        // ... and every market's stake folds up to the thesis, counted once.
+        (uint32 totalVotes,,,,) = _deliberate.debates(debateId);
+        assertEq(_deliberate.getArgument(debateId, _ROOT_ARGUMENT_ID).subtreeVotes, totalVotes);
     }
 
     // --- outcome ---

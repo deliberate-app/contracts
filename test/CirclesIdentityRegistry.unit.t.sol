@@ -49,7 +49,8 @@ contract CirclesIdentityRegistryTest is Test {
 
     function test_isRegistered_admitsWhoeverTheAnchorTrusts() public {
         // The mode that makes a Circles group reusable as a debate's membership: the adapter reads the trust
-        // list the group already maintains, so nothing here has to be curated twice.
+        // list the group already maintains, so nothing here has to be curated twice. Membership alone decides -
+        // an organization or a group the anchor trusts is admitted just as a human would be.
         CirclesIdentityRegistry registry = _registry(_group, false);
         _hub.setTrust(_group, _member, true);
 
@@ -64,16 +65,6 @@ contract CirclesIdentityRegistryTest is Test {
         _hub.setTrust(_member, _group, true);
 
         assertFalse(registry.isRegistered(_member));
-    }
-
-    function test_isRegistered_admitsANonHumanAnchoredMemberWhenPersonhoodIsNotRequired() public {
-        // Anchored without a personhood requirement, the gate is membership alone - so an organization or a
-        // group the anchor trusts is admitted just as a human would be.
-        CirclesIdentityRegistry registry = _registry(_group, false);
-        _hub.setTrust(_group, _member, true);
-
-        assertFalse(_hub.isHuman(_member));
-        assertTrue(registry.isRegistered(_member));
     }
 
     // --- both conditions ---

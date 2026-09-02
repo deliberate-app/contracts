@@ -35,10 +35,13 @@ contract AllowlistIdentityRegistryTest is Test {
 
     function test_setMembership_addsAndRemovesMembers() public {
         _setMembership(_alice, true);
+        _setMembership(_bob, true);
         assertTrue(_registry.isRegistered(_alice));
+        assertTrue(_registry.isRegistered(_bob));
 
         _setMembership(_alice, false);
         assertFalse(_registry.isRegistered(_alice));
+        assertTrue(_registry.isRegistered(_bob));
     }
 
     function test_setMembership_setsSeveralAccountsInOneCall() public {
@@ -75,15 +78,5 @@ contract AllowlistIdentityRegistryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, _alice));
         vm.prank(_alice);
         _registry.setMembership(accounts, true);
-    }
-
-    function test_setMembership_leavesAccountsItWasNotGiven() public {
-        _setMembership(_alice, true);
-        _setMembership(_bob, true);
-
-        _setMembership(_alice, false);
-
-        assertFalse(_registry.isRegistered(_alice));
-        assertTrue(_registry.isRegistered(_bob));
     }
 }
