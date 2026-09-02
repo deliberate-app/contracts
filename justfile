@@ -31,12 +31,11 @@ test *args:
 
 # Show coverage
 # --ir-minimum is required: coverage instrumentation disables the optimizer and via_ir, and the
-# tally hits "stack too deep" without it. That same unoptimized build puts the argument-cap tally
-# far over its gas assertion, which only means anything against the shipped build - so that one
-# test sits out the coverage run rather than reporting a failure it cannot avoid.
+# tally hits "stack too deep" without it. That same unoptimized build puts the tally's gas
+# benchmarks far over their bounds, which only mean anything against the shipped build - so the
+# benchmark file sits out the coverage run rather than reporting failures it cannot avoid.
 coverage *args:
-    forge coverage --ir-minimum --no-match-coverage "(test|script)" \
-        --no-match-test "test_tallyTree_staysWithinTheBlockGasLimitAtTheArgumentCap" {{ args }}
+    forge coverage --ir-minimum --no-match-coverage "(test|script)" --no-match-path "test/*.gas.t.sol" {{ args }}
 
 # Lint (forge lint + solhint)
 lint:
