@@ -38,14 +38,7 @@ contract DeliberateMarketTest is Test {
     // approval, splitting into 5/5 market reserves - warped into the rating phase.
     function _productionArgument() internal returns (DebateGen.Debate memory debate, uint16 argumentId) {
         debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        argumentId = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpToRating(debate);
     }
 
@@ -117,14 +110,7 @@ contract DeliberateMarketTest is Test {
         // The same lone-corrector scenario at the frontend's new default fee of 1% instead of the
         // replayed era's 5%: fee 100 -> 9900 net, (500, 500) -> (25, 10400), shares 500 + 9900 - 25 = 10375.
         DebateGen.Debate memory debate = vm.createDebateWithFee(_deliberate, _ALICE, _LOCKING_DURATION, 1);
-        uint16 argumentId = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpToRating(debate);
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS);
 
@@ -167,14 +153,7 @@ contract DeliberateMarketTest is Test {
         // market shielded the argument (Bob's 5 con shares paid floor(5 * 2/7) = 1); settling at
         // the tallied rating, the sub-debate corrects what his shares are worth.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        uint16 parent = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 90,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 parent = vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
         vm.addArgument({
             debate: debate, author: _CAROL, parentId: parent, isSupporting: false, initialApproval: 90, deposit: 3000

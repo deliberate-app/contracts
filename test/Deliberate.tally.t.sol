@@ -40,14 +40,7 @@ contract DeliberateTallyTest is Test {
         // rated up to 104/105 ~ 99% approval. Under the old fixed 50:50 blend its empty
         // descendants slot halved the sway to ~50%; now a leaf keeps its full own approval.
         DebateGen.Debate memory debate = vm.createDebateWithFee(_deliberate, _ALICE, _LOCKING_DURATION, 1);
-        uint16 argumentId = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpToRating(debate);
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 100 -> net 9900: reserves (25, 10400), votes 10900
 
@@ -67,23 +60,9 @@ contract DeliberateTallyTest is Test {
         // 90% approval against a 105-token parent market moves the blend from ~99% to ~83%,
         // not to near-zero.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        uint16 parent = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 parent = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to
-        uint16 child = vm.addArgument({
-            debate: debate,
-            author: _CAROL,
-            parentId: parent,
-            isSupporting: false,
-            initialApproval: 90,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 child = vm.addCon(debate, _CAROL, parent, 90);
         vm.warpToRating(debate);
         vm.stakePro(debate, _BOB, parent, Parameters.INITIAL_TOKENS); // fee 5 -> net 95: reserves (1, 100), votes 105
 
@@ -105,22 +84,8 @@ contract DeliberateTallyTest is Test {
         // neutral but carrying a 40-token sub-debate at 90%. B's subtree (50) outweighs A (10)
         // at the thesis - under own-votes weighting they would count equally.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 90,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
-        uint16 b = vm.addArgument({
-            debate: debate,
-            author: _BOB,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
+        uint16 b = vm.addPro(debate, _BOB, DebateGen.ROOT, 50);
         vm.warpWindows(debate, 1);
         vm.addArgument({
             debate: debate, author: _CAROL, parentId: b, isSupporting: true, initialApproval: 90, deposit: 4000
@@ -149,22 +114,8 @@ contract DeliberateTallyTest is Test {
         // folds at zero strength but full subtree weight, so it dampens its neighborhood instead
         // of switching sides.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 90,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
-        uint16 attack = vm.addArgument({
-            debate: debate,
-            author: _BOB,
-            parentId: DebateGen.ROOT,
-            isSupporting: false,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
+        uint16 attack = vm.addCon(debate, _BOB, DebateGen.ROOT, 50);
         vm.warpWindows(debate, 1);
         vm.addArgument({
             debate: debate, author: _CAROL, parentId: attack, isSupporting: false, initialApproval: 90, deposit: 3000
@@ -190,14 +141,7 @@ contract DeliberateTallyTest is Test {
         // stood all 180 seconds and the pushed price zero, so the tally reads exactly the seed:
         // no rating, and the pushed stake earns no weight either (held for zero seconds).
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        uint16 argumentId = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         (,, uint48 ratingEndTime,) = _deliberate.phases(debate.id);
         vm.warp(ratingEndTime);
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 5 -> net 95: reserves (1, 100)
@@ -216,14 +160,7 @@ contract DeliberateTallyTest is Test {
         // A stake at the window's midpoint: the corrected price and the grown stake each stand 90
         // of 180 seconds, so both count at half. Half the window, half the voice.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        uint16 argumentId = vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        uint16 argumentId = vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
         (, uint48 editingEndTime,,) = _deliberate.phases(debate.id);
         vm.warp(editingEndTime + 90);
         vm.stakePro(debate, _BOB, argumentId, Parameters.INITIAL_TOKENS); // fee 500 -> net 9500: reserves (25, 10000), votes 10500
@@ -244,14 +181,7 @@ contract DeliberateTallyTest is Test {
         // conviction either way, so the thesis nets exactly zero - and zero does not confirm.
         // Silence never approves a thesis; only positive net endorsement does.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
-        vm.addArgument({
-            debate: debate,
-            author: _ALICE,
-            parentId: DebateGen.ROOT,
-            isSupporting: true,
-            initialApproval: 50,
-            deposit: Parameters._MIN_DEBATE_DEPOSIT
-        });
+        vm.addPro(debate, _ALICE, DebateGen.ROOT, 50);
 
         vm.warpToTallying(debate);
         vm.tally(debate);
