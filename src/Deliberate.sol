@@ -991,7 +991,7 @@ contract Deliberate is IDeliberate {
                 // by the stake behind it. At this point `subtreeStake` holds the tallied children's subtree
                 // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
                 // included), the weight it folds in with.
-                int40 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
+                int56 rating = _calculateRating({debateId: debateId, argumentId: argumentId});
                 uint32 subtreeStake =
                     _timeWeightedStake({debateId: debateId, argument: argument}) + argument.subtreeStake;
                 argument.subtreeStake = subtreeStake;
@@ -1149,7 +1149,7 @@ contract Deliberate is IDeliberate {
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
     /// @return rating The tallied rating of the argument - signed, negative meaning refuted.
-    function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int40 rating) {
+    function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int56 rating) {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
         // The own approval, centered so the market's undecided price is zero and time-weighted over the
@@ -1170,7 +1170,7 @@ contract Deliberate is IDeliberate {
         // `Σ sway * subtreeStake` rather than as a mean already rounded once per child, so nothing is lost
         // between the children and here and the result cannot depend on the order they were folded in.
         uint32 ownStake = _timeWeightedStake({debateId: debateId, argument: argument});
-        rating = SafeCast.toInt40(
+        rating = SafeCast.toInt56(
             (int256(centeredApproval) * int256(uint256(ownStake)) + int256(argument.descendantsNumerator))
                 / int256(uint256(ownStake) + uint256(argument.subtreeStake))
         );

@@ -32,8 +32,10 @@ library Argument {
     /// @param rating The tallied rating, written by the tally: signed, negative meaning refuted, and the value
     /// the argument's shares settle against at redemption. Zero until the tally. Stored beside the tally-time
     /// state it shares a slot with - `subtreeStake` is repurposed by the tally, so re-deriving the rating
-    /// later would double-count the argument's own stake. Narrow because the value is an approval on the
-    /// `_MAX_APPROVAL` scale and needs 33 bits, which is what buys the numerator its width.
+    /// later would double-count the argument's own stake. Narrower than the 64 bits it had: an approval on
+    /// the `_MAX_APPROVAL` scale needs 33, and the two bytes saved are what buy the numerator its width.
+    /// Not narrower still - under 48 bits a client decodes it as a float rather than an integer, which
+    /// would make the same rating a different type read from here than from `ArgumentRated`.
     /// @param centeredApprovalSeconds The centered approval multiplied by the seconds it stood, accumulated
     /// over the rating window. The tally divides by the window to read the time-weighted approval: a price is
     /// bought by holding it, not by having the last word. Its magnitude is bounded by the full-scale approval
@@ -57,7 +59,7 @@ library Argument {
         uint32 stake; //                  | + 4
         uint32 subtreeStake; //           | + 4
         int72 descendantsNumerator; //    | + 9
-        int40 rating; //                  ┘ + 5 = 30
+        int56 rating; //                  ┘ + 7 = 32
         int88 centeredApprovalSeconds; // ┐  11
         uint80 stakeSeconds; //           | +10
         uint48 lastAccrualTime; //        | + 6
