@@ -115,7 +115,7 @@ interface IDeliberate {
     /// @notice Emitted when the tally rates an argument.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @param rating The argument's tallied rating: its own centered approval and its descendants' aggregate
+    /// @param rating The argument's weighted rating: its own centered approval and its descendants' aggregate
     /// blended by the stake behind each, on the signed `_MAX_APPROVAL` fixed point whose zero is the market's
     /// undecided price - negative means refuted. Its sway on the parent is the rating clamped at zero, negated
     /// if it attacks, weighted by its subtree stake among its siblings'.

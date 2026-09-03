@@ -29,7 +29,7 @@ library Argument {
     /// `subtreeStake`; kept unreduced so the tally divides once, at the end, instead of once per child. A mean
     /// rounded per child would depend on the order the children were tallied in, which is the leaf set's order
     /// and no part of what the debate said.
-    /// @param rating The tallied rating, written by the tally: signed, negative meaning refuted, and the value
+    /// @param rating The weighted rating, written by the tally: signed, negative meaning refuted, and the value
     /// the argument's shares settle against at redemption. Zero until the tally. Stored beside the tally-time
     /// state it shares a slot with - `subtreeStake` is repurposed by the tally, so re-deriving the rating
     /// later would double-count the argument's own stake. Narrower than the 64 bits it had: an approval on

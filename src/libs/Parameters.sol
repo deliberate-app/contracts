@@ -49,6 +49,6 @@ library Parameters {
     /// them hold one claim stated sharply in any script.
     uint256 public constant MAX_CONTENT_LENGTH = 256;
 
-    /// @notice The fixed-point scale of approvals and tallied ratings (the full scale equals `type(uint32).max`).
+    /// @notice The fixed-point scale of approvals and weighted ratings (the full scale equals `type(uint32).max`).
     int64 internal constant _MAX_APPROVAL = int64(uint64(type(uint32).max));
 }

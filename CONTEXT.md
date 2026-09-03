@@ -27,20 +27,23 @@ _Avoid_: contentURI, digest, CID, IPFS
 The on-chain, leaves-to-root aggregation of argument sway that produces the debate's outcome,
 reading time-weighted inputs: every price and every stake counts for the seconds it stood in the
 rating window (ADR-0013), so a rating is bought by holding a price, not by having the last word,
-and weight is earned by exposure. Each argument's tallied rating blends its own approval with its
+and weight is earned by exposure. Each argument's weighted rating blends its own approval with its
 descendants' aggregate, weighted by the stake behind each (ADR-0011) — a childless argument's
 rating is its approval; a debated one is corrected in proportion to the stake that debate
 attracted.
 
-**Tallied rating**:
+**Weighted rating**:
 The tally's verdict on one argument, on a signed scale whose zero is the market's undecided
 price: positive is endorsed, negative is refuted — and the value the argument's shares settle
-against at redemption (ADR-0014). Distinct from approval (the market's live, unsigned price) and
-from sway (what the rating exerts on the parent).
-_Avoid_: impact (the legacy name — it conflated the rating with the sway), score
+against at redemption (ADR-0014). Weighted twice over: its own market and its sub-debate are
+blended by the stake behind each (ADR-0011), and both inputs count for the time they stood
+(ADR-0013). Distinct from the argument rating (that same market's live price, centered) and from
+sway (what this rating exerts on the parent). Held as `Argument.rating`, carried by `ArgumentRated`.
+_Avoid_: tallied rating (the earlier name), impact (the legacy one — it conflated the rating with
+the sway), score
 
 **Sway**:
-An argument's pull on its parent's rating: its tallied rating clamped at neutral — a refuted
+An argument's pull on its parent's rating: its weighted rating clamped at neutral — a refuted
 argument sways nothing rather than aiding the other side (ADR-0012) — signed by its stance and
 carrying its whole subtree's stake. A refuted child keeps its weight in the parent's aggregate,
 so a demolished sub-debate dampens its neighborhood instead of vanishing from it.
@@ -56,7 +59,7 @@ _Avoid_: rating market
 
 **Good-argument share / Bad-argument share**:
 The display names of an argument market's pro and con shares (`shares.pro`/`shares.con` in the
-contract). A good-argument share pays out with the argument's tallied rating at redemption — the
+contract). A good-argument share pays out with the argument's weighted rating at redemption — the
 tree's verdict, which reduces to the market's own time-weighted price when nothing was argued
 beneath the argument — and a bad-argument share its complement; the name says what the claim is
 on, not which side of the parent the argument takes. Bought by staking "underrated" and "overrated" respectively.
@@ -64,8 +67,15 @@ _Avoid_: pro share, con share (in user-facing copy — they collide with the pro
 arguments)
 
 **Approval**:
-An argument market's current rating of the argument — the price of belief in it, rising as participants stake on the pro side (the argument is underrated) and falling as they stake on the con side (overrated).
-_Avoid_: score, rating value
+An argument market's current price of belief in the argument, rising as participants stake on the pro side (the argument is underrated) and falling as they stake on the con side (overrated). The contract holds it unsigned, 0..1 on the `_MAX_APPROVAL` scale; centered onto the signed scale the tally and every reader speak, it is the **argument rating**.
+_Avoid_: score, market (as the name of the figure — the market is the mechanism, the argument rating is what it says)
+
+**Argument stake**:
+The vote tokens collateralizing one argument's own market: its creator's deposit plus every net stake since. Held as `Argument.stake`.
+
+**Accumulated stake**:
+An argument's own stake plus every sub-argument's — the weight its branch folds into its parent with, and the denominator of the descendants' aggregate. Time-weighted when the tally reads it (ADR-0013). Held as `Argument.subtreeStake`.
+_Avoid_: subtree stake (the field's name, not a reader's)
 
 **Vote tokens**:
 The non-transferable, debate-scoped budget every participant receives on joining, spent on argument deposits and pro/con stakes.

@@ -15,7 +15,7 @@ import {DebateGen} from "./libs/DebateGen.sol";
 // stake" shown as 191. Every figure is re-derived from the mechanism alone, so a failing assert here would
 // be an actual math bug - a passing suite pins each surprise on market economics instead. The era held
 // whole vote tokens; the contract now holds hundredths, so the trades replay at a hundred times the scale
-// with the finer rounding the extra digits allow. And a share now settles at the tallied rating built from
+// with the finer rounding the extra digits allow. And a share now settles at the weighted rating built from
 // time-weighted prices, not at the closing price the era paid; where the mechanisms disagree the comments
 // say so.
 contract DeliberateMarketTest is Test {
@@ -73,7 +73,7 @@ contract DeliberateMarketTest is Test {
         vm.tally(debate);
         assertTrue(vm.outcome(debate));
 
-        // A pro share settles at the tallied rating - for this childless argument its own
+        // A pro share settles at the weighted rating - for this childless argument its own
         // time-weighted price, a hair under the closing 18550/18564 (the neutral seed stood the
         // window's first second) - below one per share by construction, never a multiplier.
         vm.redeem(debate, _BOB, argumentId);
@@ -152,7 +152,7 @@ contract DeliberateMarketTest is Test {
         // with a tiny early con stake that barely moves its market - and a counter-argument
         // backed by 3000 demolishes the argument from below. Under price settlement the lazy
         // market shielded the argument (Bob's 533 con shares would pay floor(533 * 195/657) = 158); settling at
-        // the tallied rating, the sub-debate corrects what his shares are worth.
+        // the weighted rating, the sub-debate corrects what his shares are worth.
         DebateGen.Debate memory debate = vm.createDebate(_deliberate, _ALICE, _LOCKING_DURATION);
         uint16 parent = vm.addPro(debate, _ALICE, DebateGen.ROOT, 90);
         vm.warpWindows(debate, 1); // the parent finalizes, so it can be replied to

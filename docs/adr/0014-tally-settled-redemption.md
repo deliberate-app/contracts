@@ -3,7 +3,7 @@ status: accepted
 date: 2026-08-14
 ---
 
-# Shares settle at the tallied rating
+# Shares settle at the weighted rating
 
 A share redeems at its market's own closing price, so each market is its own resolution criterion.
 `incentives.md` names the two costs (§7 gap 2, §9.6):
@@ -20,7 +20,7 @@ A share redeems at its market's own closing price, so each market is its own res
 
 ## Decision
 
-A share settles against the argument's tallied rating — the tree's verdict, unclamped:
+A share settles against the argument's weighted rating — the tree's verdict, unclamped:
 
 ```
 pro share pays  (1 + rating(A)) / 2

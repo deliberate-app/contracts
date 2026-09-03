@@ -884,7 +884,7 @@ contract Deliberate is IDeliberate {
             return;
         }
 
-        // A share settles against the tallied rating - the tree's verdict on the argument, not the
+        // A share settles against the weighted rating - the tree's verdict on the argument, not the
         // price its own market happened to close at: a pro share pays the rating mapped back onto
         // the price scale, a con share the complement. For a childless argument the rating is its
         // own time-weighted price, so the rule reduces to the market price wherever the tree had
@@ -987,7 +987,7 @@ contract Deliberate is IDeliberate {
             // argument is final (its window ends before rating does), so this guards a case the phase clock rules
             // out.
             if (_isFinal(argument)) {
-                // The argument's tallied rating: its own approval and its descendants' aggregate, each weighted
+                // The argument's weighted rating: its own approval and its descendants' aggregate, each weighted
                 // by the stake behind it. At this point `subtreeStake` holds the tallied children's subtree
                 // stakes; afterwards it holds the argument's full subtree stake (own time-weighted stake
                 // included), the weight it folds in with.
@@ -1144,11 +1144,11 @@ contract Deliberate is IDeliberate {
         }
     }
 
-    /// @notice Internal function to calculate the tallied rating of an argument in a debate. Requires the
+    /// @notice Internal function to calculate the weighted rating of an argument in a debate. Requires the
     /// argument's accumulators to be complete: accrued through the rating window's end.
     /// @param debateId The ID of the debate.
     /// @param argumentId The ID of the argument.
-    /// @return rating The tallied rating of the argument - signed, negative meaning refuted.
+    /// @return rating The weighted rating of the argument - signed, negative meaning refuted.
     function _calculateRating(uint256 debateId, uint16 argumentId) internal view returns (int56 rating) {
         Argument.Data storage argument = _debates[debateId].arguments[argumentId];
 
