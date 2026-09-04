@@ -107,7 +107,11 @@ Sourcify and Gnosisscan:
 | Gnosis Chain (100) | address | block |
 |---|---|---|
 | `Deliberate` | [`0x28b939ed3F67c8eaB198e46E9d41CcB4d19c6DE3`](https://gnosisscan.io/address/0x28b939ed3F67c8eaB198e46E9d41CcB4d19c6DE3) | 48049642 |
-| `CirclesIdentityRegistry` (any Circles human) | [`0x74bEF28610f70831429dc8d9014Bdeb5C60C4c31`](https://gnosisscan.io/address/0x74bEF28610f70831429dc8d9014Bdeb5C60C4c31) | 48049642 |
+| `IdentityRegistryFactory` | [`0x215b49E5Ca4b4f7A7C67777d2F840Ec1a9636ad2`](https://gnosisscan.io/address/0x215b49E5Ca4b4f7A7C67777d2F840Ec1a9636ad2) | 48084197 |
+| `CirclesIdentityRegistry` (any Circles human, cloned by the factory) | [`0xfeA940eE192AB29cdD97B3187d0885Ab193077D2`](https://gnosisscan.io/address/0xfeA940eE192AB29cdD97B3187d0885Ab193077D2) | 48084197 |
+| `AllowlistIdentityRegistry` implementation | [`0x07eFcb5DE727dF70c916A8c8cA548eDA93dA76Db`](https://gnosisscan.io/address/0x07eFcb5DE727dF70c916A8c8cA548eDA93dA76Db) | 48084197 |
+| `CirclesIdentityRegistry` implementation | [`0xc4b8b7FC1640d44a9B57F12D45d9b0be0a0f8B10`](https://gnosisscan.io/address/0xc4b8b7FC1640d44a9B57F12D45d9b0be0a0f8B10) | 48084197 |
+| `CirclesIdentityRegistry` (any Circles human, standalone, superseded by the clone) | [`0x74bEF28610f70831429dc8d9014Bdeb5C60C4c31`](https://gnosisscan.io/address/0x74bEF28610f70831429dc8d9014Bdeb5C60C4c31) | 48049642 |
 
 ## Layout
 
