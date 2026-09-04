@@ -11,7 +11,7 @@ import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
 /// @title AllowlistIdentityRegistry
 /// @author Michael Heuer
 /// @notice An identity registry that admits the accounts on a list. Its owner keeps the list, and one
-/// registry can serve any number of debates. `initialize` configures it, so the factory can clone it.
+/// registry can serve any number of debates. The factory clones it, so `initialize` sets the owner.
 contract AllowlistIdentityRegistry is IAllowlistIdentityRegistry, Initializable, OwnableUpgradeable {
     /// @notice The members by account.
     mapping(address account => bool member) internal _members;

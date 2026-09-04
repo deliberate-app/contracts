@@ -41,8 +41,7 @@ contract CirclesIdentityRegistry is ICirclesIdentityRegistry, Initializable {
     /// registry would admit every address. A debate that wants this names the zero registry instead.
     error RegistryWouldAdmitEveryone();
 
-    /// @notice Binds the implementation to one Circles Hub. `initialize` sets which accounts a clone
-    /// admits.
+    /// @notice Binds the implementation to one Circles Hub. Every clone of it reads that Hub.
     /// @param circlesHub The Circles v2 Hub every clone of this implementation reads.
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(ICirclesHub circlesHub) {
