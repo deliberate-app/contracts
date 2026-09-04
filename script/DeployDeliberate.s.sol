@@ -7,10 +7,9 @@ import {Script} from "forge-std-1.16.1/src/Script.sol";
 import {Deliberate} from "../src/Deliberate.sol";
 
 /// @title DeployDeliberate
-/// @notice Deploys Deliberate. It takes no constructor arguments. Identity registries are not part of the
-/// protocol; `DeployIdentityRegistryFactory` deploys them.
+/// @notice Deploys Deliberate. Identity registries are not part of the protocol, so
+/// `DeployIdentityRegistryFactory` deploys them separately.
 contract DeployDeliberate is Script {
-    /// @notice Deploys the protocol.
     /// @return deliberate The address of the deployed contract.
     function run() public returns (address deliberate) {
         vm.startBroadcast();
