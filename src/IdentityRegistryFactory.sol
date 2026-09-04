@@ -6,8 +6,6 @@ import {Clones} from "@openzeppelin-contracts-5.6.1/proxy/Clones.sol";
 
 import {AllowlistIdentityRegistry} from "./adapters/AllowlistIdentityRegistry.sol";
 import {CirclesIdentityRegistry, ICirclesHub} from "./adapters/CirclesIdentityRegistry.sol";
-import {IAllowlistIdentityRegistry} from "./interfaces/IAllowlistIdentityRegistry.sol";
-import {ICirclesIdentityRegistry} from "./interfaces/ICirclesIdentityRegistry.sol";
 import {IIdentityRegistryFactory} from "./interfaces/IIdentityRegistryFactory.sol";
 
 /// @title IdentityRegistryFactory
@@ -33,7 +31,7 @@ contract IdentityRegistryFactory is IIdentityRegistryFactory {
     /// @inheritdoc IIdentityRegistryFactory
     function createAllowlistRegistry(address owner) external override returns (address registry) {
         registry = Clones.clone(_ALLOWLIST_IMPLEMENTATION);
-        IAllowlistIdentityRegistry(registry).initialize(owner);
+        AllowlistIdentityRegistry(registry).initialize(owner);
 
         emit AllowlistRegistryCreated({registry: registry, owner: owner});
     }
@@ -41,7 +39,7 @@ contract IdentityRegistryFactory is IIdentityRegistryFactory {
     /// @inheritdoc IIdentityRegistryFactory
     function createCirclesRegistry(address anchor, bool requireHuman) external override returns (address registry) {
         registry = Clones.clone(_CIRCLES_IMPLEMENTATION);
-        ICirclesIdentityRegistry(registry).initialize({trustAnchor: anchor, humanRequired: requireHuman});
+        CirclesIdentityRegistry(registry).initialize({trustAnchor: anchor, humanRequired: requireHuman});
 
         emit CirclesRegistryCreated({registry: registry, anchor: anchor, requireHuman: requireHuman});
     }

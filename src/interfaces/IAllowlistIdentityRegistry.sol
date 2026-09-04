@@ -13,11 +13,6 @@ interface IAllowlistIdentityRegistry is IIdentityRegistry {
     /// @param member Whether the account is now a member.
     event MembershipSet(address indexed account, bool member);
 
-    /// @notice Sets the owner who keeps this registry's list of admitted accounts. Callable once.
-    /// @param initialOwner The account that receives ownership, and with it sole authority over who may
-    /// join every debate this registry admits accounts for.
-    function initialize(address initialOwner) external;
-
     /// @notice Sets the membership of several accounts at once.
     /// @param accounts The accounts to set membership for; repeated accounts settle on the last write.
     /// @param member Whether the accounts become members.

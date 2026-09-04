@@ -137,6 +137,6 @@ contract IdentityRegistryFactoryTest is Test {
         address registry = _factory.createAllowlistRegistry(_owner);
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        IAllowlistIdentityRegistry(registry).initialize(_other);
+        AllowlistIdentityRegistry(registry).initialize(_other);
     }
 }

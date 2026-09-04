@@ -23,8 +23,16 @@ contract AllowlistIdentityRegistry is IAllowlistIdentityRegistry, Initializable,
         _disableInitializers();
     }
 
-    /// @inheritdoc IAllowlistIdentityRegistry
-    function initialize(address initialOwner) external override initializer {
+    /// @notice Sets the owner who keeps the list. The factory calls this on a new clone, and no later
+    /// call can change the owner this way.
+    /// @param initialOwner The account that receives ownership, and with it sole authority over who this
+    /// registry admits.
+    function initialize( /* solhint-disable-line comprehensive-interface*/
+        address initialOwner
+    )
+        external
+        initializer
+    {
         __Ownable_init(initialOwner);
     }
 
