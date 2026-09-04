@@ -49,8 +49,18 @@ contract CirclesIdentityRegistry is ICirclesIdentityRegistry, Initializable {
         _disableInitializers();
     }
 
-    /// @inheritdoc ICirclesIdentityRegistry
-    function initialize(address trustAnchor, bool humanRequired) external override initializer {
+    /// @notice Sets which accounts this registry admits. The factory calls this on a new clone, and no
+    /// later call can change what the registry admits.
+    /// @param trustAnchor The avatar whose trust admits an account. The zero address admits every account
+    /// Circles registered as a human instead.
+    /// @param humanRequired Whether an admitted account must also be a registered human.
+    function initialize( /* solhint-disable-line comprehensive-interface*/
+        address trustAnchor,
+        bool humanRequired
+    )
+        external
+        initializer
+    {
         if (trustAnchor == address(0) && !humanRequired) {
             revert RegistryWouldAdmitEveryone();
         }
