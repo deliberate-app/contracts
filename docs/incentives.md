@@ -241,9 +241,10 @@ adapters:
   the flagship where its verifier is reachable, the **zk-passport family (Self, zkPassport,
   Rarimo)** as the credential-based alternative.
 - **Pragmatic Base-native fallback: Coinbase Verifications** — an externally operated KYC registry
-  ("Verified Account" EAS attestations on Base) matching the old registry shape behind the
-  reference adapter [`EASIdentityRegistry`](../src/adapters/EASIdentityRegistry.sol) (configured
-  attester + schema + indexer, revocation/expiry checked). Non-private (the account↔person link
+  ("Verified Account" EAS attestations on Base), which would need an adapter reading the attestation
+  through EAS' indexer and checking revocation and expiry. A reference one existed and was removed
+  once the Gnosis deployment made Circles the gate that ships: it read a configured attester and
+  schema, and the git history has it. Non-private (the account↔person link
   sits with Coinbase), and the deciding caveat: **deduplication is only as strong as the provider's
   per-identity address policy** — whether one Coinbase account can attest several addresses is
   exactly the one-human-one-join question, and there is deliberately no public cross-address human

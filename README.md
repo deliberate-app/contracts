@@ -77,8 +77,8 @@ slither .
 Who may join is chosen per debate, so `Deliberate` takes no constructor arguments. A debate names an
 `IIdentityRegistry` at creation: the zero address admits everyone; an `AllowlistIdentityRegistry` is a group its
 owner curates and any number of debates can share; `CirclesIdentityRegistry` reads the Circles v2 Hub on
-Gnosis Chain, admitting any Circles human (or whoever a chosen avatar trusts); `EASIdentityRegistry` gates on an
-attestation. None of them is part of the protocol, so each is deployed on its own: the any-Circles-human
+Gnosis Chain, admitting any Circles human (or whoever a chosen avatar trusts). Anything else implementing the
+interface works too. None of them is part of the protocol, so each is deployed on its own: the any-Circles-human
 registry has its own script, serves any number of deployments, and outlives the one it was deployed beside.
 With a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`)
 and the `gnosis` endpoint from `foundry.toml` (or any RPC URL in its place):
