@@ -493,7 +493,7 @@ contract DeliberateTest is Test {
         uint16 argumentId = _createArgument(firstDebateId, true, 50);
         assertEq(_deliberate.getArgument(firstDebateId, argumentId).creator, member);
 
-        vm.expectRevert(Deliberate.IdentityProofInvalid.selector);
+        vm.expectRevert(Deliberate.IdentityUnregistered.selector);
         vm.prank(member);
         _deliberate.join(secondDebateId);
     }
