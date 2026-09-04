@@ -76,8 +76,8 @@ contract Deliberate is IDeliberate {
     /// @param actual The actual address.
     error AddressInvalid(address expected, address actual);
 
-    /// @notice Thrown if the identity proof of an account is invalid.
-    error IdentityProofInvalid();
+    /// @notice Thrown when the registry a debate named does not have the caller registered.
+    error IdentityUnregistered();
 
     /// @notice Thrown if the time is out of bounds.
     /// @param limit The limit time as a unix timestamp.
@@ -301,7 +301,7 @@ contract Deliberate is IDeliberate {
         // what lets a personhood proof, a curated allowlist and a Circles group be the same thing here.
         IIdentityRegistry registry = _debates[debateId].identityRegistry;
         if (address(registry) != address(0) && !registry.isRegistered(msg.sender)) {
-            revert IdentityProofInvalid();
+            revert IdentityUnregistered();
         }
 
         User.Data storage user = _users[debateId][msg.sender];
