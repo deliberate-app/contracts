@@ -2,31 +2,31 @@
 
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin-contracts-5.6.1/access/Ownable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin-contracts-upgradeable-5.6.1/proxy/utils/Initializable.sol";
 
 import {IAllowlistIdentityRegistry} from "../interfaces/IAllowlistIdentityRegistry.sol";
 import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
 
 /// @title AllowlistIdentityRegistry
 /// @author Michael Heuer
-/// @notice An identity registry whose membership its owner maintains directly - the group a creator curates
-/// themselves, for communities that keep no membership anywhere a contract could already read.
-///
-/// One registry serves any number of debates: a creator deploys it once, curates it as the group changes,
-/// and passes its address to every debate that group should decide. Membership is read at the moment of
-/// joining, so removing an account bars it from joining afterwards without disturbing debates it already
-/// joined - vote tokens are granted once and settle inside the debate that granted them.
-///
-/// The owner is trusted completely, which is the point: this is a stated, legible authority over who
-/// participates, and it makes no claim to sybil resistance beyond the owner's own diligence.
-contract AllowlistIdentityRegistry is IAllowlistIdentityRegistry, Ownable {
+/// @notice An identity registry that admits the accounts on a list. Its owner keeps the list, and one
+/// registry can serve any number of debates. `initialize` configures it, so the factory can clone it.
+contract AllowlistIdentityRegistry is IAllowlistIdentityRegistry, Initializable, OwnableUpgradeable {
     /// @notice The members by account.
     mapping(address account => bool member) internal _members;
 
-    /// @notice Deploys the registry under an owner who maintains its membership.
-    /// @param initialOwner The account receiving ownership, and with it sole authority over who may join
-    /// every debate this registry gates.
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    /// @notice Leaves the implementation uninitialized. It exists to be cloned, and an owner must not be
+    /// able to take it over.
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @inheritdoc IAllowlistIdentityRegistry
+    function initialize(address initialOwner) external override initializer {
+        __Ownable_init(initialOwner);
+    }
 
     /// @inheritdoc IAllowlistIdentityRegistry
     function setMembership(address[] calldata accounts, bool member) external override onlyOwner {

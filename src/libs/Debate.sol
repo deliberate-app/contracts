@@ -18,7 +18,7 @@ library Debate {
     /// @param participantsCount The number of accounts that joined the debate - the `N` in the bounty payout.
     /// @param feePercentage The market fee in percent, chosen by the debate creator at creation and accrued
     /// to an argument's creator on every stake on that argument. Stored narrow: the domain is 0..99.
-    /// @param identityRegistry The registry gating who may join, chosen by the creator per debate. The zero
+    /// @param identityRegistry The registry that decides who may join, chosen by the creator per debate. The zero
     /// address leaves the debate open to everyone.
     /// @param leafArgumentIds The IDs of the leaf arguments of the debate tree.
     struct Data {

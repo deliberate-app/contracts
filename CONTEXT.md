@@ -93,8 +93,10 @@ A personhood-verified account that has joined a debate and received vote tokens.
 _Avoid_: voter, debater (both are just participants acting in a phase)
 
 **Identity registry**:
-The pluggable on-chain registry the join gate queries to check that an account belongs to a verified person.
-_Avoid_: Proof of Humanity (one legacy provider, not the concept)
+The pluggable on-chain registry `join` queries to check that an account belongs to a verified person. A
+debate names one at creation; the zero address admits everyone.
+_Avoid_: Proof of Humanity (one legacy provider, not the concept), gate (say who may join, or which accounts
+a registry admits)
 
 **Bounty**:
 The stake the creator attaches to a debate, claimable after tallying by participants who ended with more vote tokens than the initial grant — those who net won points by arguing or rating.
