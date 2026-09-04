@@ -89,20 +89,19 @@ deploy deployer chain *args:
         --sig "run()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
-# Simulate the any-Circles-human registry deployment (dry-run)
-simulate-circles-registry chain *args:
+# Simulate the identity registry factory deployment (dry-run)
+simulate-registry-factory chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
-    forge script script/DeployCirclesIdentityRegistry.s.sol:DeployCirclesIdentityRegistry \
+    forge script script/DeployIdentityRegistryFactory.s.sol:DeployIdentityRegistryFactory \
         --sig "run()" \
         --rpc-url {{ chain }} {{ args }}
 
-# Deploy the any-Circles-human registry. Independent of Deliberate: a gate is chosen per debate, so this
-# adapter is deployed on its own schedule and serves any number of deployments.
-deploy-circles-registry deployer chain *args:
+# Deploy the identity registry factory; it also clones the registry admitting every registered Circles human
+deploy-registry-factory deployer chain *args:
     @echo "Cleaning contracts to ensure reproducible build..."
     @just clean
-    forge script script/DeployCirclesIdentityRegistry.s.sol:DeployCirclesIdentityRegistry \
+    forge script script/DeployIdentityRegistryFactory.s.sol:DeployIdentityRegistryFactory \
         --sig "run()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
@@ -129,10 +128,19 @@ verify-custom address chain verifier-url *args:
     forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
-# Verify the any-Circles-human registry from `deploy-circles-registry` (constructor: hub, no anchor, humans only)
-verify-circles-registry address chain *args:
-    forge verify-contract {{ address }} src/adapters/CirclesIdentityRegistry.sol:CirclesIdentityRegistry \
-        --constructor-args $(cast abi-encode "constructor(address,address,bool)" 0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8 0x0000000000000000000000000000000000000000 true) \
+# Verify the identity registry factory (constructor: the Gnosis Circles Hub)
+verify-registry-factory address chain *args:
+    forge verify-contract {{ address }} src/IdentityRegistryFactory.sol:IdentityRegistryFactory \
+        --constructor-args $(cast abi-encode "constructor(address)" 0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8) \
+        --chain {{ chain }} --watch {{ args }}
+
+# Verify the two implementations behind the clones (a registry itself is a standard EIP-1167 proxy)
+verify-registry-implementations allowlist circles chain *args:
+    forge verify-contract {{ allowlist }} \
+        src/adapters/AllowlistIdentityRegistry.sol:AllowlistIdentityRegistry \
+        --chain {{ chain }} --watch {{ args }}
+    forge verify-contract {{ circles }} src/adapters/CirclesIdentityRegistry.sol:CirclesIdentityRegistry \
+        --constructor-args $(cast abi-encode "constructor(address)" 0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8) \
         --chain {{ chain }} --watch {{ args }}
 
 # Publish contracts to the Soldeer registry

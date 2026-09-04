@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 /// @dev The two Circles Hub reads the adapter makes, scriptable per address. The real Hub derives both from
 /// avatar bookkeeping the adapter never touches, so reproducing that bookkeeping here would test Circles
 /// rather than the adapter. Not declared as `ICirclesHub`: that interface now extends the protocol's own
-/// `IHubV2`, whose ERC-1155 and demurrage surface has nothing to do with the gate, and the tests hand this
-/// mock over by address anyway.
+/// `IHubV2`, whose ERC-1155 and demurrage surface has nothing to do with who may join, and the tests hand
+/// this mock over by address anyway.
 contract MockCirclesHub {
     mapping(address avatar => bool human) internal _humans;
     mapping(address truster => mapping(address trustee => bool trusted)) internal _trust;

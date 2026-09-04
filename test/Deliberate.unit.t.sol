@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {Clones} from "@openzeppelin-contracts-5.6.1/proxy/Clones.sol";
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
@@ -22,7 +23,7 @@ contract DeliberateTest is Test {
 
     Deliberate internal _deliberate;
 
-    // A curated group, maintained by this contract: the gate the gated-mode tests point their debates at.
+    // A curated group, maintained by this contract: the registry the restricted-join tests point at.
     AllowlistIdentityRegistry internal _registry;
 
     uint48 internal constant _LOCKING_DURATION = 1 minutes;
@@ -31,7 +32,8 @@ contract DeliberateTest is Test {
     uint16 internal constant _ROOT_ARGUMENT_ID = 0;
 
     function setUp() public {
-        _registry = new AllowlistIdentityRegistry(address(this));
+        _registry = AllowlistIdentityRegistry(Clones.clone(address(new AllowlistIdentityRegistry())));
+        _registry.initialize(address(this));
         _deliberate = new Deliberate();
     }
 
@@ -45,7 +47,7 @@ contract DeliberateTest is Test {
         debateId = _createDebate({feePercentage: feePercentage, identityRegistry: IIdentityRegistry(address(0))});
     }
 
-    function _createGatedDebate(IIdentityRegistry identityRegistry) internal returns (uint256 debateId) {
+    function _createRestrictedDebate(IIdentityRegistry identityRegistry) internal returns (uint256 debateId) {
         debateId = _createDebate({feePercentage: 5, identityRegistry: identityRegistry});
     }
 
@@ -431,13 +433,13 @@ contract DeliberateTest is Test {
 
     function test_createDebate_recordsTheGateItWasGiven() public {
         uint256 openDebateId = _createDebate();
-        uint256 gatedDebateId = _createGatedDebate(_registry);
+        uint256 restrictedDebateId = _createRestrictedDebate(_registry);
 
         (,,,, IIdentityRegistry openGate) = _deliberate.debates(openDebateId);
-        (,,,, IIdentityRegistry namedGate) = _deliberate.debates(gatedDebateId);
+        (,,,, IIdentityRegistry namedRegistry) = _deliberate.debates(restrictedDebateId);
 
         assertEq(address(openGate), address(0));
-        assertEq(address(namedGate), address(_registry));
+        assertEq(address(namedRegistry), address(_registry));
     }
 
     // --- join ---
@@ -477,8 +479,8 @@ contract DeliberateTest is Test {
         // Membership decides admission and nothing after it: a debate keeps the participant it admitted when the
         // group later drops them, and it is the next join that the loss bars. That is what lets one curated group
         // serve every debate that names it, each reading it once.
-        uint256 firstDebateId = _createGatedDebate(_registry);
-        uint256 secondDebateId = _createGatedDebate(_registry);
+        uint256 firstDebateId = _createRestrictedDebate(_registry);
+        uint256 secondDebateId = _createRestrictedDebate(_registry);
         address member = makeAddr("member");
         _setMembership(member, true);
 

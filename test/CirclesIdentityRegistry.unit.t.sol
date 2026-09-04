@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {Clones} from "@openzeppelin-contracts-5.6.1/proxy/Clones.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {CirclesIdentityRegistry, ICirclesHub} from "../src/adapters/CirclesIdentityRegistry.sol";
@@ -9,6 +10,7 @@ import {MockCirclesHub} from "./mocks/MockCirclesHub.m.sol";
 
 contract CirclesIdentityRegistryTest is Test {
     MockCirclesHub internal _hub;
+    CirclesIdentityRegistry internal _implementation;
 
     address internal _group;
     address internal _member;
@@ -16,23 +18,27 @@ contract CirclesIdentityRegistryTest is Test {
 
     function setUp() public {
         _hub = new MockCirclesHub();
+        _implementation = new CirclesIdentityRegistry(ICirclesHub(address(_hub)));
         _group = makeAddr("group");
         _member = makeAddr("member");
         _outsider = makeAddr("outsider");
     }
 
+    /// @dev Registries are clones in practice, so the tests read one: same code, own setting.
     function _registry(address anchor, bool requireHuman) internal returns (CirclesIdentityRegistry registry) {
-        registry =
-            new CirclesIdentityRegistry({hub: ICirclesHub(address(_hub)), anchor: anchor, requireHuman: requireHuman});
+        registry = CirclesIdentityRegistry(Clones.clone(address(_implementation)));
+        registry.initialize({trustAnchor: anchor, humanRequired: requireHuman});
     }
 
     // --- configuration ---
 
-    function test_constructor_revertsWhenTheGateWouldAdmitEveryone() public {
+    function test_initialize_revertsWhenTheGateWouldAdmitEveryone() public {
         // Neither an anchor nor a personhood requirement leaves nothing to check. A debate wanting that is
         // open, and expresses it with the zero registry rather than with a contract that always says yes.
+        CirclesIdentityRegistry registry = CirclesIdentityRegistry(Clones.clone(address(_implementation)));
+
         vm.expectRevert(CirclesIdentityRegistry.RegistryWouldAdmitEveryone.selector);
-        _registry(address(0), false);
+        registry.initialize({trustAnchor: address(0), humanRequired: false});
     }
 
     // --- personhood, with no anchor ---

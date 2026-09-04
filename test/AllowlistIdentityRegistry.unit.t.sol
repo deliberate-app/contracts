@@ -2,7 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin-contracts-5.6.1/access/Ownable.sol";
+import {Clones} from "@openzeppelin-contracts-5.6.1/proxy/Clones.sol";
+import {OwnableUpgradeable} from "@openzeppelin-contracts-upgradeable-5.6.1/access/OwnableUpgradeable.sol";
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 
 import {AllowlistIdentityRegistry} from "../src/adapters/AllowlistIdentityRegistry.sol";
@@ -19,7 +20,9 @@ contract AllowlistIdentityRegistryTest is Test {
         _owner = makeAddr("owner");
         _alice = makeAddr("alice");
         _bob = makeAddr("bob");
-        _registry = new AllowlistIdentityRegistry(_owner);
+        // A registry is a clone of one implementation in practice, so the tests read one.
+        _registry = AllowlistIdentityRegistry(Clones.clone(address(new AllowlistIdentityRegistry())));
+        _registry.initialize(_owner);
     }
 
     function _setMembership(address account, bool member) internal {
@@ -75,7 +78,7 @@ contract AllowlistIdentityRegistryTest is Test {
         address[] memory accounts = new address[](1);
         accounts[0] = _alice;
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, _alice));
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, _alice));
         vm.prank(_alice);
         _registry.setMembership(accounts, true);
     }

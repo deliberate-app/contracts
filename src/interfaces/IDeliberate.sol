@@ -21,7 +21,7 @@ interface IDeliberate {
     /// @param editingEndTime The end time of the editing phase.
     /// @param ratingEndTime The end time of the rating phase.
     /// @param feePercentage The debate's market fee in percent, accrued to an argument's creator on every stake.
-    /// @param identityRegistry The registry gating who may join; the zero address leaves the debate open.
+    /// @param identityRegistry The registry that decides who may join; the zero address leaves the debate open.
     event DebateCreated(
         uint256 indexed debateId,
         address indexed creator,
@@ -167,7 +167,7 @@ interface IDeliberate {
     /// stake on that argument; fixed for the debate's lifetime.
     /// @param identityRegistry The registry deciding who may join. The zero address leaves the debate open to
     /// everyone; any other address is asked `isRegistered` on each join, which is how a personhood proof, a
-    /// curated allowlist and a Circles group all become the same gate. One registry serves any number of
+    /// curated allowlist and a Circles group all answer the same question. One registry serves any number of
     /// debates, so a creator maintaining a membership reuses it by address.
     /// @param bountyToken The ERC-20 the bounty is denominated in; the zero address attaches no bounty and the
     /// token cannot be changed later. Any ERC-20 works - the token is deliberately uncurated.
@@ -320,7 +320,7 @@ interface IDeliberate {
     /// @return argumentsCount The number of arguments in the debate.
     /// @return participantsCount The number of accounts that joined the debate.
     /// @return feePercentage The debate's market fee in percent, chosen by its creator at creation.
-    /// @return identityRegistry The registry gating who may join; the zero address means the debate is open.
+    /// @return identityRegistry The registry that decides who may join; the zero address means the debate is open.
     function debates(uint256 debateId)
         external
         view

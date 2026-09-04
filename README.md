@@ -75,25 +75,29 @@ slither .
 #### Deployment
 
 Who may join is chosen per debate, so `Deliberate` takes no constructor arguments. A debate names an
-`IIdentityRegistry` at creation: the zero address admits everyone; an `AllowlistIdentityRegistry` is a group its
-owner curates and any number of debates can share; `CirclesIdentityRegistry` reads the Circles v2 Hub on
-Gnosis Chain, admitting any Circles human (or whoever a chosen avatar trusts). Anything else implementing the
-interface works too. None of them is part of the protocol, so each is deployed on its own: the any-Circles-human
-registry has its own script, serves any number of deployments, and outlives the one it was deployed beside.
-With a funded [keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`)
-and the `gnosis` endpoint from `foundry.toml` (or any RPC URL in its place):
+`IIdentityRegistry` at creation: the zero address admits everyone; an `AllowlistIdentityRegistry` admits the
+accounts on a list its owner keeps, and any number of debates can share it; `CirclesIdentityRegistry` reads the
+Circles v2 Hub on Gnosis Chain, admitting every registered Circles human, or the accounts a chosen avatar
+trusts. Anything else implementing the interface works too.
+
+None of them is part of the protocol, so they are deployed apart from `Deliberate`, by
+`IdentityRegistryFactory`. The factory deploys one implementation per kind and hands out EIP-1167 minimal
+proxies, so a creator who wants a registry of their own pays a clone rather than a deployment. With a funded
+[keystore account](https://getfoundry.sh/cast/reference/cast-wallet-import) (`cast wallet import`) and the
+`gnosis` endpoint from `foundry.toml` (or any RPC URL in its place):
 
 ```sh
 just simulate gnosis                    # dry run
 just deploy <KEYSTORE_ACCOUNT> gnosis   # broadcast
 just verify <DELIBERATE_ADDRESS> gnosis # Sourcify and Etherscan; `verify-sourcify`, `verify-etherscan`, `verify-custom` singly
 
-just simulate-circles-registry gnosis                    # the default gate, separately
-just deploy-circles-registry <KEYSTORE_ACCOUNT> gnosis
-just verify-circles-registry <REGISTRY_ADDRESS> gnosis
+just simulate-registry-factory gnosis                    # the factory, separately
+just deploy-registry-factory <KEYSTORE_ACCOUNT> gnosis   # it also clones the any-Circles-human registry
+just verify-registry-factory <FACTORY_ADDRESS> gnosis
+just verify-registry-implementations <ALLOWLIST_IMPL> <CIRCLES_IMPL> gnosis
 ```
 
-Each script prints its address. The `deliberate` address and its deployment block feed the indexer's
+Each script prints its addresses. The `deliberate` address and its deployment block feed the indexer's
 `config.yaml` and the frontend's `VITE_DELIBERATE_ADDRESS`; the registry address feeds the frontend's
 `VITE_CIRCLES_REGISTRY` (deployment pipeline: contracts -> indexer -> frontend).
 
