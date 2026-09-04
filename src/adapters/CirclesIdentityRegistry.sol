@@ -2,18 +2,18 @@
 
 pragma solidity ^0.8.24;
 
+import {IHubV2} from "circles-contracts-v2-0.3.6/src/hub/IHub.sol";
+
 import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
 
 /// @title ICirclesHub
 /// @author Michael Heuer
-/// @notice The minimal read subset of the Circles v2 Hub on Gnosis. Circles registers avatars as humans,
-/// groups or organizations, and lets any avatar extend expiring, directional trust to any address.
-interface ICirclesHub {
-    /// @notice Returns whether an avatar is registered as a human.
-    /// @param avatar The address to check.
-    /// @return human Whether the avatar is a registered human.
-    function isHuman(address avatar) external view returns (bool human);
-
+/// @notice The Circles v2 Hub as this adapter reads it: the protocol's own `IHubV2`, which carries
+/// `isHuman`, plus the one read Circles leaves off it. `isTrusted` is public on the Hub implementation but
+/// absent from the published interface, so it is declared here against the same address, with the signature
+/// the deployed Hub carries. Circles registers avatars as humans, groups or organizations, and lets any
+/// avatar extend expiring, directional trust to any address.
+interface ICirclesHub is IHubV2 {
     /// @notice Returns whether the truster's trust in the trustee is currently valid.
     /// @param truster The trusting avatar.
     /// @param trustee The trusted address.

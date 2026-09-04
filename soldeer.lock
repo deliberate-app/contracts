@@ -13,6 +13,12 @@ checksum = "f6257dbc993c2499fe08fdc93f66e12459fe3458ee62ce716b92e1d95ee0b504"
 integrity = "2f539b6241258fc3c127c97225b3cb1b5e9225e422d2c1cb233c52a6f5c29002"
 
 [[dependencies]]
+name = "circles-contracts-v2"
+version = "0.3.6"
+git = "https://github.com/CirclesUBI/circles-contracts-v2"
+rev = "62cd5fc4c7b3335e1a33c5b035b367fdca2c78d6"
+
+[[dependencies]]
 name = "forge-std"
 version = "1.16.1"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_16_1_08-05-2026_08:51:16_forge-std-1.16.zip"
