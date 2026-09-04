@@ -89,6 +89,23 @@ deploy deployer chain *args:
         --sig "run()" \
         --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
 
+# Simulate the any-Circles-human registry deployment (dry-run)
+simulate-circles-registry chain *args:
+    @echo "Cleaning contracts to ensure reproducible build..."
+    @just clean
+    forge script script/DeployCirclesIdentityRegistry.s.sol:DeployCirclesIdentityRegistry \
+        --sig "run()" \
+        --rpc-url {{ chain }} {{ args }}
+
+# Deploy the any-Circles-human registry. Independent of Deliberate: a gate is chosen per debate, so this
+# adapter is deployed on its own schedule and serves any number of deployments.
+deploy-circles-registry deployer chain *args:
+    @echo "Cleaning contracts to ensure reproducible build..."
+    @just clean
+    forge script script/DeployCirclesIdentityRegistry.s.sol:DeployCirclesIdentityRegistry \
+        --sig "run()" \
+        --broadcast --rpc-url {{ chain }} --account {{ deployer }} {{ args }}
+
 # --- Verification ---
 # The deploy recipes verify inline when passed `--verify ...`; these re-verify a
 # standing deployment when that inline pass was skipped or timed out. Deliberate
@@ -112,7 +129,7 @@ verify-custom address chain verifier-url *args:
     forge verify-contract {{ address }} src/Deliberate.sol:Deliberate \
         --chain {{ chain }} --verifier-url {{ verifier-url }} --watch {{ args }}
 
-# Verify the any-Circles-human registry the deploy script puts beside Deliberate (constructor: hub, no anchor, humans only)
+# Verify the any-Circles-human registry from `deploy-circles-registry` (constructor: hub, no anchor, humans only)
 verify-circles-registry address chain *args:
     forge verify-contract {{ address }} src/adapters/CirclesIdentityRegistry.sol:CirclesIdentityRegistry \
         --constructor-args $(cast abi-encode "constructor(address,address,bool)" 0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8 0x0000000000000000000000000000000000000000 true) \
